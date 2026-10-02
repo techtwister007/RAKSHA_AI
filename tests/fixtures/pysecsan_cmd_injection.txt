@@ -1,0 +1,11 @@
+INFO: Instrumenting target with Atheris coverage
+PySecSan: command injection detected in subprocess.Popen -- tainted argument reached a shell=True sink
+ === Uncaught Python exception: ===
+PySecSanSinkException: command injection
+Traceback (most recent call last):
+  File "/src/target/fuzz/fuzz_cmd.py", line 18, in TestOneInput
+    runner.run_user_command(data.decode("utf-8", "replace"))
+  File "/src/target/app/runner.py", line 57, in run_user_command
+    subprocess.Popen(cmd, shell=True)
+  File "/usr/local/lib/python3.11/site-packages/pysecsan/sanitizers.py", line 88, in hook
+    abort_with_issue("command injection")

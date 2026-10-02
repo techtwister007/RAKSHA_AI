@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+build/
+dist/
+
+# Pipeline output
+raksha-findings.sarif
+*.sarif
+corpus/
+crashes/
+artifacts/

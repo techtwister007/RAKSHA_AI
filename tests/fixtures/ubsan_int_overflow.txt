@@ -1,0 +1,5 @@
+/src/target/src/checksum.c:57:21: runtime error: signed integer overflow: 2147483647 + 1 cannot be represented in type 'int'
+    #0 0x4d2a1f in compute_checksum /src/target/src/checksum.c:57:21
+    #1 0x4d1b03 in verify_frame /src/target/src/frame.c:204:9
+    #2 0x4d19a7 in LLVMFuzzerTestOneInput /src/target/fuzz/fuzz_frame.c:17:3
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /src/target/src/checksum.c:57:21

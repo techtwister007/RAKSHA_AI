@@ -1,0 +1,17 @@
+=================================================================
+==31337==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x602000000118 at pc 0x0000004f1b2d bp 0x7ffd3c4a5b40 sp 0x7ffd3c4a5300
+WRITE of size 8 at 0x602000000118 thread T0
+    #0 0x4f1b2c in parse_header /src/target/src/parser.c:142:9
+    #1 0x4f0a3e in handle_packet /src/target/src/net.c:88:5
+    #2 0x4f09b1 in LLVMFuzzerTestOneInput /src/target/fuzz/fuzz_parser.c:21:3
+    #3 0x5b2d41 in fuzzer::Fuzzer::ExecuteCallback(unsigned char const*, unsigned long) /src/llvm-project/compiler-rt/lib/fuzzer/FuzzerLoop.cpp:611:15
+    #4 0x7f2a1b2d8082 in __libc_start_main /build/glibc/csu/libc-start.c:308:16
+
+0x602000000118 is located 0 bytes to the right of 8-byte region [0x602000000110,0x602000000118)
+allocated by thread T0 here:
+    #0 0x4b8a1d in malloc /src/llvm-project/compiler-rt/lib/asan/asan_malloc_linux.cpp:69:3
+    #1 0x4f1a02 in parse_header /src/target/src/parser.c:131:18
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow /src/target/src/parser.c:142:9 in parse_header
+SHADOW BYTES AROUND THE BUGGY ADDRESS:
+==31337==ABORTING

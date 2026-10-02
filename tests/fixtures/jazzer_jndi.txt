@@ -1,0 +1,11 @@
+INFO: Instrumented com.example.svc.AuditLogger (took 21 ms, size +18%)
+== Java Exception: com.code_intelligence.jazzer.api.FuzzerSecurityIssueCritical: Remote JNDI Lookup
+Remote JNDI lookups can cause remote code execution when the attacker controls the
+looked-up name. This is the Log4Shell bug class (CVE-2021-44228).
+	at com.code_intelligence.jazzer.sanitizers.NamingContextLookup.lookupHook(NamingContextLookup.java:62)
+	at com.example.svc.AuditLogger.write(AuditLogger.java:48)
+	at com.example.svc.RequestHandler.handle(RequestHandler.java:112)
+	at com.example.fuzz.RequestFuzzer.fuzzerTestOneInput(RequestFuzzer.java:19)
+== libFuzzer crashing input ==
+MS: 2 ChangeByte-InsertRepeatedBytes-; base unit: 9f2b1c0e
+artifact_prefix='./'; Test unit written to ./crash-7f3a9b2c1d4e5f60

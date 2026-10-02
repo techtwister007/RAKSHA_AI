@@ -1,0 +1,8 @@
+INFO: Instrumenting target with Atheris coverage
+ === Uncaught Python exception: ===
+IndexError: list index out of range
+Traceback (most recent call last):
+  File "/src/target/fuzz/fuzz_parse.py", line 14, in TestOneInput
+    parse_record(data)
+  File "/src/target/app/records.py", line 33, in parse_record
+    return fields[3].strip()

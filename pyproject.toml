@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "raksha"
+version = "0.1.0"
+description = "RAKSHA AI — an offline cyber-reasoning system: find, fix, prove"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+# Dev-only. The runtime has no third-party dependencies by design: every import is
+# either stdlib or a tool invoked as a subprocess, which keeps the offline bundle small
+# and the air-gap claim easy to audit.
+dev = ["pytest>=8", "jsonschema>=4"]
+
+[tool.setuptools.packages.find]
+include = ["raksha*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]

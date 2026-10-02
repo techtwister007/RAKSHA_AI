@@ -1,0 +1,6 @@
+== Java Exception: com.code_intelligence.jazzer.api.FuzzerSecurityIssueHigh: SQL Injection
+Injected query: SELECT * FROM users WHERE id = '' OR '1'='1'
+	at com.code_intelligence.jazzer.sanitizers.SqlInjection.checkSqlQuery(SqlInjection.java:98)
+	at com.example.dao.UserDao.findById(UserDao.java:71)
+	at com.example.svc.RequestHandler.handle(RequestHandler.java:95)
+artifact_prefix='./'; Test unit written to ./crash-aa11bb22cc33
