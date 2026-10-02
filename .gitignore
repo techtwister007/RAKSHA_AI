@@ -6,6 +6,9 @@ __pycache__/
 build/
 dist/
 
+# Recovery bundles (snapshots of this repo's own history -- never committed back)
+*.bundle
+
 # Pipeline output
 raksha-findings.sarif
 *.sarif
