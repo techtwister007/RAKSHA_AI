@@ -1,0 +1,26 @@
+# GPU profile: the two-model split co-resident on one 32 GB GPU, served by vLLM, reachable only on
+# the internal compose network. The orchestrator talks to it on loopback-equivalent service DNS.
+# Pull the cable: nothing here has a route to the internet.
+services:
+  vllm:
+    image: vllm/vllm-openai:latest          # carried in the bundle, not pulled at runtime
+    command: ["--model", "/models/qwen3-coder-next-32b", "--served-model-name", "qwen3-coder-next-32b"]
+    volumes: ["./models:/models:ro"]
+    networks: ["sealed"]
+    deploy:
+      resources:
+        reservations:
+          devices: [{capabilities: ["gpu"]}]
+
+  raksha:
+    image: raksha-ai:latest
+    environment:
+      RAKSHA_INFERENCE_BASE_URL: "http://vllm:8000/v1"
+      RAKSHA_SEALED: "1"
+    volumes: ["./targets:/targets:ro", "./out:/out:rw"]
+    networks: ["sealed"]
+    depends_on: ["vllm"]
+
+networks:
+  sealed:
+    internal: true                           # no gateway to the host network — egress is impossible

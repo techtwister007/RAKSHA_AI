@@ -1,0 +1,15 @@
+# CPU-only degraded profile: no vLLM. The pipeline runs model-free — template + retrieval lanes and
+# the mitigation floor — which the gate never needed a model for. Benchmark this before the finale so
+# the degraded path is a known number, not a surprise.
+services:
+  raksha:
+    image: raksha-ai:latest
+    environment:
+      RAKSHA_SEALED: "1"
+      # no RAKSHA_INFERENCE_BASE_URL -> get_client() returns None -> model-free operation
+    volumes: ["./targets:/targets:ro", "./out:/out:rw"]
+    networks: ["sealed"]
+
+networks:
+  sealed:
+    internal: true
