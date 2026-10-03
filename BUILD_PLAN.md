@@ -18,10 +18,16 @@ Three companion documents carry the detail; this file is the short, committed ve
 | **Target type** | Mixed / unknown | Repos first; lane D (service) and the binary lane are Phase 3, not later. |
 | **What scores** | **Findings and patches score equally** | **Breadth-first.** Many proven findings fast; REPORT_ONLY is worth as much as a patch. Patches are opportunistic — dependency bumps first because they are free, then template fixes, then the model. Never spend the clock on a hard patch while cheap proven findings are unbanked. |
 
-Still to ask the organisers (see campaign plan, Part 0): fuzz-rate limits on their environment
-(Q8), hardware and GPU (Q5), language hint (Q6), team size (Q7), judging format (Q9), whether the
-jury has the shortlisting deck (Q10), data handling and wipe (Q11). Working assumptions for each are
-recorded in the campaign plan.
+Also settled: fuzz at full rate (no rate limiting); a GPU is available; one builder, whole
+product; judging format unknown — optimise for product quality and the required output; **every
+language must be covered**; their code may stay on our machine.
+
+**"All languages" is a product requirement, met in two tiers.** Tier 1, every language: the
+language-agnostic lanes — dependency CVEs (OSV covers every ecosystem), secrets, config, SBOM, and
+Semgrep's generic rules across 30+ languages — run on any target and produce proven findings.
+Tier 2, deep (fuzz + fix): C/C++, Java/Kotlin, JS/TS, Python first; Go (native fuzzing) and Rust
+(cargo-fuzz) next because they are cheap to add behind the same oracle plugin API. No language
+ever yields nothing.
 
 ## Settled decisions
 
