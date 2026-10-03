@@ -15,3 +15,8 @@ raksha-findings.sarif
 corpus/
 crashes/
 artifacts/
+
+# Java slice build output
+demo-targets/**/target/
+demo-targets/**/cp.txt
+raksha-java-slice.sarif

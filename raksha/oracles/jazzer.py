@@ -47,7 +47,11 @@ class JazzerOracle(Oracle):
 
         exc = match.group("exc")
         title = (match.group("title") or "").strip()
-        frames = self._frames(raw)
+        # Only the stack that FOLLOWS the exception banner is this finding's trace. Output can
+        # contain earlier stacks (e.g. a logged warning with its own `at ...` lines); taking
+        # frames from the whole text would localise to the wrong place. This also matches real
+        # Jazzer output, which prints the banner and then the stack.
+        frames = self._frames(raw[match.start():])
         is_security_issue = "FuzzerSecurityIssue" in exc
 
         if is_security_issue:

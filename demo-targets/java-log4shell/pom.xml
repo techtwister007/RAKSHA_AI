@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>audit-svc</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <!--
+    A deliberately vulnerable demo target for RAKSHA AI.
+
+    It is a tiny audit-logging service that logs a caller-supplied value through log4j
+    2.14.1 — the version vulnerable to CVE-2021-44228 (Log4Shell). A request value of the
+    form ${jndi:ldap://...} triggers a remote JNDI lookup. Jazzer's built-in
+    NamingContextLookup sanitizer catches this with no harness logic from us.
+
+    The RAKSHA fix (template lane) is to bump log4j-core to 2.17.1, where message-pattern
+    JNDI lookup is removed. The project's own JUnit suite proves normal logging is
+    unchanged across the bump — which is exactly what the gate's differential + own-tests
+    check consumes.
+
+    Property naming lets the gate / fix templates bump the version without hand-editing XML.
+  -->
+  <properties>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <log4j.version>2.14.1</log4j.version>
+    <junit.version>5.10.2</junit.version>
+    <jazzer.version>0.22.1</jazzer.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <!-- Jazzer's API, so the harness compiles. The fuzzer engine itself is supplied at
+           fuzz time by the `jazzer` launcher; only the API is needed to build. -->
+      <groupId>com.code-intelligence</groupId>
+      <artifactId>jazzer-api</artifactId>
+      <version>${jazzer.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
