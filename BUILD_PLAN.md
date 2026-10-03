@@ -92,8 +92,8 @@ kill-switches are in the campaign plan, Part 2.
 | # | Phase | Exit gate | Status |
 |---|---|---|---|
 | 0 | Keystone — one record, one gate, three oracles | C/Java/Python records all pass one gate; SARIF validates against the OASIS schema | **done** |
-| 1 | The five-check gate, for real; cross-confirmation; model-test check | A planted overfitting patch is rejected; a noisy service causes no false rejection | next |
-| 2 | Java vertical slice + Log4Shell demo target; inference behind one interface | Log4Shell found, fixed, proven with zero human input, 10 runs in a row | |
+| 1 | The five-check gate, for real; cross-confirmation; model-test check | A planted overfitting patch is rejected; a noisy service causes no false rejection | **done** (`raksha/gate/`, 17 tests) |
+| 2 | Java vertical slice + Log4Shell demo target; inference behind one interface | Log4Shell found, fixed, proven with zero human input, 10 runs in a row | next |
 | 3 | Build agent, offline mirror, build-free lanes, dependency-bump patch lane, lane D, jury exporter | A target that will not build still yields proven findings within 10 minutes | |
 | 4 | Sandbox, offline bundle (GPU + CPU variants), cable-pull install, local vLLM | Sealed SSD → running in ≤ 20 min, cable out; CPU profile benchmarked | |
 | 5 | Console screens 1, 3, 5; Scorecard live | Beats 2–5 of the arc need no narration; badges read 0 and are true | |

@@ -258,6 +258,11 @@ class Finding:
 
     fix_site_set: list[FixSite] = field(default_factory=list)
     patch_diff: str | None = None
+    #: The regression test the model wrote. Set ONLY after it has been shown to fail on the
+    #: vulnerable build and pass on the patched one; an unverified test never enters here.
+    regression_test: str | None = None
+    #: Findings that were merged into this one by lane cross-confirmation (their ids).
+    merged_from: list[str] = field(default_factory=list)
     repair_lane: RepairLane | None = None
     #: Every lane tried, in order. The last entry is `repair_lane`. Kept so that
     #: inference spent on a candidate the gate then rejected stays visible in the
@@ -547,6 +552,8 @@ class Finding:
                 }
                 for s in self.fix_site_set
             ],
+            "regression_test_verified": self.regression_test is not None,
+            "merged_from": list(self.merged_from),
             "repair": {
                 "lane": self.repair_lane.value if self.repair_lane else None,
                 "lane_history": [l.value for l in self.lane_history],
