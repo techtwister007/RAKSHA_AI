@@ -1,0 +1,643 @@
+<title>RAKSHA Campaign Plan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: a campaign order — situation, mission, execution by phase, the day itself, contingencies. Same drawing-sheet system as the architecture sheet. */
+  :root{
+    --bg:#f3f5f0; --surface:#fff; --surface-2:#e8ebe4; --tint:#dfe3da;
+    --fg:#1a2420; --fg-dim:#5b6660; --rule:#c6ccc2;
+    --signal:#9c5f14; --verified:#2c6540; --reject:#993024; --novel:#474785;
+    --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;
+    --data:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#111613; --surface:#1a211d; --surface-2:#222a25; --tint:#2b342e;
+    --fg:#e4e9e3; --fg-dim:#98a29b; --rule:#36403a;
+    --signal:#dfa05c; --verified:#6fbf8b; --reject:#df8275; --novel:#9d9ddd; color-scheme:dark}}
+  :root[data-theme="dark"]{
+    --bg:#111613; --surface:#1a211d; --surface-2:#222a25; --tint:#2b342e;
+    --fg:#e4e9e3; --fg-dim:#98a29b; --rule:#36403a;
+    --signal:#dfa05c; --verified:#6fbf8b; --reject:#df8275; --novel:#9d9ddd; color-scheme:dark}
+
+  body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .sheet{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:24px 72px}
+  h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;margin:0}
+  p{margin:0}
+  .toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--rule);
+       padding-block:9px;margin-bottom:22px;overflow-x:auto;white-space:nowrap}
+  .toc a{font-family:var(--data);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-dim);
+       text-decoration:none;margin-right:18px;border-bottom:1px solid transparent}
+  .toc a:hover,.toc a:focus-visible{color:var(--fg);border-bottom-color:var(--fg)}
+
+  .block{border:1.5px solid var(--fg);background:var(--surface)}
+  .block-top{display:flex;flex-wrap:wrap;border-bottom:1.5px solid var(--fg)}
+  .block-name{flex:1 1 320px;min-width:0;padding:18px 20px}
+  .block-name h1{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.015em;line-height:1.05}
+  .block-name .expand{font-family:var(--data);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-dim);margin-top:8px}
+  .block-meta{flex:0 1 290px;min-width:0;display:grid;grid-template-columns:auto 1fr;gap:2px 14px;padding:18px 20px;
+       border-left:1.5px solid var(--fg);align-content:start}
+  .block-meta dt{font-family:var(--data);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim);align-self:center}
+  .block-meta dd{font-family:var(--data);font-size:11px;margin:0}
+  .usp{padding:15px 20px;font-family:var(--display);font-size:clamp(16px,2.6vw,21px);font-weight:600;letter-spacing:-.012em;border-bottom:1px solid var(--rule)}
+  .thesis{padding:15px 20px;font-size:14.5px}
+  .principle{padding:13px 20px;border-top:1px solid var(--rule);background:var(--surface-2);font-family:var(--display);font-size:clamp(14px,2.1vw,17px);font-weight:600}
+
+  .part{margin-top:50px;padding-top:12px;border-top:3px double var(--fg)}
+  .part-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .part-head .pn{font-family:var(--data);font-size:11px;letter-spacing:.14em;color:var(--signal);text-transform:uppercase;font-weight:600}
+  .part-head h2{font-size:clamp(20px,3.2vw,27px);font-weight:700;letter-spacing:-.015em}
+  .part-sub{color:var(--fg-dim);font-size:14px;margin-top:8px;max-width:72ch}
+  section{margin-top:32px}
+  .shead{display:flex;align-items:baseline;gap:13px;border-bottom:1.5px solid var(--fg);padding-bottom:6px;flex-wrap:wrap}
+  .shead .ref{font-family:var(--data);font-size:10.5px;letter-spacing:.12em;color:var(--fg-dim);text-transform:uppercase;flex:0 0 auto}
+  .shead h3{font-size:clamp(16px,2.4vw,20px);font-weight:600;letter-spacing:-.01em}
+  .lede{color:var(--fg-dim);font-size:13.5px;max-width:70ch;margin-top:10px}
+  .lede strong,.card p strong{color:var(--fg)}
+
+  .tscroll{overflow-x:auto;margin-top:18px;border:1px solid var(--rule)}
+  table{border-collapse:collapse;width:100%;min-width:700px;background:var(--surface);font-size:12.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--rule)}
+  thead th{background:var(--surface-2);font-family:var(--data);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim);border-bottom:1.5px solid var(--fg);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.idx{font-family:var(--data);font-size:10.5px;color:var(--fg-dim);width:1%;white-space:nowrap}
+  td.mech{font-weight:600}
+  .mono{font-family:var(--data);font-size:11px}
+  .sig{color:var(--signal);font-weight:600} .ok{color:var(--verified);font-weight:600}
+  .rej{color:var(--reject);font-weight:600} .nov{color:var(--novel);font-weight:600}
+  .crit{font-family:var(--data);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg-dim);white-space:nowrap}
+
+  .grid{display:grid;gap:13px;margin-top:18px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(285px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+  .card{border:1px solid var(--rule);background:var(--surface);padding:14px 16px;min-width:0}
+  .card h4{font-size:13.5px;font-weight:600;margin-bottom:5px}
+  .card p{font-size:12.5px;color:var(--fg-dim)}
+  .card.b{border-left:3px solid var(--novel)} .card.s{border-left:3px solid var(--signal)}
+  .card.v{border-left:3px solid var(--verified)} .card.r{border-left:3px solid var(--reject)}
+  .card .k{font-family:var(--data);font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-dim);display:block;margin-bottom:5px}
+  .stat{font-family:var(--display);font-size:clamp(22px,4vw,30px);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+  .stat-l{font-size:11.5px;color:var(--fg-dim);margin-top:4px}
+
+  .phase{margin-top:16px;border:1px solid var(--rule);background:var(--surface)}
+  .phase-h{display:flex;gap:14px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--rule);background:var(--surface-2);flex-wrap:wrap}
+  .phase-h .n{font-family:var(--data);font-size:10.5px;letter-spacing:.12em;color:var(--signal);font-weight:600}
+  .phase-h h4{font-size:14.5px;font-weight:600;flex:1 1 auto;min-width:0}
+  .phase-h .st{font-family:var(--data);font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-dim)}
+  .phase-h .st.done{color:var(--verified)}
+  .phase-b{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0}
+  .phase-b > div{padding:12px 16px;min-width:0;font-size:12.5px}
+  .phase-b > div + div{border-left:1px solid var(--rule)}
+  .phase-b .k{font-family:var(--data);font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--fg-dim);display:block;margin-bottom:5px}
+  .phase-b ul{margin:0;padding-left:16px;color:var(--fg-dim)}
+  .phase-b li{margin-bottom:3px}
+  .exit{color:var(--verified)} .kill{color:var(--reject)}
+  @media (max-width:760px){.phase-b > div + div{border-left:none;border-top:1px solid var(--rule)}}
+
+  .hours{margin-top:18px;border:1px solid var(--rule);background:var(--surface)}
+  .hr{display:grid;grid-template-columns:92px 1fr;gap:12px;padding:10px 15px;border-bottom:1px solid var(--rule);font-size:12.5px}
+  .hr:last-child{border-bottom:none}
+  .hr .t{font-family:var(--data);font-size:11px;color:var(--signal);font-weight:600}
+  .hr .sleep{color:var(--novel);font-weight:600}
+  .hr b{font-weight:600}
+  @media (max-width:520px){.hr{grid-template-columns:1fr}}
+
+  .check{margin-top:16px;columns:2;column-gap:26px;font-size:12.5px}
+  .check div{break-inside:avoid;margin-bottom:6px;padding-left:22px;position:relative;color:var(--fg-dim)}
+  .check div::before{content:"";position:absolute;left:0;top:4px;width:11px;height:11px;border:1.4px solid var(--fg);border-radius:2px}
+  .check b{color:var(--fg);font-weight:600}
+  @media (max-width:620px){.check{columns:1}}
+
+  .qa{margin-top:16px}
+  .qa div{border:1px solid var(--rule);background:var(--surface);padding:11px 15px;margin-bottom:8px}
+  .qa .q{font-weight:600;font-size:13px}
+  .qa .a{font-size:12.5px;color:var(--fg-dim);margin-top:4px}
+  .wall{margin-top:22px;border:1.5px solid var(--fg);background:var(--surface-2);padding:17px 20px;font-family:var(--display);font-size:clamp(14px,2.2vw,18px);font-weight:600;text-wrap:balance}
+  .fin{margin-top:26px;border-top:1.5px solid var(--fg);padding-top:13px;font-size:12.5px;color:var(--fg-dim);max-width:78ch}
+  @media (max-width:560px){.block-meta{border-left:none;border-top:1.5px solid var(--fg);flex-basis:100%}}
+</style>
+
+<div class="sheet">
+  <nav class="toc" aria-label="Contents">
+    <a href="#number">The number</a>
+    <a href="#unknowns">0 · Find out first</a>
+    <a href="#strategy">1 · Strategy</a>
+    <a href="#build">2 · Build</a>
+    <a href="#finale">3 · The 36 hours</a>
+    <a href="#pitch">4 · The room</a>
+    <a href="#premortem">5 · Pre-mortem</a>
+    <a href="#logistics">6 · Logistics</a>
+    <a href="#ready">7 · Readiness</a>
+  </nav>
+
+  <div class="block">
+    <div class="block-top">
+      <div class="block-name">
+        <h1>RAKSHA AI</h1>
+        <p class="expand">Campaign plan — from today to the end of the finale</p>
+      </div>
+      <dl class="block-meta">
+        <dt>For</dt><dd>AI Kavach Grand Finale</dd>
+        <dt>Builder</dt><dd>Solo · several weeks prep</dd>
+        <dt>Spine</dt><dd>Java first · cloud dev, offline ship</dd>
+        <dt>Pairs with</dt><dd>Architecture sheet</dd>
+        <dt>Status</dt><dd>Phase 0 complete</dd>
+      </dl>
+    </div>
+    <p class="usp">Make the demo certain. Make the evaluation honest. Never let one depend on the other.</p>
+    <p class="thesis">This is the plan for winning the room, not just building the system. It covers
+      the engineering order, the 36 hours themselves, the pitch, every way we could lose and what
+      is already in place against each, and the night-before checklist.</p>
+    <p class="principle">Make CORE flawless. Make a few WOW beats perfect. Describe the rest. Never let a nice-to-have break a must-have.</p>
+  </div>
+
+  <!-- ============ THE NUMBER ============ -->
+  <div class="part" id="number">
+    <div class="part-head"><span class="pn">First</span><h2>What "95% sure" can honestly mean</h2></div>
+    <p class="part-sub">No plan makes winning 95% certain — the jury and the other teams are not ours
+      to control, and our own dossier forbids claiming more than 95% on anything. What a plan
+      <em>can</em> do is take every risk we control to near zero and tilt the ones we do not. That is
+      the standard here.</p>
+    <div class="grid g3">
+      <div class="card v"><p class="stat">≈ 95%+</p><p class="stat-l">a flawless, convincing
+        <strong>demo</strong> — because the demo runs on targets we built and rehearsed, not on the
+        unknown one</p></div>
+      <div class="card"><p class="stat">≈ 85–90%</p><p class="stat-l">a real, honest result on
+        <strong>their</strong> unknown target — the fallback ladder's number, not luck</p></div>
+      <div class="card s"><p class="stat">tilted</p><p class="stat-l">the room: a prepared answer to
+        every question they will ask, and a differentiation story per criterion</p></div>
+    </div>
+    <p class="lede">The dossier's raw chain is ~70% × ~80% × ~65% ≈ <strong>36%</strong> for a
+      flawless end-to-end live run. Everything below is about which of those three terms we take
+      off the critical path, and how.</p>
+  </div>
+
+  <!-- ============ 0 UNKNOWNS ============ -->
+  <div class="part" id="unknowns">
+    <div class="part-head"><span class="pn">Part 0</span><h2>Find out first — the finale's own rules decide half the plan</h2></div>
+    <p class="part-sub">The earlier draft silently assumed answers to every one of these. Each one,
+      answered the wrong way, changes what we build. Ask the organisers in writing, now, and record
+      the answers in the decision log. Where no answer comes, the "if silent" column is the
+      assumption we build to — and we say so in the room.</p>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>#</th><th>Question to the organisers</th><th>Why it changes the build</th><th>If silent, assume</th></tr></thead>
+        <tbody>
+          <tr><td class="idx">Q1</td><td class="mech">Is pre-built code allowed, or must the system be built during the 36 hours?</td>
+            <td class="rej">Existential. If only the 36 hours count, the keystone and gate are pre-positioned as "tooling we assembled" and the six BUILD items are what we build live — and the phase order flips.</td>
+            <td class="ok">ANSWERED: pre-built allowed. Provenance history kept in git.</td></tr>
+          <tr><td class="idx">Q2</td><td class="mech">How is the finale scored — by a mechanical harness (submit PoV + patch, they verify) or by jury observation?</td>
+            <td class="rej">If mechanical, the <strong>submission format</strong> is the whole game: a wrong format scores zero. If by jury, the console is.</td>
+            <td class="ok">ANSWERED: they provide real working code; our system runs on it; judged on <strong>accuracy, speed and least resources</strong>. So the evaluation on their code is the main event, resource telemetry is a scoring asset, and time-to-first-finding matters more than depth. Exporter still built.</td></tr>
+          <tr><td class="idx">Q3</td><td class="mech">What is the target: source repos, built containers, or live hosts on a network?</td>
+            <td>Repos favour fuzzing; <strong>live hosts favour lane D and binary lanes</strong>, and make REPORT_ONLY the dominant honest outcome. The dossier is repo-centric.</td>
+            <td class="ok">ANSWERED: mixed / unknown. Lane D and the binary lane are Phase 3.</td></tr>
+          <tr><td class="idx">Q4</td><td class="mech">Do REPORT_ONLY findings score, or only patched ones?</td>
+            <td>Decides whether to spend the budget breadth-first (many proven findings) or depth-first (fewer patches).</td>
+            <td class="ok">ANSWERED: <strong>findings and patches score equally.</strong> Breadth-first: bank proven findings fast; patches are opportunistic (dependency bumps first, then templates, then the model). REPORT_ONLY is worth as much as a patch.</td></tr>
+          <tr><td class="idx">Q5</td><td class="mech">Hardware: ours or theirs? GPU? May we bring a machine?</td>
+            <td>No GPU → CPU profile is the real profile, not the fallback.</td>
+            <td>Ours allowed. Bring it; carry the bundle in both GPU and CPU-only variants.</td></tr>
+          <tr><td class="idx">Q6</td><td class="mech">Any language hint for the simulated environment?</td>
+            <td>Decides which second adapter gets depth after Java.</td>
+            <td>None. Java deepest; C and Python breadth; supply-chain lanes cover the rest.</td></tr>
+          <tr><td class="idx">Q7</td><td class="mech">Team size permitted at the finale?</td>
+            <td>See Decision 7 — one more person removes the single largest human risk.</td>
+            <td>At least two. Recruit one.</td></tr>
+          <tr><td class="idx">Q8</td><td class="mech">May we fuzz their targets at full rate? Any environment we must not touch?</td>
+            <td class="rej">Crashing a shared test environment in a defence setting is a disqualification, not a bug.</td>
+            <td>Lane D rate-limited with a kill handle; nothing is touched that was not explicitly handed to us.</td></tr>
+          <tr><td class="idx">Q9</td><td class="mech">Judging format: how long, how many judges, technical or military or mixed, projector or their screen?</td>
+            <td>Sets the per-beat timing and whether the Commander's Brief or the gate leads.</td>
+            <td>7 minutes + questions, mixed jury, projector. Two audiences, one demo.</td></tr>
+          <tr><td class="idx">Q10</td><td class="mech">Will the jury have read the shortlisting deck?</td>
+            <td>Deck v1 promised two 8B models and "≥ 90% patch validity". We now say 32B + 8B and measured numbers. Unexplained, that looks like a contradiction.</td>
+            <td>Yes. Open with the reconciliation line (4.3) before anyone asks.</td></tr>
+          <tr><td class="idx">Q11</td><td class="mech">Does the target code stay on our machine? Is there a wipe requirement afterwards?</td>
+            <td>A trust posture we can demonstrate: nothing leaves the perimeter, and we wipe on request.</td>
+            <td>Assume yes to both. Never commit their target to our repo; wipe script ready.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ 1 STRATEGY ============ -->
+  <div class="part" id="strategy">
+    <div class="part-head"><span class="pn">Part 1</span><h2>Five decisions that do most of the work</h2></div>
+
+    <section>
+      <div class="shead"><span class="ref">1.1</span><h3>Decision 1 — Two tracks: the demo and the evaluation never share a dependency</h3></div>
+      <p class="lede">This is the single decision that moves the number most. The 7-minute pitch
+        runs on <strong>bundled targets we own</strong> — a Java service with the vulnerable log4j,
+        a C target from ARVO, a Python app with a shell-injection sink — each driven end to end
+        dozens of times before the finale. The <strong>evaluation</strong> on the jury's unknown
+        target runs the full pipeline with every fallback armed, and its results are reported
+        exactly as they come out. The pitch never waits on the unknown.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Term in the chain</th><th>Raw</th><th>Demo track</th><th>Evaluation track</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Build + fuzz works</td><td>~70%</td>
+              <td class="ok">~100% — our targets build; rehearsed</td>
+              <td>build agent → build-free lanes; ~100% that <em>something</em> real is produced</td></tr>
+            <tr><td class="mech">Find ≥ 1 real bug</td><td>~80%</td>
+              <td class="ok">~100% — Jazzer's JNDI detector fires on log4j every time</td>
+              <td>supply-chain lane finds a dependency CVE on almost any real codebase in minutes</td></tr>
+            <tr><td class="mech">Validated patch</td><td>~65%</td>
+              <td class="ok">~100% — JNDI is a template-lane fix; the gate has passed it in rehearsal</td>
+              <td>~65% honest; otherwise REPORT_ONLY, which is a scored, signed result</td></tr>
+            <tr><td class="mech">Compound</td><td class="rej">~36%</td><td class="ok">≈ 95%+ (residual: hardware, demo mechanics — Part 6)</td><td class="sig">≈ 85–90%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">Say it to the jury in those words: <em>"Here is a bug we know, fixed in front
+        of you. And here is what the same system found on the target you gave us four hours ago,
+        with nothing we could not prove left in."</em> Both are true, and the second is the one that
+        earns trust.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">1.2</span><h3>Decisions 2–5</h3></div>
+      <div class="grid g2">
+        <div class="card b"><span class="k">Decision 2</span><h4>Java is the spine; C and Python are the proof of breadth</h4>
+          <p>Jazzer writes the harness (no synthesis risk), its detectors catch security bugs out of
+            the box, JUnit is the regression suite, and Log4Shell is the most recognisable bug of the
+            decade. Build Java to flawless first. C and Python exist to put <strong>three languages
+            on one screen</strong> — the scalability beat — not to match Java's depth.</p></div>
+        <div class="card b"><span class="k">Decision 3</span><h4>Build-free lanes run first, on everything, always</h4>
+          <p>Dependency scan, secrets, config and SBOM start the moment a target lands and need no
+            build. On an unknown target they are what puts the first finding on screen inside ten
+            minutes, while the build agent is still working. They are not the fallback; they are the
+            opening move.</p></div>
+        <div class="card b"><span class="k">Decision 4</span><h4>The console is built early, because it is the scoring interface</h4>
+          <p>Screens 1, 3 and 5 go up right after the Java slice works, not at the end. Every stage
+            then develops against a live Scorecard, so telemetry is never retrofitted and the first
+            impression on finale day is a working system, not an empty shell.</p></div>
+        <div class="card b"><span class="k">Decision 5</span><h4>Precision is shipped as a data model, not promised</h4>
+          <p>Already done: the record refuses to confirm a finding without a replaying reproducer and
+            refuses to verify a patch without five passes and a dead PoV, with 62 tests proving it.
+            Everything built from here consumes that record, so the headline claim cannot drift.</p></div>
+        <div class="card b"><span class="k">Decision 6 — new</span><h4>Dependency bumps are patches, and they are the cheapest provable ones that exist</h4>
+          <p>The supply-chain lane was treated as a <em>finding</em> lane. It is also a <strong>patching</strong>
+            lane: bump the vulnerable version, rebuild, run the suite, pass the gate. Zero inference,
+            minutes per fix, and on almost any real codebase there are several. If the finale scores
+            patches, this lane alone puts validated patches on the board before the fuzzers have
+            found their first crash. Its "reproducer" is honest and different in kind — a deterministic
+            version match against the offline OSV database, not an exploit — so the record marks the
+            confirming oracle as <span class="mono">osv-version-match</span> and the risk register ranks
+            exploit-proven findings above it. Stated, not hidden.</p></div>
+        <div class="card b"><span class="k">Decision 8 — from the Q4 answer</span><h4>Breadth first: a proven finding is worth as much as a patch</h4>
+          <p>Findings and patches score equally, and speed and resources are judged. So the clock goes
+            to <strong>proving many findings fast</strong> — build-free lanes, cross-confirmation, fast
+            minimisation and replay — and never to a hard patch while cheap proven findings sit unbanked.
+            Patches come in cost order: dependency bump → template → model, each only after the previous
+            misses. The risk register still ranks what to fix first for the operator; the score counts all
+            of it.</p></div>
+        <div class="card b"><span class="k">Decision 7 — new</span><h4>The build is solo; the finale is not</h4>
+          <p>Recruit one teammate for the 36 hours even if they write no code: they run the pitch
+            rehearsals, own the logistics list, watch the Mission Board during the sleep blocks, and
+            speak the Commander's Brief to the military half of the jury. One person removes
+            pre-mortem rows 12 and 14 almost entirely. If rules permit two, two.</p></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ 2 BUILD ============ -->
+  <div class="part" id="build">
+    <div class="part-head"><span class="pn">Part 2</span><h2>Build order, with exit gates and kill-switches</h2></div>
+    <p class="part-sub">Strictly sequential, because one person is building it. Every phase ends
+      with a working system that could be demonstrated as-is — so stopping anywhere leaves something
+      real. Phases carry an exit criterion that must be true before the next begins, and a
+      kill-switch decided now, while calm.</p>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 0</span><h4>The keystone — three oracles, one record, one gate</h4><span class="st done">done</span></div>
+      <div class="phase-b">
+        <div><span class="k">Delivered</span><ul><li>SARIF 2.1 + proof block, validated against the OASIS schema</li><li>Status machine with both invariants enforced</li><li>ASan, Jazzer, PySecSan adapters; scorecard from the records</li><li>62 tests; two real bugs caught by them</li></ul></div>
+        <div><span class="k exit">Exit gate — met</span><ul><li>A C trace, a Java reproducer and a Python abort all become valid records one gate consumes</li></ul></div>
+        <div><span class="k">Carry forward</span><ul><li>Cross-confirmation (same site + same CWE, merge) and the model-test fail-before/pass-after rule are specified but not yet coded — they land in Phase 1</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 1</span><h4>The five-check gate, for real</h4><span class="st">next</span></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>Each check as a runner over a real build dir: compile, replay PoV, differential corpus + own tests, coverage, bounded refuzz</li><li>Determinism pre-flight (3 runs), canonicaliser, quarantine list in the bundle</li><li>Cross-confirmation and the model-test check</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>A deliberately planted overfitting patch is <strong>rejected</strong>; the real fix passes</li><li>A noisy service (timestamps, UUIDs) does not cause a false rejection</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>If the canonicaliser cannot hold false rejections near zero on the noisy test, the check runs on corpus inputs that pass pre-flight only, and the quarantine count is shown — never hidden</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 2</span><h4>The Java vertical slice and the Log4Shell demo target</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>Bundled demo target: a small Spring-style service on vulnerable log4j, with JUnit tests</li><li>Ingest → Jazzer autofuzz → JNDI detector → localise → template lane → gate → signed bundle</li><li>Template library seeded with the top Jazzer bug classes: JNDI, SQLi, path traversal, command injection, deserialization</li><li>Inference behind one <span class="mono">RAKSHA_INFERENCE_BASE_URL</span> client — cloud now, vLLM later, zero code change</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Log4Shell found, fixed and proven with <strong>zero human input</strong>, ten runs in a row</li><li>Split-screen replay works: red on vulnerable, green on patched</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>LLM lane not beating templates by end of phase → templates are primary in the demo, LLM is fallback. Still impressive, raises the zero-inference number</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 3</span><h4>The weakest link — build agent, mirror, build-free lanes</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>OSV-Scanner (offline DB), Gitleaks, Checkov, Syft → CycloneDX, all emitting the record</li><li><strong>Dependency-bump patch lane</strong> (Decision 6): bump → rebuild → suite → gate</li><li>Lane D for live targets: Schemathesis / ZAP / Nuclei, rate-limited, kill handle (Q3, Q8)</li><li>The <strong>jury exporter</strong>: SARIF + patch + PoV + replay script per finding; format swappable (Q2)</li><li>Build agent loop: remedy table → OSS-Fuzz recipe retrieval → one bounded model call, cap 5 → build-free</li><li>Offline mirror of the high-probability set: devpi, Nexus, Verdaccio, aptly</li><li>Sneakernet bundle format: signed, verified on import</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>A target that <strong>will not build</strong> still yields verified findings on screen within ten minutes</li><li>Mission Board shows it <strong>amber</strong>, labelled as success</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>Mirror too large to carry → ship the benchmark targets' deps plus the top-N; state the bound. Stating the limit beats faking completeness</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 4</span><h4>Sandbox, offline bundle, and the cable-pull install</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>Every build and run in <span class="mono">--network none</span>, seccomp, cgroups; gVisor if the kernel allows</li><li>One <span class="mono">docker compose</span>; models and mirrors on the SSD; checksummed; <strong>GPU and CPU-only variants</strong> both on the media (Q5)</li><li>vLLM serving the 32B + 8B locally — first time off cloud inference</li><li>CI grep: no model SDK outside the inference module; no CDN or external asset in the console</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Sealed SSD → running system in ≤ 20 minutes on a machine with Wi-Fi off and cable out, Log4Shell demo runs</li><li>CPU-only profile benchmarked: a known number, not a hope</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>32B will not fit alongside the 8B at the chosen quant → run one model at a time; the gate never needed both</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 5</span><h4>Console screens 1, 3, 5 — and the Scorecard goes live</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>Mission Board, Finding Detail with split-screen replay and the five ticks, Scorecard reading the metrics module</li><li>Findings stream as they are born; the console opens in a working state on a pre-warmed target</li><li>Own stack, self-contained assets, no fonts fetched</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Beats 2–5 of the demo arc run on screens alone, with no narration needed</li><li><strong>NETWORK INTERFACES: 0 · CLOUD CALLS: 0</strong> badges are live and true</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>Screen 3's replay view slipping → a static before/after panel with the gate ticks. The ticks are the proof; the animation is the polish</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 6</span><h4>Breadth — C and Python slices, three languages on one screen</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>C: an ARVO target with a hand-written harness (synthesis is a stretch goal, not a dependency); ASan → template or LLM fix → gate</li><li>Python: Atheris + PySecSan with our shell/SQL/pickle sinks on a small app</li><li>All three run concurrently on the Mission Board</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>One C, one Java and one Python bug fixed in parallel by the same core, visible on one screen</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>C patching stalls → C is shown reaching <strong>REPORT_ONLY</strong> with a real reproducer. A proven report is a scored, honest outcome and demonstrates the fallback live</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 7</span><h4>Three WOW beats, in order of impact per effort</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li><strong>Bad-patch rejection:</strong> an "inject overfitting patch" button; the gate refuses it on screen 3</li><li><strong>ROE slider:</strong> asset registry with tiers; flip the demo service to "critical"; the same fix now waits for two signatures; OPA policy, cosign keys for two demo officers</li><li><strong>Vaccine sweep:</strong> a <em>bundled fleet</em> of four or five small codebases that share the JNDI pattern must exist first; rule extracted from the fix, three checks, sweep, hits on the Board — <em>only if Phases 1–6 are untouched</em></li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Beats 6, 8 and (if built) 7 run clean, ten times each</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>Anything here threatening core → cut it. Three beats done perfectly beat five done badly. The vaccine is first to go; it is also the one most worth describing even if not built</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 8</span><h4>Screens 2, 4, 6 and the Commander's Brief</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>Evidence Vault with live signature verification — a judge can do it</li><li>Commander's Brief: plain English from the bundle's facts, JSSD layout, Hindi as a stretch</li><li>Live Pipeline view</li><li>Ranked risk register, rollback script, regression test committed into the target's suite</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Beat 9 prints a staff paper; a stranger verifies a bundle signature unaided</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>JSSD rendering slips → plain-English brief only, formatted cleanly. The content is the point</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 9</span><h4>Our own numbers</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Build</span><ul><li>Benchmark rig over a slice of ARVO and AutoPatchBench; the pipeline runs unattended; the scorecard records</li><li>Benchmark report: methodology, wins and <strong>losses shown next to wins</strong></li><li><strong>Self-score</strong> on the five criteria from this run; the weakest one gets the remaining prep time</li><li>The evaluation-summary <em>template</em>, so H18–24 at the finale is fill-in, not design</li><li><span class="mono">THIRD_PARTY.md</span> licence register</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Every number we will say in the room traces to this run. Nothing borrowed</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>Numbers lower than hoped → say them. A judge who hears "34% patch validity on ARVO, here is the method" trusts the 100% precision claim more, not less</li></ul></div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-h"><span class="n">PHASE 10</span><h4>Rehearsal — twice, full length — and the recording</h4></div>
+      <div class="phase-b">
+        <div><span class="k">Do</span><ul><li>Two complete 36-hour runs on a fresh target, from sealed SSD, nobody touching it overnight</li><li>Watch for: leaks, disk filling with corpus, stuck subprocesses, model server dying at hour 20</li><li>The 7-minute arc rehearsed twenty times; the install five times; Q&amp;A mocked with a mentor playing a hostile judge</li><li><strong>Record the full arc</strong> at a safe point; copy it to two devices</li></ul></div>
+        <div><span class="k exit">Exit gate</span><ul><li>Second 36-hour run finishes with no manual intervention and the console still responsive</li></ul></div>
+        <div><span class="k kill">Kill-switch</span><ul><li>Endurance failure found late → the watchdog restarts the failing component and the Mission Board shows it. A restart you can see is a feature; a hang is not</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 3 FINALE ============ -->
+  <div class="part" id="finale">
+    <div class="part-head"><span class="pn">Part 3</span><h2>The 36 hours, hour by hour</h2></div>
+    <p class="part-sub">For one person. The system is autonomous, so the plan uses that: two sleep
+      blocks while the fuzzers run, and <em>"it found these while I slept"</em> is a line that
+      demonstrates the Functionality criterion better than any slide. Tired decisions are the enemy,
+      so the checklists in Part 6 exist to be followed, not reconsidered, at 3 a.m.</p>
+    <div class="hours">
+      <div class="hr"><span class="t">H0 – H1</span><span>Install from the sealed SSD on our own machine, cable out. Checksum the bundle. Console up on a pre-warmed bundled target so the screen is never empty. Ingest their target. <b>Build-free lanes start immediately.</b> Create the asset-registry entry; ask the organisers for test credentials if it is a service.</span></div>
+      <div class="hr"><span class="t">H1 – H2</span><span>First findings from supply-chain and secrets lanes on screen. Build agent working through remedies. Record a decision log entry: target class, lane set chosen, what we expect.</span></div>
+      <div class="hr"><span class="t">H2 – H6</span><span>Build succeeds → oracles installed, fuzz campaigns start, corpus pre-warmed. Build fails → <b>Mission Board amber</b>; static lanes deepen; kill-switch: if hopeless by H6, bring a bundled ARVO target alongside and reframe as portability. Either way, there are findings by now.</span></div>
+      <div class="hr"><span class="t">H6 – H12</span><span>First reproducers replay → first <b>CONFIRMED</b> findings. Repair ladder engages; first patches through the gate or into REPORT_ONLY. Time-box each stage; let bandit reallocation feed lanes that produce. Prepare the Commander's Brief for whatever is already verified.</span></div>
+      <div class="hr"><span class="t sleep">H12 – H15</span><span class="sleep">Sleep block 1. Fuzzers, refuzz and the vaccine sweep run unattended. Watchdog armed. Alarm set.</span></div>
+      <div class="hr"><span class="t">H15 – H18</span><span>Review what landed overnight — this is the "while I slept" material; screenshot it. Triage anything stuck. Second repair rounds. Check disk and memory; minimise corpus.</span></div>
+      <div class="hr"><span class="t">H18 – H24</span><span>Second wave: cross-confirmed static findings, vaccine hits across the bundled fleet, risk register ranked. Start the <b>evaluation summary</b>: every finding by status, every number from the scorecard, every limit stated.</span></div>
+      <div class="hr"><span class="t sleep">H24 – H27</span><span class="sleep">Sleep block 2. Same drill.</span></div>
+      <div class="hr"><span class="t">H27 – H31</span><span>Freeze the evaluation run; export SARIF + bundles for the jury. Full dress run of the 7-minute arc on the bundled targets — twice. Confirm the recording plays on the backup device. Print nothing new; the one-pagers were printed before.</span></div>
+      <div class="hr"><span class="t">H31 – H34</span><span>Pitch prep: the three screens left in their demo state, the Scorecard visible, the evaluation summary open in a tab. Re-read the Q&amp;A bank once. Eat. Do not touch the code.</span></div>
+      <div class="hr"><span class="t">H34 – H36</span><span>Judging. The arc. The honest evaluation result. The questions. Scorecard on screen the entire time.</span></div>
+    </div>
+    <p class="lede">Rule for the whole 36 hours: <strong>no change to the pipeline after H27.</strong>
+      From there the system is the system; the remaining hours are for the room.</p>
+    <div class="grid g3">
+      <div class="card s"><span class="k">Per-stage caps — so no stage eats the clock</span>
+        <p>Build agent <strong>60 min</strong> then build-free · harness attempt <strong>30 min</strong> then by hand ·
+          fuzz in <strong>30-min rounds</strong>, budget reallocated to lanes that produce · repair
+          <strong>3 rounds × 15 min</strong> then REPORT_ONLY · lane D at a fixed request rate with a kill handle.
+          Caps are configuration, set before H0, not judgement calls at H20.</p></div>
+      <div class="card s"><span class="k">The install demo, resolved</span>
+        <p>Seven minutes of judging has no room for a twenty-minute install. So the install is done
+          at <strong>H0 with an organiser witnessing</strong>, screen-recorded with a visible clock, and
+          the arc shows the 30-second cut plus the live badge. If no witness is available, the recording
+          and the badge carry it.</p></div>
+      <div class="card s"><span class="k">Their code, our conduct</span>
+        <p>Zero bytes of their target leave the machine; it is never committed to our repo; a wipe
+          script runs on request at the end. Lane D touches nothing that was not explicitly handed to us.
+          Say this unprompted in the first minute — in a defence room it is worth more than a feature.</p></div>
+    </div>
+  </div>
+
+  <!-- ============ 4 THE ROOM ============ -->
+  <div class="part" id="pitch">
+    <div class="part-head"><span class="pn">Part 4</span><h2>Winning the room</h2></div>
+
+    <section>
+      <div class="shead"><span class="ref">4.1</span><h3>What the other teams will bring, and the sentence that separates us on each criterion</h3></div>
+      <p class="lede">The architecture will look similar across many teams — it is the template
+        every AI suggests. Expect: cloud-LLM wrappers around Semgrep; dashboards listing findings
+        with no reproducer; "autonomous" systems that quietly need the internet; nobody with an
+        authority model; nobody demonstrating a failure on purpose.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Criterion</th><th>What most teams will show</th><th>What we show, and say</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Precision</td><td>A long list of findings; confidence scores from the model</td>
+              <td><strong>Zero findings without a replaying reproducer, by construction.</strong> "We would rather stay silent than guess — a false alarm on a classified system costs a cleared officer's afternoon."</td></tr>
+            <tr><td class="mech">Functionality</td><td>A human clicking "approve" between steps; a cloud call hidden behind a proxy</td>
+              <td>The cable is out. The zero-human-input counter is on screen. "It found these three while I was asleep."</td></tr>
+            <tr><td class="mech">Performance</td><td>Many bugs on one C library</td>
+              <td>Found <em>and patched</em>, with REPORT_ONLY counted honestly as proven-but-unfixed, and findings that landed while the build was still failing.</td></tr>
+            <tr><td class="mech">Speed</td><td>"It's fast"</td>
+              <td>Median time-to-PoV and time-to-patch, live, from timestamps the system wrote. "Localisation is deterministic — the model is handed one function, never the repo."</td></tr>
+            <tr><td class="mech">Scalability</td><td>Eight workers on one target</td>
+              <td>A C bug, a Java bug and a Python bug fixed by one core, on one screen. "You will not tell us what your infrastructure is written in. This is why that does not matter."</td></tr>
+            <tr><td class="mech">Novelty</td><td>"We use AI"</td>
+              <td>Six named mechanisms, each demonstrated, each marked BUILD; and the principle over them — nothing is trusted until it proves itself, including our own patches, tests, rules and harnesses.</td></tr>
+            <tr><td class="mech">Trust (unscored, decisive)</td><td>Not addressed</td>
+              <td>ROE as doctrine they already use; two-person rule; signed bundles a judge verifies live; a sandbox with no network interface; limits volunteered before being asked.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">4.2</span><h3>The seven minutes, scripted — timing and the one sentence per beat</h3></div>
+      <p class="lede">Nine beats in 420 seconds is about 45 seconds each. The sentence is what is
+        said while the screen does the work; nothing else is said. Rehearsed to time, twenty times.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Beat</th><th>Seconds</th><th>The sentence</th><th>Screen</th></tr></thead>
+          <tbody>
+            <tr><td class="idx">1</td><td class="mono">0–40</td><td>"The best models in the world fail this task two times in three — and none of them can run where your code lives. So we built something that never trusts the model."</td><td>Slide: the three numbers</td></tr>
+            <tr><td class="idx">2</td><td class="mono">40–70</td><td>"The cable is out. That badge is the kernel's count, not ours."</td><td>Scorecard · badges</td></tr>
+            <tr><td class="idx">3</td><td class="mono">70–110</td><td>"Three targets, three languages. The amber one would not build — it is still finding, because two of our four lanes never needed the build."</td><td>Mission Board</td></tr>
+            <tr><td class="idx">4</td><td class="mono">110–160</td><td>"This is Log4Shell. Watch it go from suspected to confirmed — it only moves when the exploit replays."</td><td>Live Pipeline → Finding Detail</td></tr>
+            <tr><td class="idx">5</td><td class="mono">160–200</td><td>"Same attack, both builds. Red, green. That is the proof, and it took two seconds to read."</td><td>Split-screen replay</td></tr>
+            <tr><td class="idx">6</td><td class="mono">200–250</td><td>"Now I am going to give it a bad fix — one that passes the tests and leaves the hole. Watch the gate refuse it."</td><td>Gate ticks → rejection</td></tr>
+            <tr><td class="idx">7</td><td class="mono">250–300</td><td>"One fix became a rule. The rule had to prove itself too. It just found the same mistake in four other systems."</td><td>Vaccine sweep on the Board</td></tr>
+            <tr><td class="idx">8</td><td class="mono">300–350</td><td>"Same fix, but this asset is command-and-control. It will not deploy — it waits for two officers' keys. Confidence buys autonomy; uncertainty takes it away."</td><td>ROE slider · signatures</td></tr>
+            <tr><td class="idx">9</td><td class="mono">350–400</td><td>"And this is what goes up the chain." Then: "Here is what the same system found on the target you gave us — and everything we could not prove is not in it."</td><td>Commander's Brief → evaluation summary</td></tr>
+            <tr><td class="idx">—</td><td class="mono">400–420</td><td>"Runs where classified code lives, and refuses to speak without proof. Questions."</td><td>Scorecard</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">If the vaccine beat is not built, beat 7 becomes thirty seconds on the risk
+        register — "fix these three first" — and the arc still lands.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">4.3</span><h3>The reconciliation line — say it before they ask</h3></div>
+      <p class="lede">The shortlisting deck said two 8B models and promised ≥ 90% patch validity.
+        The jury may have it in front of them. Unaddressed, that is a contradiction; addressed, it is
+        maturity. First minute, one sentence: <strong>"Since shortlisting, two things changed: we
+        replaced two generic 8B models with a coding agent and a security specialist that fit the
+        same 32 GB, and we replaced every promised number with one we measured — the report is in the
+        bundle, losses next to wins."</strong></p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">4.4</span><h3>The question bank — every one answered in a sentence</h3></div>
+      <p class="lede">Rehearse these aloud with a mentor playing a sceptical judge. The answers are
+        all true today; none depends on something unbuilt.</p>
+      <div class="qa">
+        <div><p class="q">Did you build this or download it?</p><p class="a">Both, on purpose. We assembled proven parts — AFL++, Jazzer, Semgrep, vLLM — and built six things nobody ships: the unified proof record, the oracle tripwires, the authz oracle, the differential gate, ROE, the vaccine. Every box on the architecture is marked which.</p></div>
+        <div><p class="q">How do you know the patch does not break something else?</p><p class="a">Every non-crashing fuzz input and the project's own tests must behave identically before and after; coverage must hold so it was not fixed by deleting the feature; a fresh campaign must find nothing new. We claim "no observed change across N inputs and M tests" — with the flaky inputs we quarantined listed by name. We do not claim formal equivalence.</p></div>
+        <div><p class="q">What happens when it is wrong?</p><p class="a">It cannot report a finding it cannot reproduce — the data model refuses the transition. If a patch fails any check it is not shipped; you get a proven vulnerability report instead. The system is designed to degrade, not to guess.</p></div>
+        <div><p class="q">What stops this thing patching a fire-control system on its own?</p><p class="a">Rules of Engagement. Every asset has a criticality tier that caps its authority: mission-critical is recommend-only, critical needs two officers' keys. And authority steps down automatically when the fix touches auth or crypto, when the advisor disagrees, when the change is large. Confidence buys autonomy; uncertainty takes it away.</p></div>
+        <div><p class="q">You are executing untrusted code on an Army machine.</p><p class="a">Inside a container with no network interface, seccomp and cgroups, gVisor where the kernel allows. The target code never sees a network. The badge on the screen — NETWORK INTERFACES: 0 — is the kernel's count, not ours.</p></div>
+        <div><p class="q">Why a small model? Why not the best cloud model?</p><p class="a">Two reasons. Your networks are sealed, so the cloud is not available. And the best cloud models fail this task about two-thirds of the time anyway — the losses are in the scaffold, not the parameter count. So we compete on the scaffold and the verifier, and the model only proposes.</p></div>
+        <div><p class="q">What is your bug-fix rate?</p><p class="a">On our ARVO and AutoPatchBench run: [the Phase 9 number], methodology in the report, losses shown next to wins. We do not quote a general-coding score as a security number; nobody should.</p></div>
+        <div><p class="q">Does it learn?</p><p class="a">Three loops you can see today: the corpus persists, every verified fix becomes a zero-inference template, and rejected patches become negative examples. The fourth — nightly fine-tuning on validated fixes — is designed in; it will not show a difference in 36 hours and we will not pretend it does.</p></div>
+        <div><p class="q">What about our language?</p><p class="a">Four adapters today — C/C++, Java, Node, Python — on one language-agnostic core; adding one is an adapter, not a rewrite. And the dependency, secrets and config lanes work on any language at all, which is why a Go or Rust target still produces verified findings.</p></div>
+        <div><p class="q">What if our target will not build?</p><p class="a">Then you get everything that needs no build — dependency CVEs provable from the version string, secrets, misconfiguration, an SBOM — within minutes, and the board shows that target amber: still finding. Build failure is the one thing we engineered for hardest.</p></div>
+        <div><p class="q">How is this different from a SAST dashboard?</p><p class="a">A SAST tool lists possibilities. We will not show you a finding unless we can hand you the input that triggers it and replay it in front of you. Different product: proof, not suggestions.</p></div>
+        <div><p class="q">How do you update it with no network?</p><p class="a">Signed bundles on removable media, verified on import — vulnerability databases, model weights, and other units' verified fixes. The air-gapped equivalent of apt update, and the way one installation's fix becomes every installation's vaccine.</p></div>
+        <div><p class="q">What does "Knowledge" in the name mean?</p><p class="a">The knowledge the system accumulates: the template library, the mined detection rules, the retrieval index over past fixes. Each run makes the next one smarter and cheaper.</p></div>
+        <div><p class="q">What did not work?</p><p class="a">Answer with the real one from Phase 9 or the finale. Then: "That is why the system is built to degrade — the thing we are proudest of is what it does when something fails."</p></div>
+        <div><p class="q">You planted that Log4Shell bug yourself.</p><p class="a">Yes — it is CVE-2021-44228 in log4j 2.14.1, in a realistic service, used as a controlled demonstration so you can watch every stage on a bug you already know. The honest test is the second half: what it found on the target you handed us, with nothing unproven left in.</p></div>
+        <div><p class="q">Four hundred dependency findings is noise.</p><p class="a">They are confirmed by a deterministic version match, ranked below exploit-proven findings in the risk register, and each has a validated patch — a version bump that rebuilt and passed the suite. We show you the three to fix first, not the four hundred.</p></div>
+        <div><p class="q">What if we had given you live hosts instead of source?</p><p class="a">The service lane and the binary lane run black-box — rate-limited, nothing touched that was not handed to us — and the honest output shifts toward proven reports rather than patches. The architecture degrades; it does not change.</p></div>
+        <div><p class="q">Can I check one of these myself?</p><p class="a">Yes. Open the vault, pick any verified finding, verify the signature, replay the reproducer against both builds. Thirty seconds. Please do.</p></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ 5 PRE-MORTEM ============ -->
+  <div class="part" id="premortem">
+    <div class="part-head"><span class="pn">Part 5</span><h2>Pre-mortem — it is the day after, and we lost. Why?</h2></div>
+    <p class="part-sub">Every cause we could think of, and what is already in place against it. The
+      ones marked <span class="rej">open</span> are the residual risk the 95% does not cover.</p>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>#</th><th>How we lost</th><th>Countermeasure in the plan</th><th>State</th></tr></thead>
+        <tbody>
+          <tr><td class="idx">01</td><td class="mech">Their target would not build and we had nothing to show</td><td>Build-free lanes first (Phase 3); bundled target alongside by H6; demo never depended on it (Decision 1)</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">02</td><td class="mech">The live demo died</td><td>Rehearsed twenty times; recording on two devices; narrate over it (Phase 10)</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">03</td><td class="mech">A judge asked "did you build this?" and we fumbled</td><td>Provenance marks on every component; the six BUILD items named; the answer rehearsed</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">04</td><td class="mech">A number was challenged and it was borrowed</td><td>Phase 9: every number from our own run; losses beside wins</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">05</td><td class="mech">We over-claimed and a technical judge caught it</td><td>The honesty panel, memorised; "React is not a fuzzing target"; QLoRA not claimed; harness synthesis not a headline</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">06</td><td class="mech">No GPU at the venue</td><td>Own machine brought regardless; CPU-only profile benchmarked in Phase 4; template-only still runs</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">07</td><td class="mech">Model server died at hour 20 and nobody noticed</td><td>Watchdog restart, visible on the board; dress rehearsals ran 36 hours twice</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">08</td><td class="mech">Disk filled with corpus; everything stalled</td><td>Quotas, corpus minimisation, health panel — found in rehearsal, not at the finale</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">09</td><td class="mech">Something quietly phoned home and the air-gap claim collapsed</td><td>CI grep for SDKs and external assets; the cable-pull install proves it; the badge reads the kernel</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">10</td><td class="mech">Target in a language we never adapted</td><td>Supply-chain and secrets lanes are language-agnostic; the answer is rehearsed</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">11</td><td class="mech">The authz oracle needed two accounts we did not have</td><td>Ask the organisers at H0; if none, the oracle is disabled for that target and we say so</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">12</td><td class="mech">Exhaustion at hour 30 led to an improvised change that broke the demo</td><td>Two sleep blocks; no pipeline changes after H27; checklists followed, not reconsidered</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">13</td><td class="mech">Another team had a flashier interface</td><td>Ours is their scoresheet, already filled in. Flash is not a criterion; precision is</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">14</td><td class="mech">Projector adapter, power, resolution</td><td>Logistics checklist, Part 6; tested on the venue display if access is allowed the day before</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">15</td><td class="mech">The jury weighted something we did not expect — procurement value, cost, team size</td><td>The spin-offs and risk register answer procurement; one node and one builder answer cost; it cannot be fully pre-empted</td><td class="rej">open — tilted</td></tr>
+          <tr><td class="idx">16</td><td class="mech">A competitor genuinely built something better</td><td>Not ours to control. The honesty posture and the trust story are the hardest things to match in 36 hours</td><td class="rej">open — tilted</td></tr>
+          <tr><td class="idx">19</td><td class="mech">Rules required building during the 36 hours and our pre-built core looked like cheating</td><td>Q1 asked in writing; provenance history in the repo; if required, the keystone is presented as assembled tooling and the six BUILD items are built live</td><td class="rej">open until Q1 is answered</td></tr>
+          <tr><td class="idx">20</td><td class="mech">The scoring harness wanted a format we did not produce</td><td>Q2 asked; exporter writes SARIF + patch + PoV + replay script and is swappable in 30 minutes</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">21</td><td class="mech">Targets were live hosts; our repo-centric pipeline had little to do</td><td>Q3 asked; lane D and binary lane promoted to Phase 3; REPORT_ONLY is a scored, honest outcome</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">22</td><td class="mech">We crashed a shared test environment with the fuzzer</td><td>Q8 asked; lane D rate-limited with a kill handle; nothing touched that was not explicitly ours</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">23</td><td class="mech">A judge held up deck v1 and read "≥ 90% patch validity, two 8B models"</td><td>The reconciliation line, first minute, before anyone asks (4.3)</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">24</td><td class="mech">The evaluation produced many findings but few patches, and only patches scored</td><td>Decision 6: dependency bumps as validated patches from the first hour; Q4 asked</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">17</td><td class="mech">The sealed SSD was corrupted or the bundle checksum failed</td><td>Two SSDs, checksummed, plus the full bundle on the laptop's own disk</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">18</td><td class="mech">We ran out of time before three WOW beats were perfect</td><td>Kill-switch rule: cut WOW before it threatens core. One perfect beat with a flawless core still wins the room</td><td class="ok">covered</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ 6 LOGISTICS ============ -->
+  <div class="part" id="logistics">
+    <div class="part-head"><span class="pn">Part 6</span><h2>Logistics — the unglamorous list that decides whether any of it is seen</h2></div>
+    <div class="check">
+      <div><b>Own machine</b> with the GPU, fully charged; power adapter; a second laptop as backup display host</div>
+      <div><b>Two sealed SSDs</b> with the bundle, checksums printed; bundle also on the laptop's internal disk</div>
+      <div><b>HDMI and USB-C display adapters</b>, both; tested at 1080p and 4K; font sizes legible from three metres</div>
+      <div><b>Wi-Fi and Bluetooth off</b> at the firmware level; no phone hotspot; the badge must read 0</div>
+      <div><b>The recording</b> of the full arc on two devices, playable without any software install</div>
+      <div><b>Printed one-pagers:</b> the executive summary and the layman explainer, ten copies each</div>
+      <div><b>Printed</b> the architecture sheet's Fig 1 and the honesty panel, in case the screen is lost</div>
+      <div><b>THIRD_PARTY.md</b> licence register printed and in the bundle</div>
+      <div><b>Two demo officers' keys</b> for the two-person beat, with a note of which key is whose</div>
+      <div><b>Test credentials</b> request for the organisers, written in advance, for the authz oracle</div>
+      <div><b>The eleven organiser questions</b> sent in writing, answers in the decision log, assumptions marked where silent</div>
+      <div><b>Wipe script</b> for their target code, tested; nothing of theirs in our git history</div>
+      <div><b>Both bundle variants</b> — GPU and CPU-only — on each SSD</div>
+      <div><b>Decision log</b> notebook — what was decided when, so tired-you can read what rested-you chose</div>
+      <div><b>Sleep kit:</b> alarm not on the demo machine; food that needs no preparation; water</div>
+      <div><b>A mentor's number</b> for the mock Q&amp;A the week before, and on the day if allowed</div>
+      <div><b>A clean copy of the bundled demo targets</b> to reset between rehearsal runs, with one command</div>
+    </div>
+  </div>
+
+  <!-- ============ 7 READINESS ============ -->
+  <div class="part" id="ready">
+    <div class="part-head"><span class="pn">Part 7</span><h2>Readiness — what must be true the night before</h2></div>
+    <p class="part-sub">If every line is true, the controllable risk is as close to zero as a
+      solo build can get. If any is false, that is the thing to work on — nothing else.</p>
+    <div class="check">
+      <div><b>Keystone:</b> all tests green; a C, Java and Python record pass one gate</div>
+      <div><b>Gate:</b> the planted overfitting patch is rejected on screen; the real fix passes</div>
+      <div><b>Log4Shell:</b> found, fixed and proven with zero human input, ten in a row, from the sealed SSD</div>
+      <div><b>Build-free:</b> a target that will not build shows amber and real findings inside ten minutes</div>
+      <div><b>Offline:</b> cable-pull install ≤ 20 minutes; badges read 0 and are true; CI grep passes</div>
+      <div><b>CPU profile:</b> benchmarked, number known</div>
+      <div><b>Console:</b> screens 1, 3, 5 flawless; opens in a working state; Scorecard live</div>
+      <div><b>Three languages</b> on one screen, or C shown reaching REPORT_ONLY honestly</div>
+      <div><b>WOW:</b> at least bad-patch rejection and the ROE slider run clean ten times</div>
+      <div><b>Vault:</b> a stranger verified a signature unaided</div>
+      <div><b>Numbers:</b> every figure we will say traces to the Phase 9 report</div>
+      <div><b>Endurance:</b> two 36-hour rehearsals completed without manual intervention</div>
+      <div><b>Recording:</b> exists, on two devices, watched end to end once</div>
+      <div><b>Q&amp;A:</b> the bank rehearsed aloud against a hostile mock judge</div>
+      <div><b>Logistics:</b> every line of Part 6 ticked, physically, the night before</div>
+      <div><b>Organisers' answers</b> to Q1–Q11 recorded, or the stated assumptions adopted knowingly</div>
+      <div><b>Exporter</b> produces a complete submission for one finding in the expected format</div>
+      <div><b>Dependency-bump lane</b> has produced at least one validated patch on a real codebase</div>
+      <div><b>Pitch script</b> run to 420 seconds three times in a row, with the teammate on the clock</div>
+      <div><b>Reconciliation line</b> memorised</div>
+      <div><b>Kill-switches:</b> re-read once, and agreed with yourself that you will obey them</div>
+    </div>
+    <p class="wall">The system is built to know the limits of its own authority. So is this plan: it
+      decides the hard calls now, while calm, so that hour 30 only has to follow them.</p>
+    <p class="fin">Pairs with the architecture sheet, which carries the figures, the scoring ledger,
+      the deliverables and the way ahead. This document carries the order of work, the day itself,
+      and the room. Both should be read before the first line of Phase 1 is written.</p>
+  </div>
+</div>

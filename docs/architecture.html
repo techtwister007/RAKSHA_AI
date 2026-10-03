@@ -1,0 +1,1714 @@
+<title>RAKSHA Architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: engineering drawing sheet — title block, sticky contents rail, numbered parts,
+     figures with captions, reference tables. Provenance badge on every component. */
+  :root{
+    --bg:#f3f5f0; --surface:#fff; --surface-2:#e8ebe4; --tint:#dfe3da; --tint-2:#eef0ea;
+    --fg:#1a2420; --fg-dim:#5b6660; --rule:#c6ccc2;
+    --signal:#9c5f14; --verified:#2c6540; --reject:#993024; --novel:#474785;
+    --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;
+    --data:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#111613; --surface:#1a211d; --surface-2:#222a25; --tint:#2b342e; --tint-2:#1f2622;
+    --fg:#e4e9e3; --fg-dim:#98a29b; --rule:#36403a;
+    --signal:#dfa05c; --verified:#6fbf8b; --reject:#df8275; --novel:#9d9ddd;
+    color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#111613; --surface:#1a211d; --surface-2:#222a25; --tint:#2b342e; --tint-2:#1f2622;
+    --fg:#e4e9e3; --fg-dim:#98a29b; --rule:#36403a;
+    --signal:#dfa05c; --verified:#6fbf8b; --reject:#df8275; --novel:#9d9ddd;
+    color-scheme:dark;
+  }
+
+  body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;
+       -webkit-font-smoothing:antialiased}
+  .sheet{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:24px 72px}
+  h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;margin:0}
+  p{margin:0}
+  em{font-style:italic}
+
+  /* contents rail */
+  .toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+       background:var(--bg);border-bottom:1px solid var(--rule);
+       padding-block:9px;margin-bottom:22px;overflow-x:auto;white-space:nowrap}
+  .toc a{font-family:var(--data);font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+       color:var(--fg-dim);text-decoration:none;margin-right:18px;border-bottom:1px solid transparent}
+  .toc a:hover,.toc a:focus-visible{color:var(--fg);border-bottom-color:var(--fg)}
+
+  /* title block */
+  .block{border:1.5px solid var(--fg);background:var(--surface)}
+  .block-top{display:flex;flex-wrap:wrap;border-bottom:1.5px solid var(--fg)}
+  .block-name{flex:1 1 320px;min-width:0;padding:18px 20px}
+  .block-name h1{font-size:clamp(28px,5vw,40px);font-weight:700;letter-spacing:-.015em;line-height:1.05}
+  .block-name .expand{font-family:var(--data);font-size:10.5px;letter-spacing:.09em;
+       text-transform:uppercase;color:var(--fg-dim);margin-top:8px}
+  .block-meta{flex:0 1 290px;min-width:0;display:grid;grid-template-columns:auto 1fr;
+       gap:2px 14px;padding:18px 20px;border-left:1.5px solid var(--fg);align-content:start}
+  .block-meta dt{font-family:var(--data);font-size:9.5px;letter-spacing:.1em;
+       text-transform:uppercase;color:var(--fg-dim);align-self:center}
+  .block-meta dd{font-family:var(--data);font-size:11px;margin:0}
+  .usp{padding:15px 20px;font-family:var(--display);font-size:clamp(16px,2.6vw,21px);
+       font-weight:600;letter-spacing:-.012em;border-bottom:1px solid var(--rule)}
+  .thesis{padding:15px 20px;font-size:15px}
+  .principle{padding:13px 20px;border-top:1px solid var(--rule);background:var(--surface-2);
+       font-family:var(--display);font-size:clamp(14px,2.1vw,17px);font-weight:600}
+
+  /* parts + sections */
+  .part{margin-top:52px;padding-top:12px;border-top:3px double var(--fg)}
+  .part-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .part-head .pn{font-family:var(--data);font-size:11px;letter-spacing:.14em;color:var(--signal);
+       text-transform:uppercase;font-weight:600}
+  .part-head h2{font-size:clamp(20px,3.2vw,27px);font-weight:700;letter-spacing:-.015em}
+  .part-sub{color:var(--fg-dim);font-size:14px;margin-top:8px;max-width:72ch}
+
+  section{margin-top:34px}
+  .shead{display:flex;align-items:baseline;gap:13px;border-bottom:1.5px solid var(--fg);
+       padding-bottom:6px;flex-wrap:wrap}
+  .shead .ref{font-family:var(--data);font-size:10.5px;letter-spacing:.12em;color:var(--fg-dim);
+       text-transform:uppercase;flex:0 0 auto}
+  .shead h3{font-size:clamp(16px,2.4vw,20px);font-weight:600;letter-spacing:-.01em}
+  .lede{color:var(--fg-dim);font-size:13.5px;max-width:70ch;margin-top:10px}
+
+  /* figures */
+  figure{margin:20px 0 0}
+  .canvas{overflow-x:auto;border:1px solid var(--rule);background:var(--surface);padding:14px}
+  .canvas svg{display:block;height:auto}
+  .w1240{min-width:1040px;width:1240px;max-width:100%}
+  .w1120{min-width:900px;width:1120px;max-width:100%}
+  .w1040{min-width:860px;width:1040px;max-width:100%}
+  figcaption{font-size:12.5px;color:var(--fg-dim);margin-top:10px;max-width:80ch}
+  .legend{display:flex;flex-wrap:wrap;gap:9px 20px;margin-top:11px;
+       font-family:var(--data);font-size:10px;letter-spacing:.04em;text-transform:uppercase}
+  .legend span{display:flex;align-items:center;gap:7px;color:var(--fg-dim)}
+  .legend i{width:24px;height:0;border-top-width:2px;display:block;flex:0 0 auto}
+  .lg-main{border-top-style:solid;border-color:var(--fg)}
+  .lg-deg{border-top-style:dashed;border-color:var(--signal)}
+  .lg-rej{border-top-style:dashed;border-color:var(--reject)}
+  .lg-nov{border-top-style:solid;border-color:var(--novel);border-top-width:3px!important}
+
+  /* SVG shared */
+  svg text{font-family:var(--data);fill:var(--fg)}
+  .bx{fill:var(--surface);stroke:var(--fg);stroke-width:1.2}
+  .bx-2{fill:var(--surface-2);stroke:var(--fg);stroke-width:1.1}
+  .bx-nov{fill:var(--tint);stroke:var(--novel);stroke-width:2}
+  .bx-gate{fill:var(--surface-2);stroke:var(--fg);stroke-width:2.4}
+  .bx-deg{fill:none;stroke:var(--signal);stroke-width:1.6;stroke-dasharray:5 3.5}
+  .bx-ok{fill:none;stroke:var(--verified);stroke-width:2}
+  .bx-env{fill:none;stroke:var(--fg-dim);stroke-width:1.4;stroke-dasharray:9 5}
+  .bx-ghost{fill:var(--tint-2);stroke:var(--rule);stroke-width:1}
+  .fl{fill:none;stroke:var(--fg);stroke-width:1.5}
+  .fl-deg{fill:none;stroke:var(--signal);stroke-width:1.5;stroke-dasharray:5 3.5}
+  .fl-rej{fill:none;stroke:var(--reject);stroke-width:1.5;stroke-dasharray:5 3.5}
+  .fl-ok{fill:none;stroke:var(--verified);stroke-width:1.8}
+  .fl-nov{fill:none;stroke:var(--novel);stroke-width:1.6;stroke-dasharray:6 4}
+  .mk-fg{fill:var(--fg)} .mk-deg{fill:var(--signal)} .mk-rej{fill:var(--reject)}
+  .mk-ok{fill:var(--verified)} .mk-nov{fill:var(--novel)}
+  .t-ttl{font-family:var(--display);font-size:13px;font-weight:600}
+  .t-lbl{font-size:10.5px;font-weight:500;letter-spacing:.05em}
+  .t-sub{font-size:9px;fill:var(--fg-dim);letter-spacing:.03em}
+  .t-num{font-family:var(--display);font-size:19px;font-weight:700;fill:var(--rule)}
+  .t-note{font-size:9.5px;fill:var(--fg-dim);font-style:italic}
+  .t-deg{font-size:9.5px;fill:var(--signal);letter-spacing:.05em}
+  .t-rej{font-size:9.5px;fill:var(--reject);letter-spacing:.08em}
+  .t-nov{fill:var(--novel)} .t-ok{fill:var(--verified)}
+  .t-prov{font-size:8px;fill:var(--fg-dim);letter-spacing:.1em}
+  .t-layer{font-size:8.5px;fill:var(--fg-dim);letter-spacing:.14em}
+
+  /* provenance badges */
+  .pv{font-family:var(--data);font-size:8.5px;letter-spacing:.09em;border:1px solid var(--rule);
+      border-radius:2px;padding:1px 4px;color:var(--fg-dim);white-space:nowrap;
+      vertical-align:1px;margin-left:5px}
+  .pv-b{border-color:var(--novel);color:var(--novel);font-weight:600}
+  .pv-w{border-color:var(--signal);color:var(--signal)}
+
+  /* tables */
+  .tscroll{overflow-x:auto;margin-top:18px;border:1px solid var(--rule)}
+  table{border-collapse:collapse;width:100%;min-width:700px;background:var(--surface);
+       font-size:12.5px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--rule)}
+  thead th{background:var(--surface-2);font-family:var(--data);font-size:9px;
+       letter-spacing:.1em;text-transform:uppercase;color:var(--fg-dim);
+       border-bottom:1.5px solid var(--fg);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.idx{font-family:var(--data);font-size:10.5px;color:var(--fg-dim);width:1%;white-space:nowrap}
+  td.mech{font-weight:600}
+  .mono{font-family:var(--data);font-size:11px}
+  .sig{color:var(--signal);font-weight:600}
+  .ok{color:var(--verified);font-weight:600}
+  .nov{color:var(--novel);font-weight:600}
+  .rej{color:var(--reject);font-weight:600}
+  .crit{font-family:var(--data);font-size:9px;letter-spacing:.07em;text-transform:uppercase;
+       color:var(--fg-dim);white-space:nowrap}
+
+  /* panels */
+  .grid{display:grid;gap:13px;margin-top:18px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(285px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+  .card{border:1px solid var(--rule);background:var(--surface);padding:14px 16px;min-width:0}
+  .card h4{font-size:13.5px;font-weight:600;margin-bottom:5px}
+  .card p{font-size:12.5px;color:var(--fg-dim)}
+  .card.b{border-left:3px solid var(--novel)}
+  .card.s{border-left:3px solid var(--signal)}
+  .card.v{border-left:3px solid var(--verified)}
+  .card .k{font-family:var(--data);font-size:9px;letter-spacing:.11em;text-transform:uppercase;
+       color:var(--fg-dim);display:block;margin-bottom:5px}
+  .stat{font-family:var(--display);font-size:clamp(22px,4vw,30px);font-weight:700;
+       letter-spacing:-.02em;line-height:1.1}
+  .stat-l{font-size:11.5px;color:var(--fg-dim);margin-top:4px}
+
+  /* claim / not-claim */
+  .claims{display:grid;gap:0;margin-top:18px;border:1px solid var(--rule);
+       grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .claims > div{padding:15px 17px;min-width:0}
+  .claims > div + div{border-left:1px solid var(--rule)}
+  .claims h4{font-family:var(--data);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;
+       margin-bottom:9px}
+  .claims .yes h4{color:var(--verified)} .claims .no h4{color:var(--reject)}
+  .claims ul{margin:0;padding-left:17px;font-size:12.5px;color:var(--fg-dim)}
+  .claims li{margin-bottom:6px}
+  .claims li:last-child{margin-bottom:0}
+  @media (max-width:620px){.claims > div + div{border-left:none;border-top:1px solid var(--rule)}}
+
+  /* ladder */
+  .ladder{margin-top:18px;border:1px solid var(--rule);background:var(--surface)}
+  .rung{display:flex;gap:14px;padding:11px 15px;border-bottom:1px solid var(--rule);align-items:baseline}
+  .rung:last-child{border-bottom:none}
+  .rung .n{font-family:var(--data);font-size:10.5px;color:var(--signal);flex:0 0 auto;font-weight:600}
+  .rung .t{font-size:12.5px;min-width:0}
+  .rung .t b{font-weight:600}
+
+  /* glossary */
+  .gloss{margin-top:18px;columns:2;column-gap:28px;font-size:12.5px}
+  .gloss div{break-inside:avoid;margin-bottom:9px}
+  .gloss dt{font-weight:600;display:inline}
+  .gloss dd{display:inline;margin:0;color:var(--fg-dim)}
+  @media (max-width:620px){.gloss{columns:1}}
+
+  .wall{margin-top:22px;border:1.5px solid var(--fg);background:var(--surface-2);
+       padding:17px 20px;font-family:var(--display);font-size:clamp(14px,2.2vw,18px);
+       font-weight:600;text-wrap:balance}
+  .fin{margin-top:26px;border-top:1.5px solid var(--fg);padding-top:13px;
+       font-size:12.5px;color:var(--fg-dim);max-width:78ch}
+  @media (max-width:560px){
+    .block-meta{border-left:none;border-top:1.5px solid var(--fg);flex-basis:100%}
+  }
+</style>
+
+<div class="sheet">
+
+  <nav class="toc" aria-label="Contents">
+    <a href="#brief">0 · Brief &amp; bet</a>
+    <a href="#system">A · The system</a>
+    <a href="#jury">B · What the jury sees</a>
+    <a href="#breaks">C · When it breaks</a>
+    <a href="#ahead">D · Scoring &amp; way ahead</a>
+    <a href="#terms">Terms</a>
+  </nav>
+
+  <div class="block">
+    <div class="block-top">
+      <div class="block-name">
+        <h1>RAKSHA AI</h1>
+        <p class="expand">Reasoning-based Autonomous Knowledge &amp; Security Hardening Agent</p>
+      </div>
+      <dl class="block-meta">
+        <dt>Sheet</dt><dd>System architecture</dd>
+        <dt>Covers</dt><dd>Core · wow · fallbacks · scoring</dd>
+        <dt>Origin</dt><dd>EME School, Vadodara</dd>
+        <dt>Entry</dt><dd>AI Kavach — Grand Finale</dd>
+        <dt>Status</dt><dd>Pre-build reference</dd>
+      </dl>
+    </div>
+    <p class="usp">Runs where classified code lives, and refuses to speak without proof.</p>
+    <p class="thesis">An offline cyber-reasoning system. It takes software it has never seen,
+      <strong>finds</strong> a security hole, <strong>fixes</strong> it, and <strong>proves</strong>
+      the fix holds — on a sealed network, with no human in the find-fix-prove loop.</p>
+    <p class="principle">The LLM is not the brain. The verifier is the brain.</p>
+  </div>
+
+  <!-- ================= PART 0 ================= -->
+  <div class="part" id="brief">
+    <div class="part-head"><span class="pn">Part 0</span><h2>The brief, and the bet</h2></div>
+    <p class="part-sub">Everything downstream is a consequence of three things the brief implies but
+      never says, and one bet about how to win with a weaker tool.</p>
+
+    <section>
+      <div class="shead"><span class="ref">0.1</span><h3>What the competition asks</h3></div>
+      <p class="lede">Build a cyber-reasoning system — an LLM laced with fuzzers, static and dynamic
+        analysis and a regression test harness — that autonomously finds a vulnerability, patches it,
+        and proves the fix holds, pitched to run against customised Indian Armed Forces
+        infrastructure.</p>
+      <div class="grid g3">
+        <div class="card s"><span class="k">Implication 1</span>
+          <h4>Offline is non-negotiable</h4>
+          <p>"Customised IAF infrastructure" means air-gapped. No cloud model, no <span class="mono">pip
+            install</span> at runtime. This single constraint eliminates most of what a naive team
+            would build.</p></div>
+        <div class="card s"><span class="k">Implication 2</span>
+          <h4>The target is unknown</h4>
+          <p>"Customised" means we cannot pre-study it. Unknown language, build system, source or
+            binary, library or running service — until the finale.</p></div>
+        <div class="card s"><span class="k">Implication 3</span>
+          <h4>Trust is the real currency</h4>
+          <p>Software that autonomously changes Army systems is never accepted unless it can prove
+            what it did and know the limits of its own authority.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">0.2</span><h3>Why the obvious approach fails</h3></div>
+      <p class="lede">Point a big, smart AI at the code. It fails for two independent reasons, and
+        the second is the one teams miss.</p>
+      <div class="grid g3">
+        <div class="card"><p class="stat">~34%</p><p class="stat-l">best frontier-agent patch rate
+          on SEC-bench</p></div>
+        <div class="card"><p class="stat">~18%</p><p class="stat-l">best frontier-agent
+          proof-of-vulnerability generation</p></div>
+        <div class="card"><p class="stat">~24%</p><p class="stat-l">best security detection model,
+          F1 on a 25,440-function CVE benchmark</p></div>
+      </div>
+      <p class="lede">SEC-bench Pro, on real browser-engine bugs: strongest configuration ~32%,
+        open-weight baseline ~12%, and the majority stay unsolved even with a 90-minute budget.
+        Fine-tuning security models yields <em>"calibration without comprehension"</em> — more
+        confidence, not more correctness. So "just use a smarter AI" is both unavailable (it lives
+        online) and insufficient (nobody has solved this). <strong>If even frontier models fail
+        two-thirds of the time, the winning move is not a bigger model. It is a better scaffold and
+        an incorruptible verifier — we compete where the losses actually are.</strong></p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">0.3</span><h3>The bet, and why a better model still helps</h3></div>
+      <div class="grid g2">
+        <div class="card b"><span class="k">The central bet</span>
+          <h4>Do not trust the AI. Make it prove everything.</h4>
+          <p>The model <em>guesses</em> a fix. A strict mechanical inspector <em>tests</em> it: does
+            the original attack still work? does every old behaviour still hold? does a fresh
+            campaign find anything new? Only if every check passes does the fix count. The model can
+            be weak, because <strong>the model is not the thing that decides what is true.</strong></p></div>
+        <div class="card b"><span class="k">The resolution</span>
+          <h4>The judge and the lawyer</h4>
+          <p>The verifier is the <strong>judge</strong> — the verdict is final and cannot be bribed,
+            but it does not investigate the case. The model is the <strong>lawyer</strong> — it
+            builds the case for the judge to rule on. A better lawyer never overrules the judge, but
+            walks in with a stronger case, so the judge says yes sooner and more often.</p></div>
+      </div>
+      <p class="lede">So the two halves improve different dimensions: <strong>the verifier makes us
+        safe, the model makes us effective.</strong> Deterministic code is a floor on correctness;
+        the model is the engine of discovery. This is also why test-time scaling is nearly free for
+        us — sampling several candidate patches and letting the verifier pick adds roughly ten points,
+        and our verifier already exists.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">0.4</span><h3>What is scored</h3></div>
+      <p class="lede">The five-slide shortlisting stage is banked. Every remaining point comes from
+        the finale five — so the operating rule for the whole build is that <strong>a criterion you
+        cannot measure is a criterion you cannot score.</strong> No component is finished until it
+        emits the number that proves it, while it runs.</p>
+      <div class="grid g3">
+        <div class="card v"><span class="k">Banked · shortlisting</span>
+          <h4>Resource · Novelty · Lightweight</h4>
+          <p>Already paid for by the deck. Still restated in the room, but no longer what the
+            remaining work is optimising.</p></div>
+        <div class="card"><span class="k">Live · finale</span>
+          <h4>Performance · Speed · Precision</h4>
+          <p>Bugs found and patched; median time-to-PoV and time-to-patch; how often we are right
+            and how little noise we make.</p></div>
+        <div class="card"><span class="k">Live · finale</span>
+          <h4>Functionality · Scalability</h4>
+          <p>Does the full loop run unattended; does it hold up across many targets <em>and
+            languages</em> — language scalability, not thread count.</p></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= PART A ================= -->
+  <div class="part" id="system">
+    <div class="part-head"><span class="pn">Part A</span><h2>The system</h2></div>
+    <p class="part-sub">Provenance is marked on every component, because the first thing a technical
+      judge wants to know is what we built versus what we downloaded.
+      <span class="pv">TAKE</span> use as-is ·
+      <span class="pv pv-w">WRAP</span> thin adapter ·
+      <span class="pv pv-b">BUILD</span> our work — exactly six of these are the novelty surface.</p>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 1</span><h3>The nine stages, and where each fails safely</h3></div>
+      <p class="lede">One spine, every language. The left margin marks the five layers: everything
+        below Layer 1 is written once and runs for every language, which is the scalability claim in
+        structural form. The two amber exits are the redundancy argument — each is still a real
+        result.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1240" viewBox="0 0 1240 1120" role="img"
+               aria-label="The RAKSHA pipeline in nine stages, grouped into five layers. A target is identified and classified, which selects the lane set. The build agent escalates through a remedy table, OSS-Fuzz recipe retrieval and a bounded model call; if all fail it exits to build-free mode, which rejoins at the two hunt lanes that need no build. Language oracles convert every bug class to one abort event. Four hunt lanes converge on the unified finding record. Then normalise, triage, localise, a four-lane repair ladder, and the five-check gate. A rejected patch returns to repair for up to three rounds; if none validates it exits as a proven report. A passing patch goes through ROE authority to a signed evidence bundle, which feeds the learning loops back to the oracles. Stages two through seven sit inside a sandbox with no network interface.">
+            <defs>
+              <marker id="m1f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m1d" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-deg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m1r" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-rej" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m1n" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-nov" d="M0,0 L9,3.5 L0,7 z"/></marker>
+            </defs>
+
+            <!-- layer bands -->
+            <text class="t-layer" x="36" y="330" transform="rotate(-90 36 330)" text-anchor="middle">LAYER 1 · ADAPTERS</text>
+            <path class="fl" d="M46,276 V362" style="stroke:var(--rule)"/>
+            <text class="t-layer" x="36" y="470" transform="rotate(-90 36 470)" text-anchor="middle">LAYER 2 · ORACLES</text>
+            <path class="fl" d="M46,390 V548" style="stroke:var(--rule)"/>
+            <text class="t-layer" x="36" y="650" transform="rotate(-90 36 650)" text-anchor="middle">LAYER 3 · INVARIANT CORE</text>
+            <path class="fl" d="M46,574 V746" style="stroke:var(--rule)"/>
+            <text class="t-layer" x="36" y="812" transform="rotate(-90 36 812)" text-anchor="middle">LAYER 4 · GATE</text>
+            <path class="fl" d="M46,772 V858" style="stroke:var(--rule)"/>
+            <text class="t-layer" x="36" y="985" transform="rotate(-90 36 985)" text-anchor="middle">LAYER 5 · EVIDENCE &amp; LEARNING</text>
+            <path class="fl" d="M46,886 V1034" style="stroke:var(--rule)"/>
+
+            <!-- sandbox envelope -->
+            <rect class="bx-env" x="166" y="158" width="724" height="700" rx="6"/>
+            <text class="t-sub" x="176" y="151">SANDBOX — no network interface · seccomp · cgroups · gVisor/Firecracker</text>
+            <text class="t-prov" x="700" y="151">TAKE · rated critical for trust</text>
+
+            <!-- target -->
+            <rect class="bx-2" x="400" y="20" width="250" height="38" rx="19"/>
+            <text class="t-lbl" x="525" y="38" text-anchor="middle">UNKNOWN TARGET</text>
+            <text class="t-sub" x="525" y="50" text-anchor="middle">source · binary · running service</text>
+            <path class="fl" d="M525,58 V84" marker-end="url(#m1f)"/>
+
+            <!-- 01 -->
+            <text class="t-num" x="112" y="118" text-anchor="middle">01</text>
+            <rect class="bx" x="180" y="86" width="700" height="56"/>
+            <text class="t-ttl" x="196" y="106">IDENTIFY · CLASSIFY · QUEUE</text>
+            <text class="t-prov" x="430" y="106">WRAP</text>
+            <text class="t-sub" x="196" y="122">language · build system · source|binary · entry points · asset criticality tier</text>
+            <text class="t-sub" x="196" y="135">class → lane set: library · service · CLI · binary-only   ·   job queue admits N targets in parallel</text>
+            <path class="fl" d="M525,142 V170" marker-end="url(#m1f)"/>
+            <text class="t-note" x="535" y="160">lane set selected</text>
+
+            <!-- 02 build agent -->
+            <text class="t-num" x="112" y="212" text-anchor="middle">02</text>
+            <rect class="bx" x="180" y="172" width="700" height="84"/>
+            <text class="t-ttl" x="196" y="192">BUILD AGENT</text>
+            <text class="t-note" x="320" y="192">a loop, not a genius — escalating remedies</text>
+            <text class="t-prov" x="836" y="192">BUILD</text>
+            <rect class="bx-2" x="196" y="204" width="155" height="38"/>
+            <text class="t-lbl" x="273" y="220" text-anchor="middle">standard build</text>
+            <text class="t-sub" x="273" y="233" text-anchor="middle">detected toolchain</text>
+            <path class="fl" d="M353,223 H363" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="367" y="204" width="155" height="38"/>
+            <text class="t-lbl" x="444" y="220" text-anchor="middle">remedy table</text>
+            <text class="t-sub" x="444" y="233" text-anchor="middle">zero inference</text>
+            <path class="fl" d="M524,223 H534" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="538" y="204" width="155" height="38"/>
+            <text class="t-lbl" x="615" y="220" text-anchor="middle">OSS-Fuzz recipe</text>
+            <text class="t-sub" x="615" y="233" text-anchor="middle">650+ projects · RAG</text>
+            <path class="fl" d="M695,223 H705" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="709" y="204" width="155" height="38"/>
+            <text class="t-lbl" x="786" y="220" text-anchor="middle">bounded model</text>
+            <text class="t-sub" x="786" y="233" text-anchor="middle">one fix · cap 5</text>
+
+            <path class="fl-deg" d="M880,202 H934" marker-end="url(#m1d)"/>
+            <text class="t-deg" x="907" y="195" text-anchor="middle">build fails</text>
+            <rect class="bx-deg" x="940" y="174" width="262" height="64"/>
+            <text class="t-lbl" x="1071" y="195" text-anchor="middle" style="fill:var(--signal)">BUILD-FREE MODE</text>
+            <text class="t-sub" x="1071" y="211" text-anchor="middle">static · deps · secrets · config</text>
+            <text class="t-sub" x="1071" y="226" text-anchor="middle">find + recommend, never zero</text>
+
+            <path class="fl" d="M525,256 V280" marker-end="url(#m1f)"/>
+            <text class="t-note" x="535" y="272">built</text>
+
+            <!-- 03 oracles -->
+            <text class="t-num" x="112" y="322" text-anchor="middle">03</text>
+            <rect class="bx" x="180" y="280" width="700" height="88"/>
+            <text class="t-ttl" x="196" y="300">ORACLE LAYER</text>
+            <text class="t-note" x="320" y="300">install an oracle; don't hope for a crash</text>
+            <rect class="bx-2" x="196" y="312" width="127" height="44"/>
+            <text class="t-lbl" x="259" y="330" text-anchor="middle">ASan·UBSan</text>
+            <text class="t-sub" x="259" y="344" text-anchor="middle">C/C++ · TAKE</text>
+            <rect class="bx-2" x="331" y="312" width="127" height="44"/>
+            <text class="t-lbl" x="394" y="330" text-anchor="middle">Jazzer</text>
+            <text class="t-sub" x="394" y="344" text-anchor="middle">JVM · TAKE</text>
+            <rect class="bx-2" x="466" y="312" width="127" height="44"/>
+            <text class="t-lbl" x="529" y="330" text-anchor="middle">Jazzer.js</text>
+            <text class="t-sub" x="529" y="344" text-anchor="middle">Node · TAKE</text>
+            <rect class="bx-nov" x="601" y="312" width="127" height="44"/>
+            <text class="t-lbl t-nov" x="664" y="330" text-anchor="middle">PySecSan+</text>
+            <text class="t-sub" x="664" y="344" text-anchor="middle" style="fill:var(--novel)">Python · BUILD</text>
+            <rect class="bx-nov" x="736" y="312" width="127" height="44"/>
+            <text class="t-lbl t-nov" x="799" y="330" text-anchor="middle">METAMORPHIC</text>
+            <text class="t-sub" x="799" y="344" text-anchor="middle" style="fill:var(--novel)">authz · BUILD</text>
+            <path class="fl" d="M525,368 V396" marker-end="url(#m1f)"/>
+
+            <!-- 04 hunt -->
+            <text class="t-num" x="112" y="438" text-anchor="middle">04</text>
+            <text class="t-ttl" x="196" y="390" style="font-size:11px">HUNT — lanes run in parallel, not in sequence</text>
+            <rect class="bx" x="180" y="396" width="166" height="76"/>
+            <text class="t-lbl" x="263" y="416" text-anchor="middle">A · FUZZ</text>
+            <text class="t-sub" x="263" y="430" text-anchor="middle">AFL++ · libFuzzer · Jazzer · Atheris</text>
+            <text class="t-sub" x="263" y="443" text-anchor="middle">harness: autofuzz | synthesised | by hand</text>
+            <text class="t-sub" x="263" y="462" text-anchor="middle" style="fill:var(--signal)">needs build</text>
+            <rect class="bx" x="358" y="396" width="166" height="76"/>
+            <text class="t-lbl" x="441" y="416" text-anchor="middle">B · STATIC</text>
+            <text class="t-sub" x="441" y="432" text-anchor="middle">Semgrep · CodeQL</text>
+            <text class="t-sub" x="441" y="444" text-anchor="middle">Joern · PySA</text>
+            <text class="t-sub" x="441" y="462" text-anchor="middle" style="fill:var(--verified)">build-free</text>
+            <rect class="bx" x="536" y="396" width="166" height="76"/>
+            <text class="t-lbl" x="619" y="416" text-anchor="middle">C · SUPPLY</text>
+            <text class="t-sub" x="619" y="432" text-anchor="middle">OSV · Trivy · Grype</text>
+            <text class="t-sub" x="619" y="444" text-anchor="middle">Gitleaks · Checkov</text>
+            <text class="t-sub" x="619" y="462" text-anchor="middle" style="fill:var(--verified)">build-free</text>
+            <rect class="bx" x="714" y="396" width="166" height="76"/>
+            <text class="t-lbl" x="797" y="416" text-anchor="middle">D · SERVICE</text>
+            <text class="t-sub" x="797" y="432" text-anchor="middle">Schemathesis</text>
+            <text class="t-sub" x="797" y="444" text-anchor="middle">RESTler · ZAP</text>
+            <text class="t-sub" x="797" y="462" text-anchor="middle" style="fill:var(--signal)">needs live svc</text>
+
+            <path class="fl-deg" d="M1071,238 V374 H441 V392" marker-end="url(#m1d)"/>
+            <path class="fl-deg" d="M619,374 V392" marker-end="url(#m1d)"/>
+            <text class="t-deg" x="810" y="368" text-anchor="middle">these two lanes never needed the build</text>
+
+            <path class="fl" d="M263,472 V500" marker-end="url(#m1f)"/>
+            <path class="fl" d="M441,472 V500" marker-end="url(#m1f)"/>
+            <path class="fl" d="M619,472 V500" marker-end="url(#m1f)"/>
+            <path class="fl" d="M797,472 V500" marker-end="url(#m1f)"/>
+
+            <!-- record -->
+            <rect class="bx-nov" x="180" y="502" width="700" height="52"/>
+            <text class="t-ttl t-nov" x="525" y="524" text-anchor="middle">UNIFIED FINDING RECORD · SARIF 2.1 + proof block</text>
+            <text class="t-sub" x="525" y="542" text-anchor="middle" style="fill:var(--novel)">the keystone · one record every finder emits, one gate consumes · BUILD · see Fig 2</text>
+            <path class="fl" d="M525,554 V582" marker-end="url(#m1f)"/>
+
+            <!-- 05 core -->
+            <text class="t-num" x="112" y="616" text-anchor="middle">05</text>
+            <rect class="bx" x="180" y="582" width="700" height="60"/>
+            <rect class="bx-2" x="196" y="592" width="214" height="40"/>
+            <text class="t-lbl" x="303" y="608" text-anchor="middle">NORMALISE</text>
+            <text class="t-sub" x="303" y="621" text-anchor="middle">stack-hash dedup · minimise</text>
+            <path class="fl" d="M412,612 H420" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="422" y="592" width="214" height="40"/>
+            <text class="t-lbl" x="529" y="608" text-anchor="middle">TRIAGE</text>
+            <text class="t-sub" x="529" y="621" text-anchor="middle">calibrated router · Fig 4</text>
+            <path class="fl" d="M638,612 H646" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="648" y="592" width="214" height="40"/>
+            <text class="t-lbl" x="755" y="608" text-anchor="middle">LOCALISE</text>
+            <text class="t-sub" x="755" y="621" text-anchor="middle">ripwire · no LLM search</text>
+            <text class="t-note" x="890" y="600">800 raw crashes</text>
+            <text class="t-note" x="890" y="613">collapse to ~6 bugs</text>
+            <path class="fl" d="M525,642 V670" marker-end="url(#m1f)"/>
+
+            <!-- 06 repair -->
+            <text class="t-num" x="112" y="710" text-anchor="middle">06</text>
+            <rect class="bx" x="180" y="670" width="700" height="84"/>
+            <text class="t-ttl" x="196" y="690">REPAIR LADDER</text>
+            <text class="t-note" x="320" y="690">cheapest lane first — the 32B runs only when it must</text>
+            <rect class="bx-2" x="196" y="702" width="155" height="38"/>
+            <text class="t-lbl" x="273" y="718" text-anchor="middle">TEMPLATE</text>
+            <text class="t-sub" x="273" y="731" text-anchor="middle">zero inference</text>
+            <path class="fl" d="M353,721 H363" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="367" y="702" width="155" height="38"/>
+            <text class="t-lbl" x="444" y="718" text-anchor="middle">RETRIEVAL</text>
+            <text class="t-sub" x="444" y="731" text-anchor="middle">FAISS over ARVO</text>
+            <path class="fl" d="M524,721 H534" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="538" y="702" width="155" height="38"/>
+            <text class="t-lbl" x="615" y="718" text-anchor="middle">LLM</text>
+            <text class="t-sub" x="615" y="731" text-anchor="middle">best-of-N sampled</text>
+            <path class="fl" d="M695,721 H705" marker-end="url(#m1f)"/>
+            <rect class="bx-2" x="709" y="702" width="155" height="38"/>
+            <text class="t-lbl" x="786" y="718" text-anchor="middle">MITIGATION FLOOR</text>
+            <text class="t-sub" x="786" y="731" text-anchor="middle">blunt but verified</text>
+            <path class="fl" d="M525,754 V780" marker-end="url(#m1f)"/>
+
+            <!-- 07 gate -->
+            <text class="t-num" x="112" y="822" text-anchor="middle">07</text>
+            <rect class="bx-gate" x="180" y="780" width="700" height="78"/>
+            <text class="t-ttl" x="196" y="800">FIVE-CHECK GATE</text>
+            <text class="t-note" x="330" y="800">the incorruptible inspector — all five, cheapest first · Fig 3</text>
+            <rect class="bx" x="196" y="812" width="127" height="34"/>
+            <text class="t-sub" x="259" y="833" text-anchor="middle">COMPILES</text>
+            <rect class="bx" x="331" y="812" width="127" height="34"/>
+            <text class="t-sub" x="394" y="833" text-anchor="middle">POV DEAD</text>
+            <rect class="bx-nov" x="466" y="812" width="127" height="34"/>
+            <text class="t-sub t-nov" x="529" y="833" text-anchor="middle">DIFF CORPUS</text>
+            <rect class="bx" x="601" y="812" width="127" height="34"/>
+            <text class="t-sub" x="664" y="833" text-anchor="middle">COVERAGE HELD</text>
+            <rect class="bx" x="736" y="812" width="127" height="34"/>
+            <text class="t-sub" x="799" y="833" text-anchor="middle">CLEAN REFUZZ</text>
+
+            <path class="fl-rej" d="M180,842 H158 V710 H176" marker-end="url(#m1r)"/>
+            <text class="t-rej" x="150" y="778" text-anchor="middle" transform="rotate(-90 150 778)">REJECTED · RETRY, CAP 3</text>
+
+            <path class="fl-deg" d="M880,842 H934" marker-end="url(#m1d)"/>
+            <text class="t-deg" x="907" y="835" text-anchor="middle">none validate</text>
+            <rect class="bx-deg" x="940" y="814" width="262" height="64"/>
+            <text class="t-lbl" x="1071" y="835" text-anchor="middle" style="fill:var(--signal)">REPORT_ONLY</text>
+            <text class="t-sub" x="1071" y="851" text-anchor="middle">a proven vulnerability report</text>
+            <text class="t-sub" x="1071" y="866" text-anchor="middle">never a guess on a live system</text>
+
+            <path class="fl-ok" d="M525,858 V886" marker-end="url(#m1f)"/>
+            <text class="t-note" x="535" y="878" style="fill:var(--verified)">all five pass</text>
+
+            <!-- 08 ROE -->
+            <text class="t-num" x="112" y="922" text-anchor="middle">08</text>
+            <rect class="bx-nov" x="180" y="886" width="700" height="62"/>
+            <text class="t-ttl t-nov" x="196" y="905">ROE AUTHORITY</text>
+            <text class="t-sub" x="330" y="905" style="fill:var(--novel)">what may be done with a proven fix · BUILD on OPA · Fig 6</text>
+            <rect class="bx" x="196" y="914" width="162" height="26"/>
+            <text class="t-sub" x="277" y="931" text-anchor="middle">R0 OBSERVE</text>
+            <rect class="bx" x="366" y="914" width="162" height="26"/>
+            <text class="t-sub" x="447" y="931" text-anchor="middle">R1 RECOMMEND</text>
+            <rect class="bx" x="536" y="914" width="162" height="26"/>
+            <text class="t-sub" x="617" y="931" text-anchor="middle">R2 ON APPROVAL</text>
+            <rect class="bx" x="706" y="914" width="157" height="26"/>
+            <text class="t-sub" x="784" y="931" text-anchor="middle">R3 AUTONOMOUS</text>
+            <path class="fl" d="M525,948 V974" marker-end="url(#m1f)"/>
+
+            <!-- 09 evidence -->
+            <text class="t-num" x="112" y="1008" text-anchor="middle">09</text>
+            <rect class="bx" x="180" y="974" width="700" height="60"/>
+            <text class="t-ttl" x="196" y="994">SIGNED EVIDENCE BUNDLE · COMMANDER'S BRIEF</text>
+            <text class="t-prov" x="700" y="994">cosign · in-toto · TAKE</text>
+            <text class="t-sub" x="196" y="1010">reproducer · before|after · five gate results · diff + plain English · regression test · rollback script</text>
+            <text class="t-sub" x="196" y="1024">SBOM delta · ROE level in force · approver signatures · model + prompt version · AST delta</text>
+
+            <path class="fl-nov" d="M880,1004 H912 V1072 H136 V306 H176" marker-end="url(#m1n)"/>
+            <text class="t-lbl t-nov" x="128" y="660" text-anchor="middle" transform="rotate(-90 128 660)">LEARN · corpus → 04 · vaccine rules → 04B · templates + failure memory → 06 · Fig 7</text>
+          </svg>
+        </div>
+        <div class="legend">
+          <span><i class="lg-main"></i>primary path</span>
+          <span><i class="lg-deg"></i>degraded — still a real result</span>
+          <span><i class="lg-rej"></i>gate rejection — another round</span>
+          <span><i class="lg-nov"></i>ours (BUILD)</span>
+        </div>
+        <figcaption>The dashed envelope matters as much as the spine: every build and every
+          execution of untrusted target code happens inside a container with no network interface.
+          That answer is rated critical-for-trust and the jury will ask for it.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 2</span><h3>The keystone record, and the state machine that makes precision structural</h3></div>
+      <p class="lede">We extend SARIF — the standard every static tool already emits — rather than
+        inventing a format, so any tool's output can enter and ours can leave into anything that
+        reads SARIF. The precision claim is not a tuning result; it is this state machine refusing a
+        transition.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1120" viewBox="0 0 1120 440" role="img"
+               aria-label="The finding record's fields, and its state machine. SUSPECTED sits inside a not-reportable region. It becomes CONFIRMED only when a reproducer is attached and replaying it fires the oracle — either from its own lane or cross-confirmed by another lane's reproducer landing on the same fix site. CONFIRMED becomes PATCHED when a candidate fix exists, and PATCHED becomes VERIFIED only when all five gate checks pass and the attack is dead. A rejected patch returns to CONFIRMED, and exhausted rounds end at REPORT_ONLY. CONFIRMED, PATCHED, VERIFIED and REPORT_ONLY are all inside the reportable region.">
+            <defs>
+              <marker id="m2f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m2r" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-rej" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m2d" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-deg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m2n" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-nov" d="M0,0 L9,3.5 L0,7 z"/></marker>
+            </defs>
+
+            <!-- record fields -->
+            <rect class="bx-nov" x="20" y="20" width="250" height="230"/>
+            <text class="t-ttl t-nov" x="34" y="42">THE RECORD</text>
+            <text class="t-sub" x="34" y="56" style="fill:var(--novel)">SARIF 2.1 result + proof block</text>
+            <text class="t-sub" x="34" y="80">oracle</text>
+            <text class="t-sub" x="34" y="95">bug_class  (CWE)</text>
+            <text class="t-sub" x="34" y="110" style="fill:var(--novel)">reproducer   ← the precision field</text>
+            <text class="t-sub" x="34" y="125">replay_before / replay_after</text>
+            <text class="t-sub" x="34" y="140">status</text>
+            <text class="t-sub" x="34" y="155">fix_site_set  (ranked)</text>
+            <text class="t-sub" x="34" y="170">gate  (five checks)</text>
+            <text class="t-sub" x="34" y="185">roe_level</text>
+            <text class="t-sub" x="34" y="200">signatures</text>
+            <text class="t-note" x="34" y="222">+ transition timestamps and the</text>
+            <text class="t-note" x="34" y="235">repair lane, so Speed and Resource</text>
+            <text class="t-note" x="34" y="248">are measured, not estimated</text>
+
+            <!-- regions -->
+            <rect class="bx-env" x="300" y="46" width="186" height="110" rx="5" style="stroke:var(--reject)"/>
+            <text class="t-rej" x="393" y="38" text-anchor="middle">NOT REPORTABLE</text>
+            <rect class="bx-env" x="530" y="46" width="570" height="110" rx="5" style="stroke:var(--verified)"/>
+            <text class="t-sub" x="815" y="38" text-anchor="middle" style="fill:var(--verified)">REPORTABLE — every one has a reproducer that replays</text>
+
+            <!-- states -->
+            <rect class="bx-2" x="318" y="78" width="150" height="46"/>
+            <text class="t-lbl" x="393" y="98" text-anchor="middle">SUSPECTED</text>
+            <text class="t-sub" x="393" y="113" text-anchor="middle">static match, no proof</text>
+
+            <path class="fl" d="M468,101 H546" marker-end="url(#m2f)"/>
+            <text class="t-sub" x="507" y="94" text-anchor="middle">reproducer</text>
+            <text class="t-sub" x="507" y="118" text-anchor="middle">replays</text>
+
+            <rect class="bx" x="550" y="78" width="140" height="46"/>
+            <text class="t-lbl" x="620" y="98" text-anchor="middle">CONFIRMED</text>
+            <text class="t-sub" x="620" y="113" text-anchor="middle">proven real</text>
+
+            <path class="fl" d="M690,101 H758" marker-end="url(#m2f)"/>
+            <text class="t-sub" x="724" y="94" text-anchor="middle">candidate</text>
+
+            <rect class="bx" x="762" y="78" width="140" height="46"/>
+            <text class="t-lbl" x="832" y="98" text-anchor="middle">PATCHED</text>
+            <text class="t-sub" x="832" y="113" text-anchor="middle">proves nothing yet</text>
+
+            <path class="fl-ok" d="M902,101 H950" marker-end="url(#m2f)"/>
+            <text class="t-sub" x="926" y="94" text-anchor="middle" style="fill:var(--verified)">5/5</text>
+
+            <rect class="bx-ok" x="954" y="78" width="132" height="46"/>
+            <text class="t-lbl t-ok" x="1020" y="98" text-anchor="middle">VERIFIED</text>
+            <text class="t-sub" x="1020" y="113" text-anchor="middle" style="fill:var(--verified)">ships, signed</text>
+
+            <!-- rejection loop -->
+            <path class="fl-rej" d="M832,124 V162 H620 V128" marker-end="url(#m2r)"/>
+            <text class="t-rej" x="726" y="156" text-anchor="middle">gate rejects · cap 3 rounds</text>
+
+            <!-- report only -->
+            <path class="fl-deg" d="M620,162 V206 H880" marker-end="url(#m2d)"/>
+            <rect class="bx-deg" x="884" y="186" width="202" height="42"/>
+            <text class="t-lbl" x="985" y="203" text-anchor="middle" style="fill:var(--signal)">REPORT_ONLY</text>
+            <text class="t-sub" x="985" y="218" text-anchor="middle">proven, no fix claimed</text>
+            <text class="t-deg" x="700" y="200">rounds exhausted</text>
+
+            <!-- cross confirmation -->
+            <rect class="bx-nov" x="300" y="272" width="786" height="88"/>
+            <text class="t-ttl t-nov" x="316" y="293">LANE CROSS-CONFIRMATION</text>
+            <text class="t-sub" x="520" y="293" style="fill:var(--novel)">the second route into CONFIRMED — our extension, and only possible because every lane emits one record</text>
+            <rect class="bx-2" x="316" y="304" width="206" height="44"/>
+            <text class="t-sub" x="419" y="322" text-anchor="middle">lane B · Semgrep</text>
+            <text class="t-sub" x="419" y="336" text-anchor="middle">possible SQLi, UserDao:71</text>
+            <path class="fl-nov" d="M524,326 H568" marker-end="url(#m2n)"/>
+            <rect class="bx-2" x="572" y="304" width="206" height="44"/>
+            <text class="t-sub" x="675" y="322" text-anchor="middle">lane A · fuzzer, later</text>
+            <text class="t-sub" x="675" y="336" text-anchor="middle">reproducer: same fix site AND same CWE</text>
+            <path class="fl-nov" d="M780,326 H824" marker-end="url(#m2n)"/>
+            <rect class="bx-ok" x="828" y="304" width="242" height="44"/>
+            <text class="t-sub t-ok" x="949" y="322" text-anchor="middle">the static finding is promoted</text>
+            <text class="t-sub" x="949" y="336" text-anchor="middle" style="fill:var(--verified)">SUSPECTED → CONFIRMED · records merge to one</text>
+            <path class="fl-nov" d="M949,300 V272 V240 H393 V128" marker-end="url(#m2n)" style="stroke-dasharray:4 4"/>
+
+            <text class="t-note" x="20" y="300">The rule that makes</text>
+            <text class="t-note" x="20" y="314">precision structural:</text>
+            <text class="t-lbl t-nov" x="20" y="334">no reproducer,</text>
+            <text class="t-lbl t-nov" x="20" y="350">no report.</text>
+            <text class="t-note" x="20" y="372">Enforced by refusing</text>
+            <text class="t-note" x="20" y="386">the transition — not by</text>
+            <text class="t-note" x="20" y="400">review or by promise.</text>
+          </svg>
+        </div>
+        <figcaption>Cross-confirmation is our addition, not the dossier's. Two rules keep it
+          honest: the reproducer must land on the <strong>same fix site with the same CWE</strong>
+          (a null dereference at line 71 does not confirm a SQL-injection match at line 71), and
+          the two records <strong>merge into one</strong> on the dedup key — otherwise one bug is
+          counted twice and the Performance number is inflated.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 3</span><h3>The gate, in order</h3></div>
+      <p class="lede">Cheapest check first, so a bad patch is refused for the least compute. Each
+        candidate must earn all five itself — it never inherits a previous round's passes.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1040" viewBox="0 0 1080 300" role="img"
+               aria-label="The five gate checks in sequence: compiles, proof-of-vulnerability dead, differential corpus, coverage held, clean refuzz. All five passing yields a verified patch. Any one failing drops to a rejected bar that returns the finding to repair for up to three rounds, then issues a report-only result. The differential corpus check is guarded by a determinism pre-flight run three times, a canonicaliser and a quarantine list.">
+            <defs>
+              <marker id="m3f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m3r" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-rej" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m3o" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-ok" d="M0,0 L9,3.5 L0,7 z"/></marker>
+            </defs>
+            <rect class="bx-nov" x="330" y="8" width="366" height="38"/>
+            <text class="t-sub t-nov" x="513" y="25" text-anchor="middle">determinism pre-flight (3 runs) · canonicaliser · quarantine list</text>
+            <text class="t-sub" x="513" y="38" text-anchor="middle" style="fill:var(--novel)">so a noisy service cannot cause a false rejection</text>
+            <path class="fl-nov" d="M513,46 V62" marker-end="url(#m3f)"/>
+
+            <rect class="bx" x="40" y="64" width="160" height="58"/>
+            <text class="t-lbl" x="120" y="88" text-anchor="middle">1 · COMPILES</text>
+            <text class="t-sub" x="120" y="105" text-anchor="middle">builds and imports</text>
+            <path class="fl" d="M200,93 H214" marker-end="url(#m3f)"/>
+            <rect class="bx" x="218" y="64" width="160" height="58"/>
+            <text class="t-lbl" x="298" y="88" text-anchor="middle">2 · POV DEAD</text>
+            <text class="t-sub" x="298" y="105" text-anchor="middle">attack no longer fires</text>
+            <path class="fl" d="M378,93 H392" marker-end="url(#m3f)"/>
+            <rect class="bx-nov" x="396" y="64" width="160" height="58"/>
+            <text class="t-lbl t-nov" x="476" y="88" text-anchor="middle">3 · DIFF CORPUS</text>
+            <text class="t-sub" x="476" y="105" text-anchor="middle" style="fill:var(--novel)">N corpus inputs + M own tests</text>
+            <path class="fl" d="M556,93 H570" marker-end="url(#m3f)"/>
+            <rect class="bx" x="574" y="64" width="160" height="58"/>
+            <text class="t-lbl" x="654" y="88" text-anchor="middle">4 · COVERAGE HELD</text>
+            <text class="t-sub" x="654" y="105" text-anchor="middle">not fixed by deleting</text>
+            <path class="fl" d="M734,93 H748" marker-end="url(#m3f)"/>
+            <rect class="bx" x="752" y="64" width="160" height="58"/>
+            <text class="t-lbl" x="832" y="88" text-anchor="middle">5 · CLEAN REFUZZ</text>
+            <text class="t-sub" x="832" y="105" text-anchor="middle">no new bug found</text>
+            <path class="fl-ok" d="M912,93 H936" marker-end="url(#m3o)"/>
+            <rect class="bx-ok" x="940" y="64" width="104" height="58"/>
+            <text class="t-lbl t-ok" x="992" y="88" text-anchor="middle">VERIFIED</text>
+            <text class="t-sub" x="992" y="105" text-anchor="middle" style="fill:var(--verified)">ships</text>
+
+            <path class="fl-rej" d="M120,122 V196" marker-end="url(#m3r)"/>
+            <path class="fl-rej" d="M298,122 V196" marker-end="url(#m3r)"/>
+            <path class="fl-rej" d="M476,122 V196" marker-end="url(#m3r)"/>
+            <path class="fl-rej" d="M654,122 V196" marker-end="url(#m3r)"/>
+            <path class="fl-rej" d="M832,122 V196" marker-end="url(#m3r)"/>
+            <text class="t-rej" x="134" y="160">any one fails</text>
+            <rect class="bx" x="40" y="198" width="1004" height="56" style="stroke:var(--reject);stroke-width:1.8"/>
+            <text class="t-lbl" x="542" y="222" text-anchor="middle" style="fill:var(--reject)">REJECTED — the exact failure is fed back to repair</text>
+            <text class="t-sub" x="542" y="240" text-anchor="middle">up to 3 rounds, each candidate re-earning all five · then REPORT_ONLY</text>
+            <text class="t-note" x="40" y="283">Four of five is not a pass. Nothing unproven ships.</text>
+          </svg>
+        </div>
+        <figcaption>Check 3 is two baselines in one: every non-crashing <strong>corpus
+          input</strong> must produce identical output before and after, <em>and</em> the target's
+          <strong>own regression suite</strong> (JUnit, pytest, Jest) must still pass. That is what
+          makes the honest claim "no observed behaviour changed across N inputs and M tests" true —
+          and when a target ships no tests, M is zero and the bundle says so. The corpus half is
+          free, because fuzzing already produced it.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 4</span><h3>The brain — three components, and the ladder down to none</h3></div>
+      <p class="lede">The model layer is a <em>proposer</em>, subordinate to the gate. Note what is
+        taken away from it: localisation is deterministic, so the model is handed one function rather
+        than asked to search a repo.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1120" viewBox="0 0 1120 420" role="img"
+               aria-label="The model layer: a serving runtime running a 32B repair brain and an 8B security advisor co-resident in 32GB, wrapped by an agent scaffold, plus a tiny calibrated classifier that routes lanes and pre-gates patches. The repair brain writes the patch and the regression test; the advisor classifies the CWE, judges exploitability and whether the fix addresses the security root cause, and its disagreement triggers an ROE step-down but never blocks the gate. Below, a degradation ladder from two co-resident models to one model, to a CPU-only smaller profile, to template and retrieval only with no model at all.">
+            <defs>
+              <marker id="m4f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m4d" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-deg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m4n" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-nov" d="M0,0 L9,3.5 L0,7 z"/></marker>
+            </defs>
+
+            <rect class="bx-env" x="20" y="18" width="700" height="190" rx="5"/>
+            <text class="t-sub" x="32" y="12">ONE NODE · 32 GB VRAM · both models co-resident at Q4/Q5, with room for context</text>
+
+            <rect class="bx-2" x="36" y="34" width="330" height="30"/>
+            <text class="t-sub" x="201" y="53" text-anchor="middle">AGENT SCAFFOLD — mini-SWE-agent / OpenHands · TAKE</text>
+            <rect class="bx-2" x="374" y="34" width="330" height="30"/>
+            <text class="t-sub" x="539" y="53" text-anchor="middle">SERVING — vLLM / llama.cpp · TAKE</text>
+
+            <rect class="bx" x="36" y="76" width="330" height="76"/>
+            <text class="t-lbl" x="52" y="96">REPAIR BRAIN · 32B</text>
+            <text class="t-sub" x="52" y="111">Qwen3-Coder-Next (or SWE-Swiss-32B) · TAKE</text>
+            <text class="t-sub" x="52" y="127">writes the patch —</text>
+            <text class="t-sub t-ok" x="52" y="141">and the regression test that proves it</text>
+
+            <rect class="bx" x="374" y="76" width="330" height="76"/>
+            <text class="t-lbl" x="390" y="96">SECURITY ADVISOR · 8B</text>
+            <text class="t-sub" x="390" y="111">Foundation-sec-8B-Reasoning · TAKE</text>
+            <text class="t-sub" x="390" y="127">classifies CWE · judges exploitability ·</text>
+            <text class="t-sub" x="390" y="141">checks the fix hits the security root cause</text>
+
+            <rect class="bx-nov" x="36" y="162" width="668" height="36"/>
+            <text class="t-sub t-nov" x="52" y="180">CALIBRATED CLASSIFIER · BUILD — bounded, typed, offline. The intern's dispatcher: not the inspector, not the mechanic.</text>
+            <text class="t-sub" x="52" y="193" style="fill:var(--novel)">triage 800 crashes before spending tokens  ·  route template|retrieval|LLM so the 32B runs only when it must  ·  kill bad candidates before the differential test</text>
+
+            <!-- advisor consequence -->
+            <path class="fl-deg" d="M720,114 H780" marker-end="url(#m4d)"/>
+            <rect class="bx-deg" x="786" y="76" width="312" height="76"/>
+            <text class="t-lbl" x="942" y="96" text-anchor="middle" style="fill:var(--signal)">IF THE ADVISOR DISAGREES</text>
+            <text class="t-sub" x="942" y="113" text-anchor="middle">the patch drops to R1 — recommend only</text>
+            <text class="t-sub" x="942" y="128" text-anchor="middle" style="fill:var(--fg)">It reduces authority. It never blocks the gate.</text>
+            <text class="t-sub" x="942" y="143" text-anchor="middle">An LLM with a veto would not be a mechanical judge.</text>
+
+            <!-- degrade ladder -->
+            <text class="t-ttl" x="20" y="248">DEGRADE LADDER — the pipeline survives all the way down</text>
+            <rect class="bx" x="20" y="260" width="250" height="52"/>
+            <text class="t-lbl" x="145" y="280" text-anchor="middle">32B + 8B</text>
+            <text class="t-sub" x="145" y="296" text-anchor="middle">target profile, one GPU</text>
+            <path class="fl-deg" d="M270,286 H292" marker-end="url(#m4d)"/>
+            <rect class="bx" x="296" y="260" width="250" height="52"/>
+            <text class="t-lbl" x="421" y="280" text-anchor="middle">ONE MODEL</text>
+            <text class="t-sub" x="421" y="296" text-anchor="middle">swap in, swap out</text>
+            <path class="fl-deg" d="M546,286 H568" marker-end="url(#m4d)"/>
+            <rect class="bx" x="572" y="260" width="250" height="52"/>
+            <text class="t-lbl" x="697" y="280" text-anchor="middle">CPU-ONLY, SMALLER</text>
+            <text class="t-sub" x="697" y="296" text-anchor="middle">benchmark it in advance</text>
+            <path class="fl-deg" d="M822,286 H844" marker-end="url(#m4d)"/>
+            <rect class="bx-ok" x="848" y="260" width="250" height="52"/>
+            <text class="t-lbl t-ok" x="973" y="280" text-anchor="middle">TEMPLATE + RETRIEVAL</text>
+            <text class="t-sub" x="973" y="296" text-anchor="middle" style="fill:var(--verified)">zero model — the gate never needed one</text>
+
+            <text class="t-note" x="20" y="340">Taken away from the model on purpose: localisation is deterministic (ripwire), so the model sees one function, not the repository.</text>
+            <text class="t-note" x="20" y="356">The lesson the benchmarks force: a bare 32B scores ~9% on SWE-bench; the same size trained as an agent with a proper harness reaches 60–71%.</text>
+            <text class="t-lbl" x="20" y="378">The scaffold and the training matter far more than raw size — which is exactly why we compete on the scaffold.</text>
+            <text class="t-note" x="20" y="400">One GPU serialises model calls through a queue; parallelism lives in the CPU-bound find lanes. Reserve models: RedSage (~8B) for the advisor; CyberPal 2.0 (4B–20B) lighter.</text>
+          </svg>
+        </div>
+        <figcaption>Three components, not one. The scaffold is load-bearing: the whole thesis is
+          that a well-scaffolded 32B beats a bigger unscaffolded model, so the scaffold is not
+          plumbing — it is the argument.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 5</span><h3>Nothing is trusted until it proves itself</h3></div>
+      <p class="lede">This is the frame over the whole novelty surface, and the most defensible thing
+        we can say in the room. One philosophy, enforced mechanically at five different levels — and
+        we apply it to our own outputs, not just the target's code. The third instance closes a hole
+        the dossier leaves open: the model writes the regression test that goes into the bundle and
+        into the target's own suite, so a test that never actually failed on the vulnerable build
+        would be a worthless proof — it has to earn its place like everything else.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1040" viewBox="0 0 1080 300" role="img"
+               aria-label="Five instances of one principle. A finding must have a reproducer that replays before it can be reported. A patch must pass five mechanical checks before it ships. The regression test the model writes must fail on the vulnerable build and pass on the patched one before it enters the bundle. A detection rule must pass three checks before it sweeps. A fuzzing harness must compile and produce coverage before it is used. All are ours except the harness check, which is borrowed tooling.">
+            <defs>
+              <marker id="m5f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+            </defs>
+            <text class="t-ttl" x="20" y="22">EVERY OUTPUT OF THIS SYSTEM — INCLUDING OUR OWN — MUST EARN ITS PLACE</text>
+
+            <rect class="bx-nov" x="20" y="40" width="196" height="150"/>
+            <text class="t-lbl t-nov" x="118" y="62" text-anchor="middle">A FINDING</text>
+            <text class="t-sub" x="118" y="78" text-anchor="middle" style="fill:var(--novel)">1 check · BUILD</text>
+            <path class="fl" d="M118,86 V102" marker-end="url(#m5f)"/>
+            <text class="t-sub" x="118" y="120" text-anchor="middle">a reproducer that</text>
+            <text class="t-sub" x="118" y="134" text-anchor="middle">actually replays</text>
+            <text class="t-note" x="118" y="158" text-anchor="middle">else locked at</text>
+            <text class="t-note" x="118" y="171" text-anchor="middle">SUSPECTED, forever</text>
+
+            <rect class="bx-nov" x="230" y="40" width="196" height="150"/>
+            <text class="t-lbl t-nov" x="328" y="62" text-anchor="middle">A PATCH</text>
+            <text class="t-sub" x="328" y="78" text-anchor="middle" style="fill:var(--novel)">5 checks · BUILD</text>
+            <path class="fl" d="M328,86 V102" marker-end="url(#m5f)"/>
+            <text class="t-sub" x="328" y="118" text-anchor="middle">compiles · PoV dead</text>
+            <text class="t-sub" x="328" y="132" text-anchor="middle">corpus + tests identical</text>
+            <text class="t-sub" x="328" y="146" text-anchor="middle">coverage held · refuzz</text>
+            <text class="t-note" x="328" y="171" text-anchor="middle">else REPORT_ONLY</text>
+
+            <rect class="bx-nov" x="440" y="40" width="196" height="150"/>
+            <text class="t-lbl t-nov" x="538" y="62" text-anchor="middle">THE MODEL'S TEST</text>
+            <text class="t-sub" x="538" y="78" text-anchor="middle" style="fill:var(--novel)">2 checks · BUILD</text>
+            <path class="fl" d="M538,86 V102" marker-end="url(#m5f)"/>
+            <text class="t-sub" x="538" y="120" text-anchor="middle">fails on the vulnerable build</text>
+            <text class="t-sub" x="538" y="134" text-anchor="middle">passes on the patched build</text>
+            <text class="t-note" x="538" y="158" text-anchor="middle">else it never enters</text>
+            <text class="t-note" x="538" y="171" text-anchor="middle">the bundle or the suite</text>
+
+            <rect class="bx-nov" x="650" y="40" width="196" height="150"/>
+            <text class="t-lbl t-nov" x="748" y="62" text-anchor="middle">A DETECTION RULE</text>
+            <text class="t-sub" x="748" y="78" text-anchor="middle" style="fill:var(--novel)">3 checks · BUILD</text>
+            <path class="fl" d="M748,86 V102" marker-end="url(#m5f)"/>
+            <text class="t-sub" x="748" y="118" text-anchor="middle">hits the vulnerable shape</text>
+            <text class="t-sub" x="748" y="132" text-anchor="middle">misses the fixed shape</text>
+            <text class="t-sub" x="748" y="146" text-anchor="middle">quiet on a clean corpus</text>
+            <text class="t-note" x="748" y="171" text-anchor="middle">else thrown away</text>
+
+            <rect class="bx-deg" x="860" y="40" width="200" height="150"/>
+            <text class="t-lbl" x="960" y="62" text-anchor="middle" style="fill:var(--signal)">A FUZZ HARNESS</text>
+            <text class="t-sub" x="960" y="78" text-anchor="middle">2 checks · WRAP</text>
+            <path class="fl" d="M960,86 V102" marker-end="url(#m5f)"/>
+            <text class="t-sub" x="960" y="120" text-anchor="middle">compiles</text>
+            <text class="t-sub" x="960" y="134" text-anchor="middle">produces coverage</text>
+            <text class="t-note" x="960" y="158" text-anchor="middle">else hand-written,</text>
+            <text class="t-note" x="960" y="171" text-anchor="middle">said openly</text>
+
+            <rect class="bx-2" x="20" y="210" width="1040" height="34"/>
+            <text class="t-lbl" x="540" y="232" text-anchor="middle">The symmetry is the claim: a system that refuses to trust its own patches, tests, rules and harnesses is one you could let near a live system.</text>
+            <text class="t-note" x="20" y="268">Honest provenance: the harness check is the thinnest of the four and sits on borrowed tooling (OSS-Fuzz-Gen + Fuzz Introspector). Java sidesteps it entirely —</text>
+            <text class="t-note" x="20" y="283">Jazzer's autofuzz writes the harness itself, which is one reason Java is the easiest target rather than the hardest, and the deepest adapter we build.</text>
+          </svg>
+        </div>
+        <figcaption>We still claim six novel mechanisms, not seven: the harness quality gate is
+          borrowed tooling with our check on top, so it belongs here as an instance of the principle
+          rather than as a headline mechanism of its own.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 6</span><h3>Authority, and how it tightens itself</h3></div>
+      <p class="lede">Autonomy is not a switch. It is a per-asset authority level the system obeys,
+        and it steps down on its own as the signals weaken — the same logic as fire control. An
+        operator may always set it lower than the cap, never higher.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1040" viewBox="0 0 1080 420" role="img"
+               aria-label="The four ROE levels from R0 observe to R3 act autonomously, with asset tier caps above them: mission-critical capped at R1, critical at R2 with a two-person rule, important at R2, routine at R3. Below, an automatic step-down arrow moves authority leftward when any of six triggers fire. At the bottom, the five standing orders that hold at every level, the two-person rule mechanism, and the policy engine and audit log.">
+            <defs>
+              <marker id="m6f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m6d" viewBox="0 0 11 9" refX="10" refY="4.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk-deg" d="M0,0 L11,4.5 L0,9 z"/></marker>
+            </defs>
+            <text class="t-sub" x="20" y="20">ASSET CRITICALITY CAPS THE LEVEL — resolved per asset from the registry (Fig 7)</text>
+            <text class="t-sub" x="398" y="42" text-anchor="middle">mission-critical</text>
+            <text class="t-sub" x="398" y="55" text-anchor="middle" style="fill:var(--fg-dim)">fire control, weapon software</text>
+            <path class="fl" d="M398,60 V76" marker-end="url(#m6f)"/>
+            <text class="t-sub" x="649" y="42" text-anchor="middle">critical (two-person) · important</text>
+            <text class="t-sub" x="649" y="55" text-anchor="middle" style="fill:var(--fg-dim)">C2, comms management · logistics, admin</text>
+            <path class="fl" d="M649,60 V76" marker-end="url(#m6f)"/>
+            <text class="t-sub" x="877" y="42" text-anchor="middle">routine</text>
+            <text class="t-sub" x="877" y="55" text-anchor="middle" style="fill:var(--fg-dim)">training LMS, internal portal</text>
+            <path class="fl" d="M877,60 V76" marker-end="url(#m6f)"/>
+
+            <rect class="bx" x="20" y="78" width="214" height="62"/>
+            <text class="t-lbl" x="127" y="100" text-anchor="middle">R0 · OBSERVE</text>
+            <text class="t-sub" x="127" y="117" text-anchor="middle">scan · map · list suspects</text>
+            <text class="t-sub" x="127" y="131" text-anchor="middle" style="fill:var(--fg-dim)">may not run the target</text>
+            <rect class="bx" x="268" y="78" width="260" height="62"/>
+            <text class="t-lbl" x="398" y="100" text-anchor="middle">R1 · RECOMMEND</text>
+            <text class="t-sub" x="398" y="117" text-anchor="middle">+ fuzz in sandbox · prove · draft and gate</text>
+            <text class="t-sub" x="398" y="131" text-anchor="middle" style="fill:var(--fg-dim)">may not apply anything outside it</text>
+            <rect class="bx" x="542" y="78" width="214" height="62"/>
+            <text class="t-lbl" x="649" y="100" text-anchor="middle">R2 · ON APPROVAL</text>
+            <text class="t-sub" x="649" y="117" text-anchor="middle">+ stage a verified patch</text>
+            <text class="t-sub" x="649" y="131" text-anchor="middle" style="fill:var(--fg-dim)">deploys after human sign-off</text>
+            <rect class="bx" x="770" y="78" width="214" height="62"/>
+            <text class="t-lbl" x="877" y="100" text-anchor="middle">R3 · AUTONOMOUS</text>
+            <text class="t-sub" x="877" y="117" text-anchor="middle">+ deploy verified fixes</text>
+            <text class="t-sub" x="877" y="131" text-anchor="middle" style="fill:var(--fg-dim)">within standing orders</text>
+
+            <path class="fl-deg" d="M900,166 H300" marker-end="url(#m6d)" style="stroke-width:2.2"/>
+            <text class="t-deg" x="600" y="159" text-anchor="middle">AUTOMATIC STEP-DOWN — authority moves this way on its own</text>
+
+            <rect class="bx-deg" x="20" y="180" width="964" height="92"/>
+            <text class="t-sub" x="36" y="199" style="fill:var(--signal)">ANY OF THESE DROPS THIS PATCH A LEVEL, EVEN ON AN R3-CLEARED ASSET</text>
+            <text class="t-sub" x="36" y="219">· patch touches auth, crypto or access control</text>
+            <text class="t-sub" x="36" y="236">· fix came from the mitigation floor, not a real fix</text>
+            <text class="t-sub" x="36" y="253">· AST delta over the size threshold</text>
+            <text class="t-sub" x="520" y="219">· differential gate quarantined many flaky inputs</text>
+            <text class="t-sub" x="520" y="236">· security advisor disagrees with the coding model</text>
+            <text class="t-sub" x="520" y="253">· first time this bug class is seen on this asset</text>
+            <text class="t-ttl" x="20" y="295" style="fill:var(--signal)">Confidence buys autonomy. Uncertainty takes it away.</text>
+
+            <rect class="bx-2" x="20" y="310" width="470" height="94"/>
+            <text class="t-lbl" x="36" y="330">STANDING ORDERS — never broken, at any level</text>
+            <text class="t-sub" x="36" y="348">· no network egress, ever</text>
+            <text class="t-sub" x="36" y="362">· never deploy a patch that failed any gate</text>
+            <text class="t-sub" x="36" y="376">· never delete more than a set amount of code</text>
+            <text class="t-sub" x="36" y="390">· every action logged with the ROE in force and who authorised it; every deployment ships with a rollback</text>
+
+            <rect class="bx-2" x="514" y="310" width="470" height="94"/>
+            <text class="t-lbl" x="530" y="330">THE TWO-PERSON RULE — critical assets</text>
+            <text class="t-sub" x="530" y="348">Two different officers sign the patch with their own keys before release.</text>
+            <text class="t-sub" x="530" y="362">Borrowed from nuclear and crypto custody doctrine. Signatures go into the bundle.</text>
+            <text class="t-sub" x="530" y="383">Enforcement: ROE is a signed OPA policy file · cosign signatures ·</text>
+            <text class="t-sub" x="530" y="396">append-only hash-chained audit log — all TAKE, all offline.</text>
+          </svg>
+        </div>
+        <figcaption>Probably our single strongest differentiator, because it answers the jury's
+          unspoken question — <em>who controls this thing?</em> — in doctrine they already use.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">Fig 7</span><h3>Learning, the vaccine, and the fleet across the air gap</h3></div>
+      <p class="lede">Four loops in the design; <strong>three claimed for the demo</strong> — the
+        nightly QLoRA refresh is a real deployment feature but it will not visibly improve anything
+        inside the finale, and saying so is worth more than implying otherwise.</p>
+      <figure>
+        <div class="canvas">
+          <svg class="w1120" viewBox="0 0 1120 400" role="img"
+               aria-label="The four learning loops: corpus persistence, template mining, failure memory, all demonstrated; and nightly QLoRA, designed but not claimed for the demo. Then the vaccine flow: a verified fix is extracted into a Semgrep rule, the rule must pass three proof checks or be thrown away, then it sweeps every registered codebase read-only, each hit stays suspected until it has its own reproducer, and confirmed hits are fixed via the template lane because the original fix is the template. The asset registry serves both the sweep and the ROE lookup. A sneakernet path carries signed bundles across the air gap to other installations.">
+            <defs>
+              <marker id="m7f" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-fg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m7n" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-nov" d="M0,0 L9,3.5 L0,7 z"/></marker>
+              <marker id="m7d" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="7" markerHeight="6" orient="auto"><path class="mk-deg" d="M0,0 L9,3.5 L0,7 z"/></marker>
+            </defs>
+
+            <text class="t-ttl" x="20" y="20">THE FOUR LOOPS</text>
+            <rect class="bx-ok" x="20" y="30" width="250" height="52"/>
+            <text class="t-lbl t-ok" x="145" y="50" text-anchor="middle">CORPUS PERSISTENCE</text>
+            <text class="t-sub" x="145" y="66" text-anchor="middle" style="fill:var(--verified)">carried across runs · demonstrated</text>
+            <rect class="bx-ok" x="282" y="30" width="250" height="52"/>
+            <text class="t-lbl t-ok" x="407" y="50" text-anchor="middle">TEMPLATE MINING</text>
+            <text class="t-sub" x="407" y="66" text-anchor="middle" style="fill:var(--verified)">each verified fix → zero-inference rule</text>
+            <rect class="bx-ok" x="544" y="30" width="250" height="52"/>
+            <text class="t-lbl t-ok" x="669" y="50" text-anchor="middle">FAILURE MEMORY</text>
+            <text class="t-sub" x="669" y="66" text-anchor="middle" style="fill:var(--verified)">rejected patches as negatives</text>
+            <rect class="bx-deg" x="806" y="30" width="250" height="52"/>
+            <text class="t-lbl" x="931" y="50" text-anchor="middle" style="fill:var(--signal)">NIGHTLY QLoRA</text>
+            <text class="t-sub" x="931" y="66" text-anchor="middle">designed, NOT claimed for the demo</text>
+
+            <!-- vaccine -->
+            <text class="t-ttl t-nov" x="20" y="116">THE VULNERABILITY VACCINE — one fix, fleet-wide immunity · BUILD on Semgrep</text>
+            <rect class="bx-nov" x="20" y="128" width="150" height="48"/>
+            <text class="t-sub t-nov" x="95" y="148" text-anchor="middle">VERIFIED FIX</text>
+            <text class="t-sub" x="95" y="162" text-anchor="middle" style="fill:var(--novel)">only verified ones</text>
+            <path class="fl-nov" d="M170,152 H190" marker-end="url(#m7n)"/>
+            <rect class="bx-2" x="194" y="128" width="150" height="48"/>
+            <text class="t-sub" x="269" y="148" text-anchor="middle">EXTRACT</text>
+            <text class="t-sub" x="269" y="162" text-anchor="middle">bad shape vs fixed shape</text>
+            <path class="fl-nov" d="M344,152 H364" marker-end="url(#m7n)"/>
+            <rect class="bx-2" x="368" y="128" width="150" height="48"/>
+            <text class="t-sub" x="443" y="148" text-anchor="middle">WRITE RULE</text>
+            <text class="t-sub" x="443" y="162" text-anchor="middle">model drafts Semgrep</text>
+            <path class="fl-nov" d="M518,152 H538" marker-end="url(#m7n)"/>
+            <rect class="bx-nov" x="542" y="128" width="150" height="48"/>
+            <text class="t-sub t-nov" x="617" y="148" text-anchor="middle">PROVE RULE · 3 checks</text>
+            <text class="t-sub" x="617" y="162" text-anchor="middle" style="fill:var(--novel)">fails → thrown away</text>
+            <path class="fl-nov" d="M692,152 H712" marker-end="url(#m7n)"/>
+            <rect class="bx-2" x="716" y="128" width="150" height="48"/>
+            <text class="t-sub" x="791" y="148" text-anchor="middle">SWEEP</text>
+            <text class="t-sub" x="791" y="162" text-anchor="middle">read-only · always R0-safe</text>
+            <path class="fl-nov" d="M866,152 H886" marker-end="url(#m7n)"/>
+            <rect class="bx-2" x="890" y="128" width="166" height="48"/>
+            <text class="t-sub" x="973" y="148" text-anchor="middle">CONFIRM, THEN FIX</text>
+            <text class="t-sub" x="973" y="162" text-anchor="middle">template lane first</text>
+
+            <text class="t-note" x="20" y="196">A sweep hit is only SUSPECTED until it earns its own reproducer, so precision stays structural. Fixing each hit follows that asset's ROE — a vaccine never bypasses authority.</text>
+            <text class="t-lbl t-nov" x="20" y="214">The original fix IS the template, so the more it learns, the less model compute it needs.</text>
+
+            <!-- registry -->
+            <rect class="bx-nov" x="20" y="232" width="330" height="76"/>
+            <text class="t-lbl t-nov" x="36" y="252">ASSET REGISTRY · BUILD</text>
+            <text class="t-sub" x="36" y="268">every codebase in the estate — its source, not just its name — with tier</text>
+            <text class="t-sub" x="36" y="283">serves the sweep (what to scan) and ROE (what is allowed)</text>
+            <text class="t-note" x="36" y="300">implied by the dossier, specified nowhere — so it is ours to build</text>
+            <path class="fl-nov" d="M350,262 H790 V180" marker-end="url(#m7n)"/>
+            <path class="fl-nov" d="M352,282 H420" marker-end="url(#m7n)"/>
+            <text class="t-sub" x="426" y="286">→ ROE lookup, Fig 6</text>
+
+            <!-- sneakernet -->
+            <rect class="bx-deg" x="600" y="232" width="456" height="76"/>
+            <text class="t-lbl" x="616" y="252" style="fill:var(--signal)">SNEAKERNET — the fleet-learning backbone</text>
+            <text class="t-sub" x="616" y="268">Each installation learns alone. A signed bundle on removable media,</text>
+            <text class="t-sub" x="616" y="283">verified on import, carries verified fixes, mined rules and vuln databases</text>
+            <text class="t-sub" x="616" y="298">across the air gap. The offline equivalent of apt update — design it now.</text>
+
+            <text class="t-note" x="20" y="340">Two retrieval indexes, deliberately separate: FAISS over ARVO fix pairs serves the repair lane; OSS-Fuzz recipe retrieval over 650+ projects serves the build agent.</text>
+            <text class="t-note" x="20" y="358">ARVO's ~6,100 bugs serve three roles at once — our practice set, our QLoRA training data, and our ground truth for measurement.</text>
+            <text class="t-note" x="20" y="382">The honest sentence to say out loud: "the deployment design includes periodic on-premise QLoRA refresh from validated fixes; the prototype demonstrates the three online learning loops."</text>
+          </svg>
+        </div>
+        <figcaption>The vaccine's value grows with fleet size, and its hits are fixed by the
+          zero-inference template lane — so the more the system learns, the less compute it needs.
+          That is a resource-utilisation argument as well as a scalability one.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">A.8</span><h3>What each oracle catches, and the footprint it all runs in</h3></div>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Oracle</th><th>Languages</th><th>Catches</th><th>Provenance</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Memory sanitizers — ASan / UBSan / MSan</td><td>C/C++, native</td>
+              <td>overflow, use-after-free, undefined behaviour, leaks</td><td><span class="pv">TAKE</span></td></tr>
+            <tr><td class="mech">Jazzer detectors</td><td>JVM</td>
+              <td>SQLi, LDAP, JNDI/log4j, command injection, deserialization, SSRF, path traversal, XPath, regex DoS</td><td><span class="pv">TAKE</span></td></tr>
+            <tr><td class="mech">Jazzer.js detectors</td><td>Node / JS / TS</td>
+              <td>command injection, path traversal</td><td><span class="pv">TAKE</span></td></tr>
+            <tr><td class="mech">PySecSan + our extensions</td><td>Python</td>
+              <td>shell exec, eval/exec, SQLi, pickle/yaml, path traversal, SSRF</td><td><span class="pv pv-b">BUILD</span></td></tr>
+            <tr><td class="mech">Metamorphic oracle</td><td>all</td>
+              <td>authz bypass, IDOR, BOLA — two principals, same response means a bug</td><td><span class="pv pv-b">BUILD</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">The non-crash insight that makes one pipeline possible: for bugs that do not
+        crash, we <strong>install a runtime tripwire at the dangerous sink</strong> so they abort
+        exactly like a memory bug would, and then reuse the entire crash-bug pipeline. One pipeline,
+        every bug class.</p>
+      <div class="shead" style="margin-top:26px"><span class="ref">A.9</span><h3>Which lanes run for which target — and every place the model is called</h3></div>
+      <p class="lede">Two tables an implementer needs that the dossier never wrote down. The first is
+        the CLASSIFY → lane-set rule from Fig 1 stage 01. The second is the full inventory of model
+        touchpoints, because "the 32B runs only when it must" is only a resource-utilisation claim if
+        we can list every time it runs and what bounds it.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Target class</th><th>A · Fuzz</th><th>B · Static</th><th>C · Supply</th><th>D · Service</th><th>Harness</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Library / module</td><td class="ok">yes, if built</td><td class="ok">yes</td><td class="ok">yes</td><td>—</td><td>autofuzz (JVM) · synthesised (C) · Atheris (Py)</td></tr>
+            <tr><td class="mech">Running service / API</td><td>at the API behind it</td><td class="ok">yes</td><td class="ok">yes</td><td class="ok">yes + metamorphic authz</td><td>OpenAPI spec drives Schemathesis / RESTler</td></tr>
+            <tr><td class="mech">CLI tool</td><td class="ok">yes, stdin/argv</td><td class="ok">yes</td><td class="ok">yes</td><td>—</td><td>argv/file harness, synthesised or by hand</td></tr>
+            <tr><td class="mech">Binary only, no source</td><td>AFL++ QEMU mode</td><td>Ghidra headless</td><td class="ok">yes (SBOM from binary)</td><td>if it serves</td><td>by hand; degrade to triage + report</td></tr>
+            <tr><td class="mech">React / SPA front end</td><td class="sig">no — not a fuzzing target</td><td class="ok">XSS, prototype pollution</td><td class="ok">yes</td><td>point at the API behind it</td><td>none</td></tr>
+            <tr><td class="mech">Unsupported language</td><td class="sig">no</td><td>Semgrep generic rules</td><td class="ok">yes — language-agnostic</td><td>if it serves</td><td>none</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Where the model is called</th><th>Which</th><th>Bounded by</th><th>If it fails or is absent</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Build agent — unknown build error</td><td>32B</td><td>one targeted fix per retry, cap 5; remedy table and OSS-Fuzz recipe tried first</td><td>build-free mode</td></tr>
+            <tr><td class="mech">Harness synthesis (C)</td><td>32B via OSS-Fuzz-Gen</td><td>harness quality gate; checkpoint</td><td>Jazzer autofuzz on JVM; hand-written for the demo target</td></tr>
+            <tr><td class="mech">Repair — LLM lane</td><td>32B</td><td>only after template and retrieval miss; best-of-N, gate picks; 3 rounds</td><td>mitigation floor, then REPORT_ONLY</td></tr>
+            <tr><td class="mech">Regression test generation</td><td>32B</td><td>must fail-before / pass-after (Fig 5)</td><td>bundle ships without a new test, and says so</td></tr>
+            <tr><td class="mech">Security judgement — CWE, exploitability, root cause</td><td>8B advisor</td><td>advisory; disagreement steps ROE down to R1, never blocks the gate</td><td>ROE conservatively capped at R2 for that patch</td></tr>
+            <tr><td class="mech">Vaccine rule drafting</td><td>32B</td><td>rule must pass its three checks or is discarded</td><td>no vaccine for that fix; nothing else affected</td></tr>
+            <tr><td class="mech">Commander's Brief — plain English, JSSD, Hindi</td><td>32B</td><td>templated structure; the facts come from the bundle, not the model</td><td>template-only brief, English</td></tr>
+            <tr><td class="mech">Triage · lane routing · pre-gate</td><td class="nov">calibrated classifier, not an LLM</td><td>typed, bounded output</td><td>default route: template → retrieval → LLM</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">Every row in the second table has a no-model path. That is the sentence behind
+        the degrade ladder in Fig 4: the gate never needed a model, so neither does the pipeline.</p>
+      <div class="grid g3">
+        <div class="card"><p class="stat">1</p><p class="stat-l">node · 32 GB VRAM · 16 cores for
+          fuzzing · ~100 GB offline cache</p></div>
+        <div class="card"><p class="stat">0</p><p class="stat-l">network interfaces · 0 cloud calls ·
+          0 bytes of source leaving the perimeter</p></div>
+        <div class="card"><p class="stat">CPU</p><p class="stat-l">degraded profile benchmarked in
+          advance, so the fallback is known rather than discovered live</p></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= PART B ================= -->
+  <div class="part" id="jury">
+    <div class="part-head"><span class="pn">Part B</span><h2>What the jury sees</h2></div>
+    <p class="part-sub">The architecture will look similar across many teams — it is the template
+      everyone's AI suggests. The room is won by what the jury can <em>see</em>. So demonstrability
+      is an architectural requirement here, not a presentation afterthought: every novel mechanism
+      needs an observable hook or it cannot be scored on novelty.</p>
+
+    <section>
+      <div class="shead"><span class="ref">B.1</span><h3>The operator console — six screens</h3></div>
+      <p class="lede"><strong>The console is the pitch.</strong> Every screen shows something the
+        jury scores with no narration needed. Built in our own stack, served entirely offline — no
+        CDN, no external fonts, nothing fetched: a console that phoned out would contradict the
+        whole claim.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>#</th><th>Screen</th><th>What it shows</th><th>What it proves</th><th>Tier</th></tr></thead>
+          <tbody>
+            <tr><td class="idx">1</td><td class="mech">Mission Board</td>
+              <td>Every target as a card: name, languages, <strong>build status — green built /
+                amber build-free but still finding / red could not ingest</strong>, finding count,
+                ROE level, status.</td>
+              <td>One glance is the whole operation, and it shows multi-language scalability without
+                a word. <span class="sig">Amber is labelled a success state, not a failure</span> —
+                that single design choice carries the degradation argument on screen.</td>
+              <td class="crit">Flawless</td></tr>
+            <tr><td class="idx">2</td><td class="mech">Live Pipeline</td>
+              <td>The nine stages as a flowing diagram; findings light up and travel
+                SUSPECTED → CONFIRMED → PATCHED → VERIFIED in real time.</td>
+              <td>The "it is actually working, live" screen — the antidote to a canned demo.</td>
+              <td class="crit">Lighter</td></tr>
+            <tr><td class="idx">3</td><td class="mech">Finding Detail <em>— the money screen</em></td>
+              <td>Split-screen exploit replay; the diff with its plain-English explanation; the five
+                checks ticking green one by one; the ranked <span class="mono">fix_site_set</span>
+                and which repair lane won.</td>
+              <td>This is where Log4Shell gets fixed in front of the jury.</td>
+              <td class="crit">Flawless</td></tr>
+            <tr><td class="idx">4</td><td class="mech">Evidence Vault</td>
+              <td>Every VERIFIED finding as a signed, downloadable bundle: reproducer, before/after,
+                gate results, SBOM, attestation, two-person signatures.</td>
+              <td><strong>A judge opens one and verifies the signature live.</strong> That is an
+                architectural requirement, not a UI feature — verification must work offline, with
+                keys present and nothing fetched.</td>
+              <td class="crit">Lighter</td></tr>
+            <tr><td class="idx">5</td><td class="mech">Scorecard <em>— leave visible during judging</em></td>
+              <td>The jury's own criteria as live KPIs: tokens per patch, VRAM, % zero-inference ·
+                time-to-PoV, time-to-patch · % with reproducer, % surviving differential ·
+                zero-human-input count · targets and languages in parallel.</td>
+              <td>We hand the judges their own scoresheet, already filled in. Plus the two badges
+                that never change: <strong>NETWORK INTERFACES: 0</strong> and
+                <strong>CLOUD CALLS: 0</strong>.</td>
+              <td class="crit">Flawless</td></tr>
+            <tr><td class="idx">6</td><td class="mech">Commander's Brief</td>
+              <td>Plain-language summary per finding, and one click to a formal report in JSSD
+                service-writing format — optionally in Hindi.</td>
+              <td>A cyber tool that outputs a proper staff paper is a quiet show-stopper for
+                <em>this</em> jury.</td>
+              <td class="crit">Lighter</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid g2">
+        <div class="card b"><span class="k">Demo-readiness is architecture</span>
+          <h4>The console opens in a working state</h4>
+          <p>Pre-warmed corpora and the first finding streaming to screen as it is born — not
+            batched at the end, and never an empty shell at t=0. The first thing the jury sees must
+            already be the system working.</p></div>
+        <div class="card b"><span class="k">Demo-readiness is architecture</span>
+          <h4>Metrics are queryable mid-run</h4>
+          <p>The Scorecard updates live, which means every stage writes its metric as it runs.
+            Telemetry retrofitted at the end cannot produce a live panel — and it is how teams lose
+            points they had already earned.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">B.2</span><h3>The demo arc — nine beats, every one on screen</h3></div>
+      <p class="lede">Most teams <em>describe</em> a system. We <em>operate</em> one in the room,
+        offline, with the jury's own scoresheet visible the entire time.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Beat</th><th>What happens</th><th>What is on screen</th><th>Criterion it serves</th></tr></thead>
+          <tbody>
+            <tr><td class="idx">1</td><td class="mech">The problem</td>
+              <td>Frontier models fail roughly two-thirds of the time; Army networks are sealed.</td>
+              <td class="crit">Framing</td></tr>
+            <tr><td class="idx">2</td><td class="mech">Pull the cable</td>
+              <td>NETWORK INTERFACES: 0 — and it keeps running.</td>
+              <td class="crit">Lightweight · trust</td></tr>
+            <tr><td class="idx">3</td><td class="mech">Mission Board</td>
+              <td>Targets light up; amber reads "build-free mode, still finding".</td>
+              <td class="crit">Scalability · performance</td></tr>
+            <tr><td class="idx">4</td><td class="mech">Log4Shell found</td>
+              <td>The pipeline carries it SUSPECTED → CONFIRMED live. Everyone in the room knows
+                this bug.</td>
+              <td class="crit">Performance · functionality</td></tr>
+            <tr><td class="idx">5</td><td class="mech">Split-screen proof</td>
+              <td>Attack hits the vulnerable build, red. Same attack bounces off the patched build,
+                green. Two seconds, no explanation needed.</td>
+              <td class="crit">Precision</td></tr>
+            <tr><td class="idx">6</td><td class="mech">Reject a bad patch</td>
+              <td>An overfitting fix is injected and the gate publicly refuses it. No other team
+                will deliberately demo a failure — which is exactly why it lands.</td>
+              <td class="crit">Precision · novelty</td></tr>
+            <tr><td class="idx">7</td><td class="mech">Vaccine sweep</td>
+              <td>One fix becomes a proven rule; variants surface in other systems and are fixed by
+                template.</td>
+              <td class="crit">Scalability · resource</td></tr>
+            <tr><td class="idx">8</td><td class="mech">ROE slider</td>
+              <td>Flip a C2 asset's tier; the same proven fix now waits for two signatures.</td>
+              <td class="crit">Functionality · trust</td></tr>
+            <tr><td class="idx">9</td><td class="mech">Commander's Brief</td>
+              <td>One click to a formal staff paper, ready to go up the chain.</td>
+              <td class="crit">Operational empathy</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">The cable-pull <em>install</em> — sealed SSD to running system in about twenty
+        minutes, with zero network interfaces shown on screen — is a separate demonstration that
+        precedes this arc; beat 2 assumes it has already happened. Throughout the arc the Scorecard
+        sits there at 100% precision, 0 cloud calls, with VRAM and speed live. The seven show-stoppers, in impact-per-effort order:
+        <strong>cable-pull offline install</strong> (lowest effort, largest effect) ·
+        <strong>live Log4Shell + split-screen</strong> · <strong>public rejection of a bad
+        patch</strong> · <strong>ROE slider</strong> · <strong>vaccine sweep</strong> (hardest to
+        fake, so do it if core is untouched) · Commander's Brief · three languages on one screen.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">B.3</span><h3>The novelty surface — six mechanisms, each with its hook</h3></div>
+      <p class="lede">Six named mechanisms, not "we use AI". Under the Fig 5 frame, each has to be
+        visible or it cannot be scored.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>#</th><th>Mechanism</th><th>What it does</th><th>What the jury sees</th></tr></thead>
+          <tbody>
+            <tr><td class="idx">01</td><td class="mech nov">Unified finding record <span class="pv pv-b">BUILD</span></td>
+              <td>SARIF plus a proof block. Every finder emits it, one gate consumes it, and the
+                data model forbids reporting a finding without a reproducer that replays.</td>
+              <td>A judge opens a bundle and replays the reproducer themselves — plus the
+                suppressed-findings counter, which is the honesty made numeric.</td></tr>
+            <tr><td class="idx">02</td><td class="mech nov">Oracle installation, not discovery <span class="pv pv-b">BUILD</span></td>
+              <td>A runtime tripwire at the dangerous sink makes a non-crashing bug abort exactly
+                like a memory bug, so it reuses the whole pipeline instead of needing a second one.</td>
+              <td>A SQL injection and a heap overflow travelling through the same screen, in the
+                same stages.</td></tr>
+            <tr><td class="idx">03</td><td class="mech nov">Metamorphic authz oracle <span class="pv pv-b">BUILD</span></td>
+              <td>Two principals, one request, identical response means a bug. No sanitizer anywhere
+                catches authorisation bypass.</td>
+              <td>An IDOR found with no crash and no signature to match against.</td></tr>
+            <tr><td class="idx">04</td><td class="mech nov">Differential-corpus gate <span class="pv pv-b">BUILD</span></td>
+              <td>Every non-crashing corpus input must produce byte-identical output before and
+                after. This kills the fix that passes a thin test suite and leaves the hole open.</td>
+              <td>The gate publicly refusing a deliberately planted overfitting patch.</td></tr>
+            <tr><td class="idx">05</td><td class="mech nov">ROE authority model <span class="pv pv-b">BUILD</span></td>
+              <td>Autonomy as doctrine the jury already uses, tightening itself as signals weaken,
+                with a two-person rule on critical assets.</td>
+              <td>Flip one asset's criticality; the same proven fix now waits for two signatures
+                instead of deploying.</td></tr>
+            <tr><td class="idx">06</td><td class="mech nov">Vulnerability Vaccine <span class="pv pv-b">BUILD</span></td>
+              <td>A verified fix becomes a detection rule that must pass three checks of its own,
+                then sweeps every registered codebase.</td>
+              <td>One fix, and the same mistake found in four other systems in the same minute.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">The seventh BUILD item is the offline glue, the console and the evidence
+        bundle — the product skin. It is not a demo beat of its own; it is what makes all six of the
+        above visible.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">B.4</span><h3>The honesty that itself scores</h3></div>
+      <p class="lede">For a defence jury the most trust-building move is to state limits plainly.
+        Volunteering the bound is what makes the headline numbers believable — and it is exactly the
+        posture a signals authority needs before trusting software near a live system.</p>
+      <div class="claims">
+        <div class="yes">
+          <h4>What we claim</h4>
+          <ul>
+            <li><strong>100% precision on reports</strong>, as a structural property — the data
+              model forbids an unproven finding from being reported.</li>
+            <li>The gate proves <em>"no observed behaviour changed across N inputs and M tests"</em>,
+              with K flaky inputs quarantined and listed by name in the bundle.</li>
+            <li>We carry the most common dependencies offline.</li>
+            <li>Self-improvement demonstrated at the loop level — three online loops.</li>
+            <li>Every number comes from our own ARVO / AutoPatchBench baseline.</li>
+          </ul>
+        </div>
+        <div class="no">
+          <h4>What we explicitly do not claim</h4>
+          <ul>
+            <li>Precision on patch <strong>semantic correctness</strong>. We do not claim formal
+              equivalence, and we say so before being asked.</li>
+            <li>Nightly QLoRA as a 36-hour result — it is a deployment feature.</li>
+            <li>A complete dependency mirror. Anything missing degrades to static analysis, not
+              failure.</li>
+            <li>That we <strong>fuzz a React front end</strong>. Its real attack surface is XSS,
+              prototype pollution, client-side authz and vulnerable dependencies — so we run static
+              and dependency lanes and point the fuzzing at the API behind it. Claiming otherwise
+              would lose a technical judge.</li>
+            <li>That the authz oracle works unaided. It needs two principals on the target,
+              supplied by the operator at ingest. The ingest form asks for them.</li>
+            <li>Any certainty above 95%, on anything.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= PART C ================= -->
+  <div class="part" id="breaks">
+    <div class="part-head"><span class="pn">Part C</span><h2>What holds when it breaks</h2></div>
+    <p class="part-sub">Our confidence does not come from the system always working. It comes from
+      the system degrading instead of dying — so the thing to engineer is the fallback ladder, not
+      the perfection.</p>
+
+    <section>
+      <div class="shead"><span class="ref">C.1</span><h3>The honest arithmetic</h3></div>
+      <div class="grid g3">
+        <div class="card"><p class="stat">~36%</p><p class="stat-l">a flawless end-to-end live run:
+          build and fuzz work (~70%) × find a real bug (~80%) × validated patch (~65%)</p></div>
+        <div class="card v"><p class="stat">~85–90%</p><p class="stat-l">a convincing demo of
+          something <em>real</em>, once the fallback ladder exists</p></div>
+        <div class="card s"><p class="stat">36 → 85</p><p class="stat-l">the build-dependent /
+          build-free split alone is what moves it. The highest-value engineering in the project, and
+          the least glamorous</p></div>
+      </div>
+      <p class="lede">Context worth keeping in mind: competitors are at the same ~36% or lower, and
+        most do not know it. Knowing our real number and designing for it is itself an edge.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">C.2</span><h3>The fallback ladder</h3></div>
+      <div class="ladder">
+        <div class="rung"><span class="n">RUNG 1</span><span class="t"><b>Target will not build</b>
+          → build-free lanes: static, dependencies, secrets, config. Still real findings.</span></div>
+        <div class="rung"><span class="n">RUNG 2</span><span class="t"><b>No harness can be
+          synthesised</b> → hand-written harness for the demo target, and we say so openly.</span></div>
+        <div class="rung"><span class="n">RUNG 3</span><span class="t"><b>Fuzzing finds nothing in
+          time</b> → static and dependency findings carry the demo. They were running in parallel,
+          not after.</span></div>
+        <div class="rung"><span class="n">RUNG 4</span><span class="t"><b>No patch validates</b> →
+          REPORT_ONLY: a proven vulnerability report, signed, with no patch claimed.</span></div>
+        <div class="rung"><span class="n">RUNG 5</span><span class="t"><b>Our pipeline stalls</b> →
+          the OSS-CRS ensemble, running in parallel on the same target the whole time.</span></div>
+        <div class="rung"><span class="n">RUNG 6</span><span class="t"><b>The live demo breaks
+          entirely</b> → the full run, recorded at a safe point before judging, narrated over.</span></div>
+      </div>
+      <p class="lede">Every rung is still a real, honest result. That is the whole point.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">C.3</span><h3>Redundancy map</h3></div>
+      <p class="lede">Every way this system can fail, and what it still delivers. The design target
+        is that no single failure reduces a run to nothing.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>#</th><th>What fails</th><th>Severity</th><th>The bypass</th><th>What still ships</th></tr></thead>
+          <tbody>
+            <tr><td class="idx">01</td><td class="mech">Target will not build</td><td class="crit">Critical</td>
+              <td>Build-free lanes B and C, already running. Offline mirror, remedy table and
+                OSS-Fuzz recipe retrieval tried first; bounded model call last.</td>
+              <td><span class="sig">Verified findings.</span> A dependency CVE is provable from the
+                version string alone.</td></tr>
+            <tr><td class="idx">02</td><td class="mech">Target is in an unsupported language</td><td class="crit">High</td>
+              <td>Go, Rust, C# kill every language-specific lane — but dependencies, secrets, config
+                and SBOM are language-agnostic.</td>
+              <td>Real findings on a language we never adapted for. Likely, since the target is
+                unknown.</td></tr>
+            <tr><td class="idx">03</td><td class="mech">No fuzz harness can be synthesised</td><td class="crit">High</td>
+              <td>Jazzer autofuzz needs none on the JVM; hand-written harness for the demo target.</td>
+              <td>The crash-bug lane on at least one language.</td></tr>
+            <tr><td class="idx">04</td><td class="mech">Fuzzing finds nothing in budget</td><td class="crit">Medium</td>
+              <td>Static, supply-chain and service lanes ran concurrently.</td>
+              <td>Static and dependency findings carry the run.</td></tr>
+            <tr><td class="idx">05</td><td class="mech">Deterministic localisation fails</td><td class="crit">Medium</td>
+              <td>Fall back to the topmost target-owned frame, skipping tool and runtime frames.</td>
+              <td>A ranked fix-site set that is never empty.</td></tr>
+            <tr><td class="idx">06</td><td class="mech">Template and retrieval lanes both miss</td><td class="crit">Medium</td>
+              <td>LLM lane with several candidates sampled and the gate picking; then the mitigation
+                floor — blunt but verified.</td>
+              <td>A candidate patch to gate.</td></tr>
+            <tr><td class="idx">07</td><td class="mech">No candidate clears the gate</td><td class="crit">High</td>
+              <td>Three rounds with the exact failure fed back, then stop.</td>
+              <td><span class="sig">REPORT_ONLY</span> — proven, signed, no patch claimed.</td></tr>
+            <tr><td class="idx">08</td><td class="mech">Differential gate false-rejects on a noisy service</td><td class="crit">High</td>
+              <td>Determinism pre-flight (3 runs) + canonicaliser for timestamps, UUIDs and
+                hash-ordered output; non-deterministic inputs quarantined and listed.</td>
+              <td>A gate that stays trustworthy instead of silently killing good patches.</td></tr>
+            <tr><td class="idx">09</td><td class="mech">Offline mirror lacks a package</td><td class="crit">Medium</td>
+              <td>That target degrades to build-free lanes. We carry the high-probability set and
+                state the bound rather than implying completeness.</td>
+              <td>Analysis, not failure.</td></tr>
+            <tr><td class="idx">10</td><td class="mech">No GPU, or out of memory</td><td class="crit">High</td>
+              <td>Two co-resident models → one → CPU-only smaller profile → template and retrieval
+                only.</td>
+              <td>The pipeline runs with <span class="ok">no model at all</span> — the gate never
+                needed one.</td></tr>
+            <tr><td class="idx">11</td><td class="mech">Binary only, no source</td><td class="crit">Medium</td>
+              <td>Ghidra headless decompile + AFL++ QEMU-mode binary fuzzing.</td>
+              <td>Triage and a report even where no patch is possible.</td></tr>
+            <tr><td class="idx">12</td><td class="mech">Our pipeline stalls as a whole</td><td class="crit">Medium</td>
+              <td>OSS-CRS ensemble in parallel on the same target.</td>
+              <td>An independent cyber-reasoning result.</td></tr>
+            <tr><td class="idx">13</td><td class="mech">Endurance — leaks, disk, stuck processes, model server dies</td><td class="crit">Medium</td>
+              <td>cgroup caps, disk quotas, corpus minimisation, watchdog restarts, health panel.</td>
+              <td>A run that survives its own duration. Only a long dress rehearsal finds these.</td></tr>
+            <tr><td class="idx">14</td><td class="mech">We execute untrusted code on an Army box</td><td class="crit">Critical</td>
+              <td>Every build and run sandboxed: no network interface, seccomp, cgroups, gVisor or
+                Firecracker.</td>
+              <td>The answer to the question the jury will ask.</td></tr>
+            <tr><td class="idx">15</td><td class="mech">Target ships no test suite</td><td class="crit">Medium</td>
+              <td>Common in real military software. The differential corpus becomes the only
+                behavioural baseline; M = 0 is written into the bundle.</td>
+              <td>The gate still holds — corpus inputs alone catch the overfitting patch. We state
+                the thinner baseline instead of hiding it.</td></tr>
+            <tr><td class="idx">16</td><td class="mech">No second user identity for the authz oracle</td><td class="crit">Medium</td>
+              <td>The metamorphic check needs two principals. These are operator-supplied at ingest
+                (test accounts or tokens); without them the oracle is disabled for that target.</td>
+              <td>Every other lane; authz findings for that target are simply not claimed.</td></tr>
+            <tr><td class="idx">17</td><td class="mech">The live demo dies</td><td class="crit">High</td>
+              <td>Full run recorded at a safe point before judging.</td>
+              <td>The result, narrated over the recording — almost nothing lost.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">C.4</span><h3>Kill-switches, decided in advance</h3></div>
+      <p class="lede">The same discipline the product claims for itself, applied to the team: know
+        the limits of your own authority, and decide the aborts while calm. Hour 30 is not calm.</p>
+      <div class="grid g2">
+        <div class="card s"><h4>Harness synthesis stalls</h4>
+          <p>No compiling, coverage-producing harness by the checkpoint → hand-write harnesses for
+            the demo target, and say so openly.</p></div>
+        <div class="card s"><h4>LLM lane is not beating templates</h4>
+          <p>By the checkpoint → demo templates as primary and the LLM as fallback. Still
+            impressive, still honest, and it raises the zero-inference number.</p></div>
+        <div class="card s"><h4>Their target will not build</h4>
+          <p>Switch to a bundled ARVO target and reframe as a portability demo. A working demo on
+            target B beats a dead terminal on target A.</p></div>
+        <div class="card s"><h4>Anything in WOW slips</h4>
+          <p>Cut it before it threatens core. A flawless core demo with three wow beats beats a
+            broken attempt at five.</p></div>
+      </div>
+      <p class="wall">Make CORE flawless. Make a few WOW beats perfect. Describe the rest. Never let
+        a nice-to-have break a must-have.</p>
+    </section>
+  </div>
+
+  <!-- ================= PART D ================= -->
+  <div class="part" id="ahead">
+    <div class="part-head"><span class="pn">Part D</span><h2>Scoring, deliverables and the way ahead</h2></div>
+
+    <section>
+      <div class="shead"><span class="ref">D.1</span><h3>Scoring alignment</h3></div>
+      <p class="lede">Build the system to <em>emit</em> these; do not retrofit them. Any component
+        that feeds no criterion is story-only — describe it, do not build it.</p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Architectural element</th><th>Criterion</th><th>The number it emits</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Unified record — no reproducer, locked at SUSPECTED</td><td><strong>Precision</strong></td>
+              <td class="mono">% reports with a replaying reproducer — 100% by construction · findings suppressed for want of one</td></tr>
+            <tr><td class="mech">Five-check gate, differential corpus</td><td><strong>Precision</strong></td>
+              <td class="mono">% candidate patches surviving · patches rejected · corpus inputs quarantined</td></tr>
+            <tr><td class="mech">Lane cross-confirmation</td><td><strong>Precision</strong></td>
+              <td class="mono">static findings promoted by another lane's reproducer</td></tr>
+            <tr><td class="mech">Status machine with transition timestamps</td><td><strong>Speed</strong></td>
+              <td class="mono">median time-to-PoV · median time-to-validated-patch</td></tr>
+            <tr><td class="mech">Deterministic localisation, no LLM search</td><td><strong>Speed</strong></td>
+              <td class="mono">time from abort trace to ranked candidate fix site</td></tr>
+            <tr><td class="mech">Four hunt lanes, two of them build-free</td><td><strong>Performance</strong></td>
+              <td class="mono">bugs found and patched per target · findings produced while the build was failing</td></tr>
+            <tr><td class="mech">Normalise — stack-hash dedup and minimisation</td><td><strong>Speed</strong> · Precision</td>
+              <td class="mono">raw crashes to distinct bugs ratio — 800 → ~6</td></tr>
+            <tr><td class="mech">Repair ladder + calibrated router + bandit reallocation</td><td>Resource</td>
+              <td class="mono">% fixes at zero inference · tokens per validated patch · live VRAM · inference attempts that produced no fix</td></tr>
+            <tr><td class="mech">One adapter per language over one invariant core, oracle plugin API</td><td><strong>Scalability</strong></td>
+              <td class="mono">language coverage matrix · verified fixes per language · targets in parallel</td></tr>
+            <tr><td class="mech">ROE authority model</td><td><strong>Functionality</strong></td>
+              <td class="mono">authority in force per action · zero-human-input count · full-loop completions</td></tr>
+            <tr><td class="mech">Vaccine sweep over the asset registry</td><td><strong>Scalability</strong></td>
+              <td class="mono">variants found in other codebases per verified fix</td></tr>
+            <tr><td class="mech">Sandbox, no network interface</td><td>Trust</td>
+              <td class="mono">network interfaces: 0 · cloud calls: 0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">The two criteria where we can be uniquely strong: <strong>Precision</strong>,
+        because 100% on reports is a structural property rather than a tuning result; and
+        <strong>Scalability</strong>, because showing the same core fix a C bug, a Java bug and a
+        Python bug answers "will this work on our unknown infrastructure?" far better than eight
+        parallel workers on one C library — especially when the jury will not tell us in advance
+        what their infrastructure is written in.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">D.2</span><h3>Deliverables — all fifteen</h3></div>
+      <div class="grid g2">
+        <div class="card b"><span class="k">Core — the product itself</span>
+          <h4>1–6</h4>
+          <p><strong>1</strong> Offline deployment bundle — one <span class="mono">docker
+            compose</span>, installable from removable media, zero network calls at runtime ·
+            <strong>2</strong> RAKSHA orchestrator — ingest funnel, oracle plugin API, four repair
+            lanes, the five-check gate, the learning loops · <strong>3</strong> Language adapters —
+            C/C++, Java, Node/JS, Python, plus binary and web · <strong>4</strong> Python security
+            sanitizer set · <strong>5</strong> Fine-tuned advisor adapter — QLoRA weights on
+            validated ARVO fix pairs, shipped with the bundle · <strong>6</strong> Operator console,
+            six screens.</p></div>
+        <div class="card v"><span class="k">Trustworthy and adoptable</span>
+          <h4>7–15</h4>
+          <p><strong>7</strong> SBOM per target (Syft → CycloneDX) · <strong>8</strong> Signed
+            attestations (cosign / in-toto, fully offline) · <strong>9</strong> Reviewable patch
+            packet — diff, plain-English explanation, new regression test and a
+            <strong>rollback script</strong>; nobody deploys a patch they cannot undo ·
+            <strong>10</strong> Permanent regression test committed into the target's own suite, so
+            the bug cannot silently return · <strong>11</strong> Ranked risk register — severity ×
+            reachability × exploitability; "fix these 3 first, ignore these 400" ·
+            <strong>12</strong> Approval workflow, two officers for critical assets ·
+            <strong>13</strong> Sneakernet update kit · <strong>14</strong> Ops documentation in
+            JSSD format — install manual, SOP, runbook · <strong>15</strong> Benchmark report on
+            ARVO + AutoPatchBench, methodology included, <strong>losses shown next to wins</strong>.</p></div>
+      </div>
+      <p class="lede">On deliverable 11: an operator with 500 systems wants priorities, not 500
+        patches dumped on them — which is arguably more valuable to them than the patching itself.
+        And the evidence bundle is the heart of the trust story, because it is the thing an officer
+        actually acts on: <em>we are not asking anyone to trust the AI, we are handing them the
+        receipts.</em></p>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Performance objective</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">Report precision — findings with a replayable reproducer</td><td class="ok">100% by construction</td></tr>
+            <tr><td class="mech">Patch validity — survives the differential corpus test</td><td class="sig">measure on AutoPatchBench; do not pre-promise</td></tr>
+            <tr><td class="mech">Median time to first proof-of-vulnerability</td><td>track and show live</td></tr>
+            <tr><td class="mech">Median time to a validated patch</td><td>track and show live</td></tr>
+            <tr><td class="mech">Run-2 speed-up from the learning loops</td><td>demonstrate the curve</td></tr>
+            <tr><td class="mech">Peak footprint</td><td>single node, 32 GB, zero network</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede"><strong>Every numeric target must come from our own ARVO / AutoPatchBench
+        baseline, never a borrowed general-coding score.</strong> A jury will ask where a number came
+        from, and that is the question that ends a pitch. Keep a
+        <span class="mono">THIRD_PARTY.md</span> of licences in the bundle too — Qwen3-Coder is
+        Apache-2.0, Foundation-sec is open-weight, the fuzzers and scanners permissive — because a
+        defence acceptance board will ask for it.</p>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">D.3</span><h3>Described, not built</h3></div>
+      <p class="lede">Legitimate, differentiating, and worth one slide each — and worth no finale
+        build time. They are differentiators precisely because they answer <em>operational</em>
+        questions (authority, rehearsal, mission impact) that a brief-literal competitor will not
+        think to ask.</p>
+      <div class="grid g3">
+        <div class="card"><h4>Red-vs-blue self-play</h4>
+          <p>A red RAKSHA injects realistic bugs into clean code; blue must find and fix them.
+            Unlimited offline training data, <em>and</em> a continuous measure of true recall — so we
+            would know our real hit rate instead of guessing it.</p></div>
+        <div class="card"><h4>Digital-twin rehearsal</h4>
+          <p>Before any patch reaches a live system it runs against a sandboxed replica under
+            replayed real traffic. A drill before the operation.</p></div>
+        <div class="card"><h4>Mission-aware priority</h4>
+          <p>Findings ranked not just by severity but by which unit and which mission depends on
+            that system.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="shead"><span class="ref">D.4</span><h3>The way ahead</h3></div>
+      <div class="ladder">
+        <div class="rung"><span class="n">NOW</span><span class="t">The core find → fix → prove
+          loop, offline, on three to four languages, with the console, ROE and the vaccine
+          demonstrated.</span></div>
+        <div class="rung"><span class="n">NEAR</span><span class="t">Harden the offline mirror and
+          the sneakernet refresh; broaden the Python sanitizer set; QLoRA self-improvement
+          on-premise.</span></div>
+        <div class="rung"><span class="n">LATER</span><span class="t">The spin-offs below, starting
+          with RAKSHA-Induct and RAKSHA-Range, since both sit naturally at EME School.</span></div>
+      </div>
+      <div class="tscroll">
+        <table>
+          <thead><tr><th>Spin-off</th><th>Customer</th><th>Why it is a natural extension</th></tr></thead>
+          <tbody>
+            <tr><td class="mech">RAKSHA-Induct</td><td>Procurement / acceptance boards</td>
+              <td>Vet vendor software <em>before</em> induction — SBOM, scan, report. Directly
+                relevant to Make-in-India vendor software that must be cleared before it enters
+                service. The decision already exists and already has a budget line, and the work is
+                read-only — no authority problem at all.</td></tr>
+            <tr><td class="mech">RAKSHA-Gate</td><td>Army software dev teams</td>
+              <td>A pre-deployment CI gate: nothing ships with a known, fixable vulnerability.</td></tr>
+            <tr><td class="mech">RAKSHA-Range</td><td>EME School, cyber cadres</td>
+              <td>A training range built from ARVO bugs and red-team self-play. Instructional
+                technology is our home turf.</td></tr>
+            <tr><td class="mech">RAKSHA-Firmware</td><td>EME equipment, radios, embedded systems</td>
+              <td>Binary and firmware analysis of electronic systems — EME's core domain.</td></tr>
+            <tr><td class="mech">RAKSHA-Vaccine</td><td>CERT / central cyber cell</td>
+              <td>Fleet-wide variant scanning from every fix discovered anywhere in the force. The
+                same core mechanism, operated centrally — not a separate build.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede">Why this matters for scoring: it shows <strong>scalability</strong> beyond the
+        demo, since one engine serves procurement, dev teams, training, firmware and central
+        defence; it shows <strong>operational empathy</strong>, because each maps to a real
+        organisation and a decision it already makes; and it keeps the core
+        <strong>lightweight</strong>, because spin-offs are configurations of one platform rather
+        than five separate builds.</p>
+    </section>
+  </div>
+
+  <!-- ================= TERMS ================= -->
+  <div class="part" id="terms">
+    <div class="part-head"><span class="pn">Reference</span><h2>Terms</h2></div>
+    <p class="part-sub">So this sheet can be read cold, by someone who is not a programmer.</p>
+    <dl class="gloss">
+      <div><dt>CRS —</dt><dd> cyber-reasoning system; a program that reasons about other programs'
+        security by itself. What the competition asks us to build.</dd></div>
+      <div><dt>Fuzzer —</dt><dd> bombards a program with thousands of malformed inputs to make it
+        crash or misbehave.</dd></div>
+      <div><dt>Harness —</dt><dd> the small wrapper that feeds fuzzer bytes into the function under
+        test. Often missing, sometimes written automatically.</dd></div>
+      <div><dt>Oracle —</dt><dd> anything that can tell you a bug just happened. A sanitizer is an
+        oracle; so are our tripwires and the metamorphic check.</dd></div>
+      <div><dt>Sanitizer —</dt><dd> instrumentation that makes a silent bad action loudly abort, so
+        it can be caught.</dd></div>
+      <div><dt>Reproducer / PoV —</dt><dd> a concrete input, or request pair, that triggers the bug.
+        "No reproducer, no report" is our precision rule.</dd></div>
+      <div><dt>Overfitting patch —</dt><dd> a "fix" that silences the one test but secretly breaks
+        normal use. What the differential corpus exists to kill.</dd></div>
+      <div><dt>Regression harness —</dt><dd> the project's own automatic "does it still work?"
+        checks.</dd></div>
+      <div><dt>Verifier / gate —</dt><dd> the part that decides what is true. In our design, the
+        brain.</dd></div>
+      <div><dt>Scaffold —</dt><dd> the reusable loop around the model that lets it act: read, edit,
+        test, retry.</dd></div>
+      <div><dt>SARIF —</dt><dd> the standard format static analysis tools already emit. We extend it
+        with a proof block rather than inventing a format.</dd></div>
+      <div><dt>CWE —</dt><dd> the standard catalogue of weakness types, e.g. CWE-89 is SQL
+        injection.</dd></div>
+      <div><dt>Quantisation (Q4/Q5) —</dt><dd> shrinking a model to fit in memory. Lower number is
+        smaller and faster, slightly less accurate.</dd></div>
+      <div><dt>AST delta —</dt><dd> how much of the code's structure a patch changed. Small is
+        surgical and good; large is suspicious.</dd></div>
+      <div><dt>Attestation —</dt><dd> a signed statement of what was tested, by which version, with
+        what result. Makes the evidence tamper-evident.</dd></div>
+      <div><dt>SBOM —</dt><dd> a machine-readable list of every component inside a piece of
+            software.</dd></div>
+      <div><dt>Variant analysis —</dt><dd> after finding one bug, searching for the same mistake
+        everywhere else. Our vaccine automates this from a verified fix.</dd></div>
+      <div><dt>Air-gapped —</dt><dd> physically disconnected from any network. Nothing can
+        <span class="mono">pip install</span> or call a cloud model there.</dd></div>
+      <div><dt>JSSD —</dt><dd> the Indian Armed Forces' Joint Services house style for documents.
+        Our Commander's Brief outputs in it.</dd></div>
+      <div><dt>ARVO —</dt><dd> ~6,100 real bugs, each with a vulnerable build, a fixed build, a
+        trigger and the gold patch. Our practice set, training data and ground truth.</dd></div>
+    </dl>
+
+    <p class="fin"><strong>Two invariants hold up everything above</strong>, and both are enforced by
+      refusing a transition in the data model rather than by review or by promise. <em>No reproducer,
+      no report</em> — a finding without one that actually replays can never leave SUSPECTED.
+      <em>Nothing unproven ships</em> — a patch reaches VERIFIED only with all five checks passed and
+      evidence the original attack is dead, each candidate earning all five itself. That is the
+      difference between a system that claims precision and one that could not produce an unproven
+      report even if it were asked to.</p>
+  </div>
+
+</div>

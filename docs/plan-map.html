@@ -1,0 +1,447 @@
+<title>RAKSHA Plan Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: a vetting map — one simple diagram per decision, a plain explanation, and the question the reader should answer. */
+  :root{
+    --bg:#f3f5f0; --surface:#fff; --surface-2:#e8ebe4; --tint:#dfe3da;
+    --fg:#1a2420; --fg-dim:#5b6660; --rule:#c6ccc2;
+    --signal:#9c5f14; --verified:#2c6540; --reject:#993024; --novel:#474785;
+    --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+    --body:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;
+    --data:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    --bg:#111613; --surface:#1a211d; --surface-2:#222a25; --tint:#2b342e;
+    --fg:#e4e9e3; --fg-dim:#98a29b; --rule:#36403a;
+    --signal:#dfa05c; --verified:#6fbf8b; --reject:#df8275; --novel:#9d9ddd; color-scheme:dark}}
+  :root[data-theme="dark"]{
+    --bg:#111613; --surface:#1a211d; --surface-2:#222a25; --tint:#2b342e;
+    --fg:#e4e9e3; --fg-dim:#98a29b; --rule:#36403a;
+    --signal:#dfa05c; --verified:#6fbf8b; --reject:#df8275; --novel:#9d9ddd; color-scheme:dark}
+
+  body{background:var(--bg);color:var(--fg);font-family:var(--body);line-height:1.55;-webkit-font-smoothing:antialiased}
+  .sheet{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:24px 72px}
+  h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+  p{margin:0}
+  .toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--rule);
+       padding-block:9px;margin-bottom:22px;overflow-x:auto;white-space:nowrap}
+  .toc a{font-family:var(--data);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-dim);
+       text-decoration:none;margin-right:16px;border-bottom:1px solid transparent}
+  .toc a:hover,.toc a:focus-visible{color:var(--fg);border-bottom-color:var(--fg)}
+
+  .block{border:1.5px solid var(--fg);background:var(--surface);padding:18px 20px}
+  .block h1{font-size:clamp(26px,5vw,38px);font-weight:700;letter-spacing:-.015em;line-height:1.05}
+  .block .sub{font-family:var(--data);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--fg-dim);margin-top:8px}
+  .block .how{margin-top:14px;font-size:14px;max-width:72ch}
+  .block .how b{font-weight:600}
+
+  .map{margin-top:26px;border:1px solid var(--rule);background:var(--surface)}
+  .map-h{display:flex;gap:14px;align-items:baseline;padding:12px 18px;border-bottom:1px solid var(--rule);background:var(--surface-2);flex-wrap:wrap}
+  .map-h .n{font-family:var(--data);font-size:11px;letter-spacing:.13em;color:var(--signal);font-weight:600}
+  .map-h h2{font-size:clamp(16px,2.5vw,20px);font-weight:600;letter-spacing:-.01em}
+  .map-b{padding:16px 18px}
+  .canvas{overflow-x:auto;padding:6px 0}
+  .canvas svg{display:block;height:auto;min-width:640px;width:1000px;max-width:100%}
+  .say{font-size:14px;margin-top:12px;max-width:74ch}
+  .say b{font-weight:600}
+  .vet{margin-top:12px;border-left:3px solid var(--novel);background:var(--tint);padding:10px 14px;font-size:13px}
+  .vet b{font-family:var(--data);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--novel);display:block;margin-bottom:3px}
+
+  svg text{font-family:var(--body);fill:var(--fg)}
+  .bx{fill:var(--surface);stroke:var(--fg);stroke-width:1.4}
+  .bx-2{fill:var(--surface-2);stroke:var(--fg);stroke-width:1.2}
+  .bx-nov{fill:var(--tint);stroke:var(--novel);stroke-width:2}
+  .bx-ok{fill:none;stroke:var(--verified);stroke-width:2}
+  .bx-deg{fill:none;stroke:var(--signal);stroke-width:1.8;stroke-dasharray:6 4}
+  .bx-rej{fill:none;stroke:var(--reject);stroke-width:1.8;stroke-dasharray:6 4}
+  .bx-env{fill:none;stroke:var(--fg-dim);stroke-width:1.4;stroke-dasharray:9 5}
+  .fl{fill:none;stroke:var(--fg);stroke-width:1.7}
+  .fl-deg{fill:none;stroke:var(--signal);stroke-width:1.7;stroke-dasharray:6 4}
+  .fl-rej{fill:none;stroke:var(--reject);stroke-width:1.7;stroke-dasharray:6 4}
+  .fl-ok{fill:none;stroke:var(--verified);stroke-width:2}
+  .mk{fill:var(--fg)} .mk-d{fill:var(--signal)} .mk-r{fill:var(--reject)} .mk-o{fill:var(--verified)}
+  .T{font-family:var(--display);font-size:15px;font-weight:600}
+  .t{font-size:12px}
+  .s{font-size:10.5px;fill:var(--fg-dim)}
+  .m{font-family:var(--data);font-size:10px;letter-spacing:.08em;fill:var(--fg-dim)}
+  .ok{fill:var(--verified)} .deg{fill:var(--signal)} .rej{fill:var(--reject)} .nov{fill:var(--novel)}
+  .big{font-family:var(--display);font-size:26px;font-weight:700}
+
+  .grid{display:grid;gap:12px;margin-top:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+  .card{border:1px solid var(--rule);background:var(--surface);padding:12px 14px;min-width:0;font-size:13px}
+  .card b{display:block;font-weight:600;margin-bottom:3px}
+  .card span{color:var(--fg-dim)}
+  .card.ok{border-left:3px solid var(--verified)} .card.todo{border-left:3px solid var(--signal)} .card.q{border-left:3px solid var(--reject)}
+  .list{margin-top:10px;font-size:13.5px}
+  .list div{display:grid;grid-template-columns:36px 1fr;gap:10px;padding:7px 0;border-bottom:1px solid var(--rule)}
+  .list div:last-child{border-bottom:none}
+  .list .k{font-family:var(--data);font-size:10.5px;color:var(--signal);font-weight:600;padding-top:2px}
+  .list span{color:var(--fg-dim)} .list b{font-weight:600;color:var(--fg)}
+  .check{margin-top:14px;columns:2;column-gap:26px;font-size:13px}
+  .check div{break-inside:avoid;margin-bottom:7px;padding-left:22px;position:relative;color:var(--fg-dim)}
+  .check div::before{content:"";position:absolute;left:0;top:4px;width:11px;height:11px;border:1.4px solid var(--fg);border-radius:2px}
+  .check b{color:var(--fg);font-weight:600}
+  @media (max-width:620px){.check{columns:1}}
+  .fin{margin-top:26px;border-top:1.5px solid var(--fg);padding-top:13px;font-size:13px;color:var(--fg-dim);max-width:78ch}
+</style>
+
+<div class="sheet">
+  <nav class="toc" aria-label="Contents">
+    <a href="#idea">1 · Idea</a><a href="#score">2 · Scoring</a><a href="#tracks">3 · Two tracks</a>
+    <a href="#pipe">4 · The machine</a><a href="#build">5 · Build order</a><a href="#day">6 · The 36 h</a>
+    <a href="#demo">7 · The 7 min</a><a href="#fall">8 · If it breaks</a><a href="#ask">9 · Ask first</a>
+    <a href="#status">10 · Status</a><a href="#vet">Vet list</a>
+  </nav>
+
+  <div class="block">
+    <h1>RAKSHA AI — the plan, on one page</h1>
+    <p class="sub">A map for vetting · each block is one decision, one picture, and the question to answer</p>
+    <p class="how">Read top to bottom. Every block ends with a <b>Vet this</b> line — the thing you
+      should agree or disagree with before anything gets built. The two long documents (the
+      architecture sheet and the campaign plan) sit behind this one; this is the map of them.</p>
+  </div>
+
+  <!-- 1 IDEA -->
+  <div class="map" id="idea">
+    <div class="map-h"><span class="n">1</span><h2>The whole idea in one picture</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 250" role="img" aria-label="A small offline model guesses a fix. A mechanical inspector tests it with five checks. If all pass, the fix ships signed. If any fails, the model tries again up to three times, then an honest report is issued with no fix claimed.">
+        <defs><marker id="a1" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L9,3.5 L0,7z"/></marker>
+        <marker id="a1o" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk-o" d="M0,0 L9,3.5 L0,7z"/></marker>
+        <marker id="a1d" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk-d" d="M0,0 L9,3.5 L0,7z"/></marker>
+        <marker id="a1r" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk-r" d="M0,0 L9,3.5 L0,7z"/></marker></defs>
+        <rect class="bx-2" x="30" y="60" width="230" height="90" rx="4"/>
+        <text class="T" x="145" y="92" text-anchor="middle">THE MODEL</text>
+        <text class="t" x="145" y="112" text-anchor="middle">small, offline, never trusted</text>
+        <text class="s" x="145" y="130" text-anchor="middle">guesses a fix — "the intern"</text>
+        <path class="fl" d="M260,105 H330" marker-end="url(#a1)"/>
+        <text class="s" x="295" y="97" text-anchor="middle">proposes</text>
+        <rect class="bx-nov" x="335" y="40" width="300" height="130" rx="4"/>
+        <text class="T nov" x="485" y="70" text-anchor="middle">THE INSPECTOR</text>
+        <text class="t" x="485" y="90" text-anchor="middle">five mechanical checks, cheapest first</text>
+        <text class="s" x="485" y="110" text-anchor="middle">does it build · is the attack dead · did anything</text>
+        <text class="s" x="485" y="125" text-anchor="middle">else change · is the code still reachable ·</text>
+        <text class="s" x="485" y="140" text-anchor="middle">does a fresh attack find nothing</text>
+        <text class="s nov" x="485" y="160" text-anchor="middle">decides what is true — "the judge"</text>
+        <path class="fl-ok" d="M635,80 H720" marker-end="url(#a1o)"/>
+        <text class="s ok" x="677" y="72" text-anchor="middle">all 5 pass</text>
+        <rect class="bx-ok" x="725" y="55" width="245" height="50" rx="4"/>
+        <text class="t ok" x="847" y="76" text-anchor="middle">SHIPS, signed, with receipts</text>
+        <text class="s" x="847" y="93" text-anchor="middle">an officer can verify it themselves</text>
+        <path class="fl-rej" d="M485,170 V205 H145 V155" marker-end="url(#a1r)"/>
+        <text class="s rej" x="315" y="222" text-anchor="middle">any one fails → exact error fed back · try again, max 3 times</text>
+        <path class="fl-deg" d="M635,140 H720" marker-end="url(#a1d)"/>
+        <text class="s deg" x="677" y="132" text-anchor="middle">3 tries fail</text>
+        <rect class="bx-deg" x="725" y="120" width="245" height="50" rx="4"/>
+        <text class="t deg" x="847" y="141" text-anchor="middle">HONEST REPORT, no fix claimed</text>
+        <text class="s" x="847" y="158" text-anchor="middle">still a proven, scored result</text>
+      </svg></div>
+      <p class="say"><b>Why this shape.</b> The best AI models in the world fail this task about two
+        times in three, and none can run on a sealed Army network anyway. So instead of hoping for a
+        smarter model, we make the model <em>irrelevant to the question of truth</em>: a weak model
+        guesses, a mechanical inspector decides. A weak guesser is fine when the judge cannot be
+        fooled. If nothing proves out, the system says so instead of guessing.</p>
+      <div class="vet"><b>Vet this</b>Do you agree the product is "the inspector plus the receipts", and the model is a replaceable part inside it? Everything else follows from this.</div>
+    </div>
+  </div>
+
+  <!-- 2 SCORING -->
+  <div class="map" id="score">
+    <div class="map-h"><span class="n">2</span><h2>What the jury scores, and the one thing we build for each</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 300" role="img" aria-label="Five finale criteria on the left each connected to the mechanism that earns it on the right: precision to the no-reproducer-no-report rule; speed to deterministic localisation and timestamps; performance to four hunt lanes two of which need no build; functionality to zero human input and the authority model; scalability to one core with one adapter per language.">
+        <defs><marker id="a2" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L9,3.5 L0,7z"/></marker></defs>
+        <text class="m" x="30" y="24">THE JURY SCORES</text>
+        <text class="m" x="430" y="24">WE BUILD · AND THE NUMBER ON SCREEN</text>
+        <g>
+          <rect class="bx-2" x="30" y="36" width="200" height="40" rx="3"/><text class="T" x="130" y="62" text-anchor="middle">Precision</text>
+          <path class="fl" d="M230,56 H420" marker-end="url(#a2)"/>
+          <rect class="bx-nov" x="425" y="36" width="545" height="40" rx="3"/>
+          <text class="t" x="440" y="53">No reproducer, no report — enforced in the data model, not by review</text>
+          <text class="s nov" x="440" y="68">% of reports with a replaying reproducer: 100%, by construction</text>
+        </g>
+        <g>
+          <rect class="bx-2" x="30" y="88" width="200" height="40" rx="3"/><text class="T" x="130" y="114" text-anchor="middle">Speed</text>
+          <path class="fl" d="M230,108 H420" marker-end="url(#a2)"/>
+          <rect class="bx" x="425" y="88" width="545" height="40" rx="3"/>
+          <text class="t" x="440" y="105">Localisation is deterministic (no model search) · every stage timestamps itself</text>
+          <text class="s" x="440" y="120">median time to first proof · median time to a validated patch, live</text>
+        </g>
+        <g>
+          <rect class="bx-2" x="30" y="140" width="200" height="40" rx="3"/><text class="T" x="130" y="166" text-anchor="middle">Performance</text>
+          <path class="fl" d="M230,160 H420" marker-end="url(#a2)"/>
+          <rect class="bx" x="425" y="140" width="545" height="40" rx="3"/>
+          <text class="t" x="440" y="157">Four hunt lanes in parallel; two need no build · dependency bumps as instant patches</text>
+          <text class="s" x="440" y="172">bugs found and patched per target — including while the build was failing</text>
+        </g>
+        <g>
+          <rect class="bx-2" x="30" y="192" width="200" height="40" rx="3"/><text class="T" x="130" y="218" text-anchor="middle">Functionality</text>
+          <path class="fl" d="M230,212 H420" marker-end="url(#a2)"/>
+          <rect class="bx-nov" x="425" y="192" width="545" height="40" rx="3"/>
+          <text class="t" x="440" y="209">Full loop with no human in it · Rules of Engagement decide what it may do, per asset</text>
+          <text class="s nov" x="440" y="224">zero-human-input counter · authority level in force per action</text>
+        </g>
+        <g>
+          <rect class="bx-2" x="30" y="244" width="200" height="40" rx="3"/><text class="T" x="130" y="270" text-anchor="middle">Scalability</text>
+          <path class="fl" d="M230,264 H420" marker-end="url(#a2)"/>
+          <rect class="bx" x="425" y="244" width="545" height="40" rx="3"/>
+          <text class="t" x="440" y="261">One language-agnostic core; adding a language is one adapter, not a rewrite</text>
+          <text class="s" x="440" y="276">a C bug, a Java bug and a Python bug fixed by the same core, on one screen</text>
+        </g>
+      </svg></div>
+      <p class="say"><b>The rule behind this block.</b> A criterion we cannot measure is a criterion we
+        cannot score — so nothing counts as finished until it emits the number that proves it, while
+        it runs. The jury's own scoresheet is on screen the whole time, already filled in. The
+        shortlisting criteria (resource, novelty, lightweight) are already banked by the deck.</p>
+      <div class="vet"><b>Vet this</b>Is each criterion matched to one concrete mechanism and one live number? If a block here feels like a promise rather than a measurement, flag it.</div>
+    </div>
+  </div>
+
+  <!-- 3 TWO TRACKS -->
+  <div class="map" id="tracks">
+    <div class="map-h"><span class="n">3</span><h2>The single most important strategic decision: two tracks</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 250" role="img" aria-label="Two parallel tracks that never share a dependency. The demo track runs on targets we built and rehearsed, about 95 percent certain. The evaluation track runs on the jury's unknown target with every fallback armed, about 85 to 90 percent likely to produce something real. Both feed the room.">
+        <defs><marker id="a3" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L9,3.5 L0,7z"/></marker></defs>
+        <rect class="bx-ok" x="30" y="30" width="600" height="80" rx="4"/>
+        <text class="T ok" x="50" y="58">DEMO TRACK — the 7 minutes</text>
+        <text class="t" x="50" y="78">Runs on targets WE built: a Java service with Log4Shell, a C bug from ARVO, a Python app.</text>
+        <text class="s" x="50" y="96">Rehearsed dozens of times. Nothing in it waits on the unknown.</text>
+        <text class="big ok" x="700" y="80" text-anchor="middle">≈ 95%+</text>
+        <text class="s" x="700" y="98" text-anchor="middle">certain</text>
+        <line x1="30" y1="125" x2="970" y2="125" stroke="var(--reject)" stroke-width="2" stroke-dasharray="4 4"/>
+        <text class="s rej" x="500" y="121" text-anchor="middle">NO SHARED DEPENDENCY — the pitch never depends on their target</text>
+        <rect class="bx-deg" x="30" y="140" width="600" height="80" rx="4"/>
+        <text class="T deg" x="50" y="168">EVALUATION TRACK — their unknown target</text>
+        <text class="t" x="50" y="188">Full pipeline, every fallback armed, results reported exactly as they come out.</text>
+        <text class="s" x="50" y="206">"Everything we could not prove is not in it."</text>
+        <text class="big deg" x="700" y="190" text-anchor="middle">≈ 85–90%</text>
+        <text class="s" x="700" y="208" text-anchor="middle">something real</text>
+        <path class="fl" d="M770,70 H830" marker-end="url(#a3)"/><path class="fl" d="M770,180 H830" marker-end="url(#a3)"/>
+        <rect class="bx" x="835" y="95" width="135" height="60" rx="4"/>
+        <text class="T" x="902" y="120" text-anchor="middle">THE ROOM</text>
+        <text class="s" x="902" y="138" text-anchor="middle">both, side by side</text>
+        <path class="fl" d="M830,70 V95"/><path class="fl" d="M830,180 V155"/>
+      </svg></div>
+      <p class="say"><b>Why it matters.</b> The raw odds of a flawless live run on an unknown target
+        are about 36% (build works × bug found × patch validates). That number was for letting the
+        pitch depend on the unknown. We don't. The demo is certain because we own it; the evaluation
+        is honest because we don't pretend. Said aloud: <em>"Here is a bug we know, fixed in front of
+        you. And here is what the same system found on the target you gave us four hours ago."</em></p>
+      <div class="vet"><b>Vet this</b>Are you comfortable that the headline demo is on a known bug (CVE-2021-44228, log4j 2.14.1), openly stated as a controlled demonstration, with the unknown-target result shown beside it?</div>
+    </div>
+  </div>
+
+  <!-- 4 THE MACHINE -->
+  <div class="map" id="pipe">
+    <div class="map-h"><span class="n">4</span><h2>The machine, in six steps</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 300" role="img" aria-label="Six steps: get the target running, hunt in four lanes, prove each finding is real with a replaying reproducer, fix via a ladder of cheapest-first lanes, prove the fix with the five-check inspector, decide authority and hand over signed receipts. Two amber exits: if the build fails, two lanes continue without it; if no fix validates, an honest report is issued. Everything runs in a sandbox with no network.">
+        <defs><marker id="a4" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L9,3.5 L0,7z"/></marker>
+        <marker id="a4d" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk-d" d="M0,0 L9,3.5 L0,7z"/></marker></defs>
+        <rect class="bx-env" x="20" y="20" width="960" height="190" rx="6"/>
+        <text class="m" x="32" y="14">SANDBOX — NO NETWORK INTERFACE · UNTRUSTED CODE NEVER TOUCHES A NETWORK</text>
+        <g><rect class="bx" x="34" y="50" width="140" height="78" rx="4"/><text class="T" x="104" y="76" text-anchor="middle">1 · RUN IT</text><text class="s" x="104" y="94" text-anchor="middle">build the target;</text><text class="s" x="104" y="108" text-anchor="middle">a loop, not a genius</text></g>
+        <path class="fl" d="M174,89 H190" marker-end="url(#a4)"/>
+        <g><rect class="bx" x="194" y="50" width="140" height="78" rx="4"/><text class="T" x="264" y="76" text-anchor="middle">2 · HUNT</text><text class="s" x="264" y="94" text-anchor="middle">4 lanes in parallel:</text><text class="s" x="264" y="108" text-anchor="middle">fuzz · static · supply · service</text></g>
+        <path class="fl" d="M334,89 H350" marker-end="url(#a4)"/>
+        <g><rect class="bx-nov" x="354" y="50" width="140" height="78" rx="4"/><text class="T nov" x="424" y="76" text-anchor="middle">3 · PROVE REAL</text><text class="s" x="424" y="94" text-anchor="middle">reproducer must replay</text><text class="s nov" x="424" y="108" text-anchor="middle">or it is never reported</text></g>
+        <path class="fl" d="M494,89 H510" marker-end="url(#a4)"/>
+        <g><rect class="bx" x="514" y="50" width="140" height="78" rx="4"/><text class="T" x="584" y="76" text-anchor="middle">4 · FIX</text><text class="s" x="584" y="94" text-anchor="middle">template → lookup →</text><text class="s" x="584" y="108" text-anchor="middle">model → safe hardening</text></g>
+        <path class="fl" d="M654,89 H670" marker-end="url(#a4)"/>
+        <g><rect class="bx-nov" x="674" y="50" width="140" height="78" rx="4"/><text class="T nov" x="744" y="76" text-anchor="middle">5 · PROVE FIX</text><text class="s" x="744" y="94" text-anchor="middle">the inspector:</text><text class="s nov" x="744" y="108" text-anchor="middle">all five checks</text></g>
+        <path class="fl" d="M814,89 H830" marker-end="url(#a4)"/>
+        <g><rect class="bx-nov" x="834" y="50" width="134" height="78" rx="4"/><text class="T nov" x="901" y="76" text-anchor="middle">6 · DECIDE</text><text class="s" x="901" y="94" text-anchor="middle">authority per asset,</text><text class="s" x="901" y="108" text-anchor="middle">then signed receipts</text></g>
+        <path class="fl-deg" d="M104,128 V165 H264 V132" marker-end="url(#a4d)"/>
+        <text class="s deg" x="184" y="182" text-anchor="middle">build fails → static + supply lanes never needed it</text>
+        <path class="fl-deg" d="M744,128 V165 H901 V132" marker-end="url(#a4d)"/>
+        <text class="s deg" x="822" y="182" text-anchor="middle">no fix validates → honest report</text>
+        <text class="s" x="500" y="240" text-anchor="middle">Written once, runs for every language. Only step 2 knows what language the target is in.</text>
+        <text class="s" x="500" y="258" text-anchor="middle">Every verified fix also becomes a detection rule that sweeps every other system for the same mistake — "the vaccine".</text>
+        <text class="s nov" x="500" y="280" text-anchor="middle">Marked purple: the pieces we build. Everything else is proven open-source tooling we assemble.</text>
+      </svg></div>
+      <p class="say"><b>The two exits are the point.</b> A system this ambitious will fail somewhere
+        on an unknown target. Ours narrows instead of stopping: a target that will not even build
+        still produces verified findings within minutes (outdated libraries, leaked secrets,
+        misconfiguration), and a bug with no validated fix still produces a signed, proven report.
+        Every exit is a real result, never a blank screen.</p>
+      <div class="vet"><b>Vet this</b>Six steps, two safe exits, one sandbox. Is anything you expected the system to do missing from this picture?</div>
+    </div>
+  </div>
+
+  <!-- 5 BUILD ORDER -->
+  <div class="map" id="build">
+    <div class="map-h"><span class="n">5</span><h2>What gets built, in what order, and what proves each step is done</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 420" role="img" aria-label="Eleven build phases as a ladder from phase 0, done, through phase 10. Each has a one-line exit gate. Phases 0 to 4 are core, 5 to 6 are the console and breadth, 7 is the wow beats, 8 to 10 are polish, measurement and rehearsal.">
+        <defs><marker id="a5" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L9,3.5 L0,7z"/></marker></defs>
+        <text class="m" x="30" y="22">CORE — without these nothing works</text>
+        <g><rect class="bx-ok" x="30" y="32" width="455" height="34" rx="3"/><text class="t ok" x="44" y="54">0 · Keystone — one record, one gate, three languages</text><text class="s" x="476" y="54" text-anchor="end">✓ DONE · 62 tests</text></g>
+        <g><rect class="bx" x="30" y="72" width="455" height="34" rx="3"/><text class="t" x="44" y="94">1 · The inspector, for real</text><text class="s" x="476" y="94" text-anchor="end">gate: rejects a planted bad patch</text></g>
+        <g><rect class="bx" x="30" y="112" width="455" height="34" rx="3"/><text class="t" x="44" y="134">2 · Java end to end + Log4Shell demo target</text><text class="s" x="476" y="134" text-anchor="end">gate: 10 clean runs, zero human input</text></g>
+        <g><rect class="bx" x="30" y="152" width="455" height="34" rx="3"/><text class="t" x="44" y="174">3 · Build agent, offline mirror, no-build lanes, dep-bump patches</text><text class="s" x="476" y="174" text-anchor="end">gate: unbuildable target → findings in 10 min</text></g>
+        <g><rect class="bx" x="30" y="192" width="455" height="34" rx="3"/><text class="t" x="44" y="214">4 · Sandbox, offline bundle, cable-pull install, local models</text><text class="s" x="476" y="214" text-anchor="end">gate: sealed SSD → running in ≤ 20 min</text></g>
+        <text class="m" x="515" y="22">THEN — the demo surface and breadth</text>
+        <g><rect class="bx" x="515" y="32" width="455" height="34" rx="3"/><text class="t" x="529" y="54">5 · Console screens 1, 3, 5 — live scorecard</text><text class="s" x="961" y="54" text-anchor="end">gate: beats 2–5 need no narration</text></g>
+        <g><rect class="bx" x="515" y="72" width="455" height="34" rx="3"/><text class="t" x="529" y="94">6 · C and Python — three languages, one screen</text><text class="s" x="961" y="94" text-anchor="end">gate: 3 bugs, 3 languages, in parallel</text></g>
+        <text class="m" x="515" y="130">WOW — a few, done perfectly</text>
+        <g><rect class="bx-nov" x="515" y="140" width="455" height="34" rx="3"/><text class="t nov" x="529" y="162">7 · Bad-patch rejection · ROE slider · vaccine (if core untouched)</text><text class="s" x="961" y="162" text-anchor="end">gate: 10 clean each</text></g>
+        <text class="m" x="515" y="198">FINISH — polish, numbers, rehearsal</text>
+        <g><rect class="bx" x="515" y="208" width="455" height="34" rx="3"/><text class="t" x="529" y="230">8 · Screens 2, 4, 6 · Commander's Brief · rollback · risk register</text><text class="s" x="961" y="230" text-anchor="end">gate: stranger verifies a bundle</text></g>
+        <g><rect class="bx" x="515" y="248" width="455" height="34" rx="3"/><text class="t" x="529" y="270">9 · Our own numbers on ARVO / AutoPatchBench · self-score</text><text class="s" x="961" y="270" text-anchor="end">gate: nothing borrowed</text></g>
+        <g><rect class="bx" x="515" y="288" width="455" height="34" rx="3"/><text class="t" x="529" y="310">10 · Two full 36-hour rehearsals · record the demo</text><text class="s" x="961" y="310" text-anchor="end">gate: no manual intervention</text></g>
+        <rect class="bx-2" x="30" y="345" width="940" height="56" rx="3"/>
+        <text class="t" x="500" y="368" text-anchor="middle">Strictly one after another (one builder). Every phase leaves a system that could be demonstrated as-is.</text>
+        <text class="s" x="500" y="388" text-anchor="middle">Each has a kill-switch decided now: if it slips, what we do instead — never "push harder at 3 a.m."</text>
+      </svg></div>
+      <p class="say"><b>The principle.</b> Make the core flawless, make a few wow beats perfect,
+        describe the rest. The order is impact-per-effort: the keystone first because everything
+        consumes it; the console early because it is the scoring interface; the vaccine last because
+        it is the hardest to fake and the first to cut.</p>
+      <div class="vet"><b>Vet this</b>Is the order right for you? In particular: console (5) before breadth (6), and the vaccine conditional on core being untouched.</div>
+    </div>
+  </div>
+
+  <!-- 6 THE 36 HOURS -->
+  <div class="map" id="day">
+    <div class="map-h"><span class="n">6</span><h2>The finale's 36 hours</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 200" role="img" aria-label="A 36-hour timeline: install and ingest in the first hour, no-build lanes finding immediately, build by hour 6, first proven findings and patches by hour 12, sleep from 12 to 15, second wave to 24, sleep 24 to 27, freeze and export at 27, rehearse to 31, prepare to 34, judging 34 to 36.">
+        <rect class="bx-2" x="30" y="40" width="940" height="44"/>
+        <g><rect class="bx" x="30" y="40" width="26" height="44"/><text class="s" x="43" y="66" text-anchor="middle">H0</text></g>
+        <g><rect class="bx" x="56" y="40" width="130" height="44"/><text class="s" x="121" y="59" text-anchor="middle">H1–6 · build;</text><text class="s" x="121" y="74" text-anchor="middle">no-build lanes finding</text></g>
+        <g><rect class="bx" x="186" y="40" width="156" height="44"/><text class="s" x="264" y="59" text-anchor="middle">H6–12 · first proofs,</text><text class="s" x="264" y="74" text-anchor="middle">first patches / reports</text></g>
+        <g><rect class="bx-nov" x="342" y="40" width="78" height="44"/><text class="s nov" x="381" y="59" text-anchor="middle">H12–15</text><text class="s nov" x="381" y="74" text-anchor="middle">SLEEP</text></g>
+        <g><rect class="bx" x="420" y="40" width="235" height="44"/><text class="s" x="537" y="59" text-anchor="middle">H15–24 · second wave, vaccine sweep,</text><text class="s" x="537" y="74" text-anchor="middle">evaluation summary drafted</text></g>
+        <g><rect class="bx-nov" x="655" y="40" width="78" height="44"/><text class="s nov" x="694" y="59" text-anchor="middle">H24–27</text><text class="s nov" x="694" y="74" text-anchor="middle">SLEEP</text></g>
+        <g><rect class="bx" x="733" y="40" width="105" height="44"/><text class="s" x="785" y="59" text-anchor="middle">H27–31 · FREEZE</text><text class="s" x="785" y="74" text-anchor="middle">export, rehearse ×2</text></g>
+        <g><rect class="bx" x="838" y="40" width="80" height="44"/><text class="s" x="878" y="59" text-anchor="middle">H31–34</text><text class="s" x="878" y="74" text-anchor="middle">prep, eat</text></g>
+        <g><rect class="bx-ok" x="918" y="40" width="52" height="44"/><text class="s ok" x="944" y="59" text-anchor="middle">H34–36</text><text class="s ok" x="944" y="74" text-anchor="middle">JUDGE</text></g>
+        <line x1="733" y1="30" x2="733" y2="95" stroke="var(--reject)" stroke-width="2"/>
+        <text class="s rej" x="733" y="112" text-anchor="middle">no change to the pipeline after H27</text>
+        <text class="s" x="30" y="140">H0 · install from sealed SSD with an organiser watching, recorded with a clock · ingest their target · ask for test credentials</text>
+        <text class="s" x="30" y="158">Sleep is deliberate: the fuzzers run unattended, and "it found these three while I slept" demonstrates autonomy better than any slide.</text>
+        <text class="s" x="30" y="176">Per-stage caps set before H0 (build 60 min, harness 30 min, fuzz in 30-min rounds, repair 3 × 15 min) so no stage eats the clock.</text>
+      </svg></div>
+      <div class="vet"><b>Vet this</b>Two three-hour sleep blocks for a solo builder, and a hard freeze at hour 27. Would you move either?</div>
+    </div>
+  </div>
+
+  <!-- 7 THE 7 MINUTES -->
+  <div class="map" id="demo">
+    <div class="map-h"><span class="n">7</span><h2>The seven minutes in front of the jury</h2></div>
+    <div class="map-b">
+      <div class="canvas"><svg viewBox="0 0 1000 210" role="img" aria-label="Nine demo beats on a timeline: the problem, pull the cable, mission board, Log4Shell found, split-screen proof, gate rejects a bad patch, vaccine sweep, ROE slider, commander's brief. The scorecard is visible throughout.">
+        <line x1="40" y1="70" x2="960" y2="70" stroke="var(--fg)" stroke-width="1.6"/>
+        <g><circle cx="60" cy="70" r="14" class="bx"/><text class="t" x="60" y="75" text-anchor="middle">1</text><text class="s" x="60" y="104" text-anchor="middle">the</text><text class="s" x="60" y="118" text-anchor="middle">problem</text></g>
+        <g><circle cx="172" cy="70" r="14" class="bx"/><text class="t" x="172" y="75" text-anchor="middle">2</text><text class="s" x="172" y="104" text-anchor="middle">pull the</text><text class="s" x="172" y="118" text-anchor="middle">cable</text></g>
+        <g><circle cx="284" cy="70" r="14" class="bx"/><text class="t" x="284" y="75" text-anchor="middle">3</text><text class="s" x="284" y="104" text-anchor="middle">mission board</text><text class="s" x="284" y="118" text-anchor="middle">3 languages, amber</text></g>
+        <g><circle cx="396" cy="70" r="14" class="bx-nov"/><text class="t nov" x="396" y="75" text-anchor="middle">4</text><text class="s" x="396" y="104" text-anchor="middle">Log4Shell</text><text class="s" x="396" y="118" text-anchor="middle">found live</text></g>
+        <g><circle cx="508" cy="70" r="14" class="bx-nov"/><text class="t nov" x="508" y="75" text-anchor="middle">5</text><text class="s" x="508" y="104" text-anchor="middle">red / green</text><text class="s" x="508" y="118" text-anchor="middle">split-screen proof</text></g>
+        <g><circle cx="620" cy="70" r="14" class="bx-nov"/><text class="t nov" x="620" y="75" text-anchor="middle">6</text><text class="s" x="620" y="104" text-anchor="middle">gate refuses</text><text class="s" x="620" y="118" text-anchor="middle">a bad patch</text></g>
+        <g><circle cx="732" cy="70" r="14" class="bx-nov"/><text class="t nov" x="732" y="75" text-anchor="middle">7</text><text class="s" x="732" y="104" text-anchor="middle">vaccine sweep</text><text class="s" x="732" y="118" text-anchor="middle">(or risk register)</text></g>
+        <g><circle cx="844" cy="70" r="14" class="bx-nov"/><text class="t nov" x="844" y="75" text-anchor="middle">8</text><text class="s" x="844" y="104" text-anchor="middle">ROE slider:</text><text class="s" x="844" y="118" text-anchor="middle">waits for 2 keys</text></g>
+        <g><circle cx="940" cy="70" r="14" class="bx"/><text class="t" x="940" y="75" text-anchor="middle">9</text><text class="s" x="940" y="104" text-anchor="middle">commander's</text><text class="s" x="940" y="118" text-anchor="middle">brief + their result</text></g>
+        <text class="s" x="500" y="40" text-anchor="middle">≈ 45 seconds each · one sentence per beat, the screen does the rest · rehearsed to time, twenty times</text>
+        <rect class="bx-2" x="40" y="145" width="920" height="46" rx="3"/>
+        <text class="t" x="500" y="164" text-anchor="middle">Visible the whole time: the Scorecard — precision 100% · NETWORK INTERFACES: 0 · CLOUD CALLS: 0 · VRAM · speed</text>
+        <text class="s" x="500" y="181" text-anchor="middle">First minute also carries two sentences: the deck-v1 reconciliation line, and "nothing of your code leaves this machine"</text>
+      </svg></div>
+      <p class="say"><b>Why beats 6 and 8 win the room.</b> No other team will deliberately show a
+        failure; watching the gate refuse a plausible fix shows judgement, not output. And the ROE
+        slider answers the question every defence judge is silently asking — <em>who controls this
+        thing?</em> — in doctrine they already use.</p>
+      <div class="vet"><b>Vet this</b>Nine beats in seven minutes. Would you cut one to buy breathing room, and if so which?</div>
+    </div>
+  </div>
+
+  <!-- 8 IF IT BREAKS -->
+  <div class="map" id="fall">
+    <div class="map-h"><span class="n">8</span><h2>If it breaks — the ladder down, and every rung is still a result</h2></div>
+    <div class="map-b">
+      <div class="list">
+        <div><span class="k">1</span><span><b>Their target won't build</b> → static, dependency, secret and config lanes keep going. Findings in minutes. Board shows amber: still finding.</span></div>
+        <div><span class="k">2</span><span><b>Target is in a language we never adapted</b> (Go, Rust, C#) → the dependency and secrets lanes work on anything. Still real findings.</span></div>
+        <div><span class="k">3</span><span><b>Can't generate a fuzz harness</b> → Java never needed one (Jazzer writes it); C uses a hand-written one, said openly.</span></div>
+        <div><span class="k">4</span><span><b>Fuzzing finds nothing in time</b> → the other lanes were running in parallel the whole time, not after.</span></div>
+        <div><span class="k">5</span><span><b>No fix passes the inspector</b> → a signed, proven vulnerability report. Scored, honest, no patch claimed.</span></div>
+        <div><span class="k">6</span><span><b>No GPU, or the model server dies</b> → smaller model → CPU only → templates and lookup only. The inspector never needed a model.</span></div>
+        <div><span class="k">7</span><span><b>Our whole pipeline stalls</b> → an independent open-source CRS runs in parallel on the same target.</span></div>
+        <div><span class="k">8</span><span><b>The live demo dies</b> → the full run was recorded at a safe point; narrate over it. Almost nothing lost.</span></div>
+        <div><span class="k">9</span><span><b>A judge challenges a number</b> → every number comes from our own benchmark run, losses shown beside wins. Nothing borrowed.</span></div>
+        <div><span class="k">10</span><span><b>A judge holds up the old deck</b> ("two 8B models, ≥ 90%") → the reconciliation sentence, said in the first minute before anyone asks.</span></div>
+      </div>
+      <p class="say"><b>The honest arithmetic.</b> Without this ladder: ~36% for a flawless live run.
+        With it: ~85–90% for a convincing demo of something real — and the demo track (block 3)
+        takes that to ≈95%+. Our confidence comes from degrading instead of dying, not from
+        assuming nothing fails.</p>
+      <div class="vet"><b>Vet this</b>Is there a failure you can imagine that isn't on this ladder? That is the one to add.</div>
+    </div>
+  </div>
+
+  <!-- 9 ASK FIRST -->
+  <div class="map" id="ask">
+    <div class="map-h"><span class="n">9</span><h2>Eleven things we must find out from the organisers before building more</h2></div>
+    <div class="map-b">
+      <p class="say">The plan silently assumed answers to all of these. Two are existential. Ask in writing now; where they stay silent, we build to the stated assumption and say so in the room.</p>
+      <div class="grid">
+        <div class="card q"><b>Q1 · Is pre-built code allowed?</b><span>If only the 36 hours count, the order flips. <em>Assume: allowed.</em></span></div>
+        <div class="card q"><b>Q2 · Scored by a machine or by the jury?</b><span>If a machine, a wrong submission format scores zero. <em>Assume: both; build a swappable exporter.</em></span></div>
+        <div class="card"><b>Q3 · Source repos, containers, or live hosts?</b><span>Live hosts favour black-box lanes and honest reports. <em>Assume: mixed.</em></span></div>
+        <div class="card"><b>Q4 · Do proven-but-unpatched reports score?</b><span>Decides breadth vs depth. <em>Assume: patches score more → dependency bumps first.</em></span></div>
+        <div class="card"><b>Q5 · Our hardware or theirs? GPU?</b><span><em>Assume: ours allowed; carry GPU and CPU bundles.</em></span></div>
+        <div class="card"><b>Q6 · Any language hint?</b><span><em>Assume: none; Java deepest.</em></span></div>
+        <div class="card"><b>Q7 · Team size at the finale?</b><span><em>Assume: two; recruit one teammate for the 36 hours.</em></span></div>
+        <div class="card q"><b>Q8 · May we fuzz their targets at full rate?</b><span>Crashing a shared defence test environment is a disqualification. <em>Assume: rate-limit, kill handle.</em></span></div>
+        <div class="card"><b>Q9 · Judging format — minutes, judges, technical or military?</b><span><em>Assume: 7 min + questions, mixed jury.</em></span></div>
+        <div class="card"><b>Q10 · Will the jury have read the shortlisting deck?</b><span><em>Assume: yes; reconciliation line ready.</em></span></div>
+        <div class="card"><b>Q11 · Does their code stay on our machine? Wipe afterwards?</b><span><em>Assume: yes and yes; wipe script ready.</em></span></div>
+      </div>
+      <div class="vet"><b>Vet this</b>Can you get Q1, Q2 and Q8 answered this week? They change the most.</div>
+    </div>
+  </div>
+
+  <!-- 10 STATUS -->
+  <div class="map" id="status">
+    <div class="map-h"><span class="n">10</span><h2>Where things stand today</h2></div>
+    <div class="map-b">
+      <div class="grid">
+        <div class="card ok"><b>Done</b><span>The keystone record (SARIF + proof block, validated against the official schema). Both invariants enforced in code. Three language adapters. Scorecard computed from records. 62 tests. On the remote branch.</span></div>
+        <div class="card ok"><b>Settled decisions</b><span>Two tracks · Java first · dep-bumps are patches · the security advisor can reduce authority but never veto the inspector · six novelty mechanisms, not seven · cross-confirmation requires same site and same bug class.</span></div>
+        <div class="card todo"><b>Next to build</b><span>Phase 1: the inspector for real — each check running on a real build, with the determinism pre-flight so a noisy service doesn't cause false rejections.</span></div>
+        <div class="card todo"><b>Not yet in the repo</b><span>The architecture sheet and campaign plan exist only as published pages; BUILD_PLAN.md lags them. One commit brings them in step.</span></div>
+        <div class="card q"><b>Open until answered</b><span>Q1 (pre-built code) and Q2 (scoring method). Everything else has a stated assumption.</span></div>
+        <div class="card"><b>Honest limits we state ourselves</b><span>100% precision on <em>reports</em>, not on patch semantic-correctness · no formal equivalence · nightly fine-tuning is designed, not demonstrated · the dependency mirror is partial · we do not fuzz React.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VET LIST -->
+  <div class="map" id="vet">
+    <div class="map-h"><span class="n">✓</span><h2>The vet list — tick each one you agree with</h2></div>
+    <div class="map-b">
+      <div class="check">
+        <div><b>The product is the inspector plus the receipts;</b> the model is a replaceable part</div>
+        <div><b>Every scored criterion</b> maps to one mechanism and one live number</div>
+        <div><b>Demo and evaluation are separate tracks</b> with no shared dependency</div>
+        <div><b>Log4Shell as the headline</b>, openly a controlled demonstration</div>
+        <div><b>Six steps, two safe exits, one sandbox</b> is the whole machine</div>
+        <div><b>Build order 0–10</b>, console before breadth, vaccine conditional</div>
+        <div><b>Two sleep blocks and a freeze at H27</b></div>
+        <div><b>Nine beats, 45 seconds each</b>, scorecard always visible</div>
+        <div><b>Beats 6 and 8</b> (refuse a bad patch; ROE slider) are the ones that must ship</div>
+        <div><b>The fallback ladder</b> has no gap you can think of</div>
+        <div><b>Q1, Q2, Q8</b> get asked this week</div>
+        <div><b>Recruit one teammate</b> for the 36 hours</div>
+        <div><b>Dependency bumps count as patches</b>, ranked below exploit-proven findings</div>
+        <div><b>The advisor never vetoes</b> the inspector; it only reduces authority</div>
+        <div><b>The honest limits</b> are said by us, first</div>
+        <div><b>Commit the two documents</b> and align BUILD_PLAN.md</div>
+      </div>
+      <p class="fin">If every box is ticked, the next action is Phase 1. If any is not, that box is the
+        conversation to have before a line of Phase 1 is written. The long documents behind this map:
+        the architecture sheet (figures, scoring ledger, deliverables, way ahead) and the campaign
+        plan (phases with gates, the 36 hours, question bank, pre-mortem, logistics).</p>
+    </div>
+  </div>
+</div>
