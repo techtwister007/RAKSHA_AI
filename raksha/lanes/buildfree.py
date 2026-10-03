@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..finding import Finding, dedup
-from . import secrets, supply, vulndb
+from . import secrets, service, supply, vulndb
 
 #: Files worth reading for secrets. Skips binaries and the usual noise directories.
 _SECRET_EXT = {".java", ".py", ".js", ".ts", ".go", ".rb", ".php", ".xml", ".yaml", ".yml",
@@ -62,11 +62,20 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
             deps.extend(supply.parse_manifest(name, text, rel))
         if secrets_on and path.suffix in _SECRET_EXT:
             findings.extend(secrets.scan_text(text, rel))
+        if _looks_like_openapi(name, text):
+            findings.extend(service.scan_openapi(text, rel))
 
     findings.extend(supply.scan_dependencies(deps, db))
     findings = dedup(findings)
     return BuildFreeResult(findings=findings, files_scanned=files, manifests_found=manifests,
                            seconds=round(time.monotonic() - started, 3))
+
+
+def _looks_like_openapi(name: str, text: str) -> bool:
+    n = name.lower()
+    if not (n.endswith(".json") and ("openapi" in n or "swagger" in n or "api" in n)):
+        return False
+    return '"openapi"' in text or '"swagger"' in text
 
 
 def _walk(root: Path):

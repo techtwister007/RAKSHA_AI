@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "gateway", "version": "1.0"},
+  "paths": {
+    "/login": {"post": {"operationId": "login", "security": [{"basic": []}]}},
+    "/users/{id}": {"delete": {"operationId": "deleteUser"}},
+    "/admin/flush": {"post": {"operationId": "flush"}},
+    "/health": {"get": {"operationId": "health"}}
+  }
+}
