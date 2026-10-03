@@ -97,9 +97,16 @@ def scorecard(findings: Iterable[Finding]) -> Scorecard:
     diff_runs = [r for f in findings for r in f.gate_history
                  if r.check is GateCheck.DIFFERENTIAL_CORPUS]
     diff_survived = [r for r in diff_runs if r.passed]
+    # Honest split of how reports were proven: an exploit that replays vs a deterministic match
+    # (a dependency CVE, a secret). Both are proof; only the first is an exploit, and the risk
+    # register ranks accordingly. Shown so we never imply an exploit we do not have.
+    by_evidence = _count(
+        f.reproducer.kind for f in with_reproducer if f.reproducer is not None
+    )
     precision = {
         "reports_with_reproducer_pct": _pct(len(with_reproducer), len(reported)),
         "reports_without_reproducer": len(reported) - len(with_reproducer),
+        "evidence_kind": by_evidence,
         "candidate_patches_gated": len(diff_runs),
         "patches_surviving_differential_pct": _pct(len(diff_survived), len(diff_runs)),
         "patches_rejected_by_gate": len(diff_runs) - len(diff_survived),

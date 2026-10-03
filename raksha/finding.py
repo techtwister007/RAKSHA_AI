@@ -123,12 +123,22 @@ class Frame:
         return f"{self.symbol}@{base}"
 
 
+#: How a finding's evidence is established. Both are replayable and both are honest; they are
+#: kept distinct so the risk register can rank exploit-proven findings above match-proven ones,
+#: and so we never *claim* an exploit we do not have.
+EXPLOIT_REPLAY = "exploit-replay"          # a crafted input replays and an oracle aborts
+DETERMINISTIC_MATCH = "deterministic-match"  # a detector deterministically re-matches (dep CVE, secret)
+
+
 @dataclass(frozen=True)
 class Reproducer:
-    """The artifact that triggers the bug, and how to replay it.
+    """The evidence that a finding is real, and how to replay it.
 
-    Without one of these, a finding is stuck at SUSPECTED forever. This is the object
-    the precision claim rests on.
+    Without one of these, a finding is stuck at SUSPECTED forever. This is the object the
+    precision claim rests on. `kind` records what sort of evidence it is: an exploit that replays,
+    or a deterministic detector that re-matches. The build-free lanes produce the latter — a
+    dependency version matched against the offline vuln DB, or a secret still present at a
+    location — which is proof, but not an exploit, and the record says so.
     """
 
     artifact_sha256: str
@@ -136,6 +146,8 @@ class Reproducer:
     artifact_path: str | None = None
     minimised: bool = False
     size_bytes: int | None = None
+    kind: str = EXPLOIT_REPLAY
+    detail: str | None = None  # e.g. "pkg@1.2.3 vulnerable per OSV GHSA-xxxx (fixed in 1.2.4)"
 
     @classmethod
     def from_bytes(
@@ -145,6 +157,8 @@ class Reproducer:
         *,
         artifact_path: str | None = None,
         minimised: bool = False,
+        kind: str = EXPLOIT_REPLAY,
+        detail: str | None = None,
     ) -> "Reproducer":
         return cls(
             artifact_sha256=hashlib.sha256(data).hexdigest(),
@@ -152,6 +166,8 @@ class Reproducer:
             artifact_path=artifact_path,
             minimised=minimised,
             size_bytes=len(data),
+            kind=kind,
+            detail=detail,
         )
 
 
@@ -518,6 +534,8 @@ class Finding:
                     "replay_cmd": self.reproducer.replay_cmd,
                     "minimised": self.reproducer.minimised,
                     "size_bytes": self.reproducer.size_bytes,
+                    "kind": self.reproducer.kind,
+                    "detail": self.reproducer.detail,
                 }
                 if self.reproducer
                 else None
@@ -609,9 +627,9 @@ class Finding:
             if not f.uri:
                 continue
             region: dict[str, Any] = {}
-            if f.line is not None:
+            if f.line is not None and f.line >= 1:
                 region["startLine"] = f.line
-            if f.column is not None:
+            if f.column is not None and f.column >= 1:  # SARIF columns are 1-based
                 region["startColumn"] = f.column
             loc: dict[str, Any] = {
                 "physicalLocation": {"artifactLocation": {"uri": f.uri}}

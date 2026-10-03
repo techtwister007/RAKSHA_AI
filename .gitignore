@@ -20,3 +20,4 @@ artifacts/
 demo-targets/**/target/
 demo-targets/**/cp.txt
 raksha-java-slice.sarif
+raksha-buildfree.sarif

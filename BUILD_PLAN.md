@@ -94,7 +94,8 @@ kill-switches are in the campaign plan, Part 2.
 | 0 | Keystone — one record, one gate, three oracles | C/Java/Python records all pass one gate; SARIF validates against the OASIS schema | **done** |
 | 1 | The five-check gate, for real; cross-confirmation; model-test check | A planted overfitting patch is rejected; a noisy service causes no false rejection | **done** (`raksha/gate/`, 17 tests) |
 | 2 | Java vertical slice + Log4Shell demo target | Log4Shell found, fixed, proven with zero human input, all five gate checks | **done** (`demo-targets/java-log4shell`, `raksha/adapters/java.py`, `raksha/slice_java.py`) |
-| 3 | Build agent, offline mirror, build-free lanes, dependency-bump patch lane, lane D, jury exporter | A target that will not build still yields proven findings within 10 minutes | next |
+| 3 | Build-free lanes (supply-chain + secrets, every ecosystem), dependency-bump patch lane | A target that will not build still yields proven findings in seconds, any language | **done** (`raksha/lanes/`, `raksha/slice_buildfree.py`) |
+| 3b | Build agent, offline mirror, lane D (service), jury exporter | build agent escalates then degrades; service lane for live targets | next |
 | 4 | Sandbox, offline bundle (GPU + CPU variants), cable-pull install, local vLLM | Sealed SSD → running in ≤ 20 min, cable out; CPU profile benchmarked | |
 | 5 | Console screens 1, 3, 5; Scorecard live | Beats 2–5 of the arc need no narration; badges read 0 and are true | |
 | 6 | C and Python slices — three languages on one screen | One C, Java and Python bug fixed in parallel by the same core | |

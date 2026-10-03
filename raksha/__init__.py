@@ -6,6 +6,8 @@ the full brief and `BUILD_PLAN.md` for what is built and what is next.
 """
 
 from .finding import (
+    DETERMINISTIC_MATCH,
+    EXPLOIT_REPLAY,
     Finding,
     FixSite,
     Frame,
@@ -26,6 +28,8 @@ from .finding import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "DETERMINISTIC_MATCH",
+    "EXPLOIT_REPLAY",
     "Finding",
     "FixSite",
     "Frame",
