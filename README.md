@@ -45,7 +45,8 @@ raksha/
   roe.py          Rules of Engagement — asset tiers, step-downs, two-person rule
   vaccine.py      one verified fix → a proven detection rule → a fleet sweep
   bundle.py brief.py risk.py rollback.py   signed evidence, Commander's Brief, risk register
-  airgap.py sandbox.py                     the no-egress guard and the isolation wrapper
+  replay.py __main__.py                    safe replay scripts and the `python -m raksha` replay CLI
+  airgap.py sandbox.py                     the no-egress guard; the one door all target code runs through
   orchestrator.py console (../console/)    the live session the six-screen console renders
   health.py rehearse.py                    endurance watchdog and dress-rehearsal harness
   benchmark.py                             our own measured numbers (ARVO-style cases)
@@ -62,6 +63,10 @@ python -m raksha.slice_three # three languages verified live through the one gat
 python -m raksha.orchestrator # serve the offline operator console on :8080
 python -m raksha.airgap      # the no-egress guard (run before building the bundle)
 python -m raksha.rehearse 10 # a short self-test of the endurance harness
+python -m raksha.benchmark   # re-measure every published number, incl. false positives on negative controls
+
+# replay a finding's evidence independently (what every bundle's replay.sh runs; exit 1 = reproduced)
+python -m raksha match npm minimist 1.2.5 --advisory GHSA-xvch-5gv4-984h
 ```
 
 The demo writes `raksha-findings.sarif`, which validates against the OASIS SARIF 2.1.0
