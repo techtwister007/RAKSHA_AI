@@ -2,9 +2,12 @@
 
 The bundle is what goes on the removable media: the orchestrator image, the model weights, the
 dependency mirrors, the vuln DB, the compose files, this script. An air-gapped node cannot re-fetch
-anything, so integrity is checked from a signed manifest on import — the air-gapped equivalent of a
-package signature. This is also the sneakernet refresh format: a new manifest + changed files on
-media, verified here before they are trusted.
+anything, so integrity is checked against a manifest of sha256 checksums on import. The manifest is
+checksummed, not signed: it proves nothing was corrupted or swapped on the media *provided the
+manifest's own hash is checked against a copy carried separately* (printed on the transfer record,
+read aloud at handover). `verify` prints that hash for exactly this comparison. Production signs the
+manifest with an offline cosign key; the check is otherwise identical. This is also the sneakernet
+refresh format: a new manifest + changed files on media, verified here before they are trusted.
 
 Usage:
   python3 bundle_manifest.py build  <bundle-dir>     write manifest.json (sha256 of every file)
@@ -84,7 +87,9 @@ def _main(argv: list[str]) -> int:
         print("BUNDLE VERIFICATION FAILED:")
         print("\n".join("  " + p for p in problems))
         return 1
+    digest = hashlib.sha256((root / MANIFEST).read_bytes()).hexdigest()
     print("bundle verified: all files present and unchanged")
+    print(f"manifest sha256: {digest}  <- compare with the copy on the transfer record")
     return 0
 
 

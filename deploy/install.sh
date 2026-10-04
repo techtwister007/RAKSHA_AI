@@ -18,10 +18,13 @@ for img in "$BUNDLE"/images/*.tar; do
     docker load -i "$img"
 done
 
-echo "3/4 confirming no network interface is required..."
-# The compose network is marked internal; nothing here reaches the internet.
+echo "3/4 confirming the sandbox image is present (target code never runs outside it)..."
+docker image inspect raksha-sandbox:latest >/dev/null 2>&1 || {
+    echo "raksha-sandbox:latest not loaded — refusing to start (RAKSHA_REQUIRE_SANDBOX=1)"; exit 1; }
 
 echo "4/4 starting the sealed stack..."
+mkdir -p /var/lib/raksha-scratch
 docker compose -f "$BUNDLE/docker-compose.$PROFILE.yml" up -d
 
-echo "done. console: http://localhost:8080  (NETWORK INTERFACES: 0 · CLOUD CALLS: 0)"
+echo "done. console: http://127.0.0.1:8080 (this host only)."
+echo "     the badges on it are measured: they read 0 only if nothing ran outside the sandbox."

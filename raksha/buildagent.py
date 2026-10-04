@@ -121,6 +121,37 @@ class Runner(Protocol):
         """Run a shell command in cwd; return (exit_code, combined_output)."""
 
 
+class ShellRunner:
+    """Runs build commands for real — in a scratch copy of the target (never in the operator's
+    mounted tree, which is read-only and must stay untouched) and through the sandbox door, since a
+    build script is target code."""
+
+    def __init__(self, *, timeout: float = 900.0) -> None:
+        self.timeout = timeout
+        self._scratch: dict[Path, Path] = {}
+
+    def run(self, cmd: str, cwd: Path) -> tuple[int, str]:
+        import os
+        import shutil
+        import tempfile
+        from .sandbox import run_untrusted
+        src = Path(cwd).resolve()
+        work = self._scratch.get(src)
+        if work is None:
+            work = Path(tempfile.mkdtemp(prefix="raksha-build-")) / src.name
+            shutil.copytree(src, work, symlinks=True)
+            self._scratch[src] = work
+        code, out, err, timed_out = run_untrusted(cmd, str(work), timeout=self.timeout, env=dict(os.environ))
+        text = (out + b"\n" + err).decode("utf-8", "replace")
+        return (code if not timed_out else -1), text + ("\n[timed out]" if timed_out else "")
+
+    def cleanup(self) -> None:
+        import shutil
+        for work in self._scratch.values():
+            shutil.rmtree(work.parent, ignore_errors=True)
+        self._scratch.clear()
+
+
 @dataclass
 class BuildOutcome:
     ok: bool
@@ -137,6 +168,8 @@ class BuildOutcome:
         if self.ok:
             return f"built with {self.system.value} after {len(self.remedies_applied)} remedy(ies): " \
                    + ", ".join(self.remedies_applied)
+        if self.system is BuildSystem.UNKNOWN:
+            return "no recognised build system → build-free mode"
         return f"{self.system.value} build failed after {self.attempts} attempt(s) → build-free mode"
 
 

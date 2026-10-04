@@ -104,3 +104,17 @@ def test_orchestrator_degrades_a_failed_build_to_build_free(tmp_path):
     assert t.build_status == "amber"                 # degraded, not red
     assert "degraded to build-free" in t.note
     assert t.finding_ids                             # the vulnerable gin dep is still found
+
+
+def test_finale_session_ingests_mounted_targets_and_writes_the_deliverables(tmp_path):
+    from raksha.bundle import verify_bundle
+    from raksha.orchestrator import finale_session
+    target = tmp_path / "targets" / "svc"
+    target.mkdir(parents=True)
+    (target / "package-lock.json").write_text('{"packages":{"node_modules/minimist":{"version":"1.2.5"}}}')
+    s = finale_session(tmp_path / "targets", tmp_path / "out")
+    assert [t["name"] for t in s.board()] == ["svc"] and s.board()[0]["findings"] == 1
+    assert (tmp_path / "out" / "submission" / "summary.json").exists()
+    bundles = list((tmp_path / "out" / "evidence").iterdir())
+    assert len(bundles) == 1 and verify_bundle(bundles[0]).ok
+    assert sorted(p.name for p in target.iterdir()) == ["package-lock.json"]   # operator's tree untouched

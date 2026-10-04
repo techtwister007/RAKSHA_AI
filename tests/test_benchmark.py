@@ -99,3 +99,20 @@ def test_real_benchmark_runs_all_deep_cases():
     report = run_cases(deep_cases())
     a = report.aggregates()
     assert a["verified_fixed"] >= 2 and a["language_count"] >= 2
+
+
+def test_negative_controls_draw_no_false_positives():
+    # the precision number the report publishes is measured here; a rule that starts firing on the
+    # clean estate fails CI instead of silently changing a published figure
+    from raksha.benchmark import NEGATIVE_CONTROLS, negative_controls
+    rep = BenchReport()
+    negative_controls(rep)
+    assert rep.negative_controls == len(NEGATIVE_CONTROLS) and rep.false_positives == 0, rep.false_positive_notes
+
+
+def test_languages_exclude_lanes():
+    rep = BenchReport(results=[
+        CaseResult("a", "any", "CWE-798", "CONFIRMED", False, False, None, None, None, DETERMINISTIC_MATCH),
+        CaseResult("b", "api", "CWE-862", "CONFIRMED", False, False, None, None, None, DETERMINISTIC_MATCH),
+        CaseResult("c", "go", "CWE-444", "CONFIRMED", False, False, None, None, None, DETERMINISTIC_MATCH)])
+    assert rep.aggregates()["languages"] == ["go"]

@@ -6,10 +6,27 @@ services:
     image: raksha-ai:latest
     environment:
       RAKSHA_SEALED: "1"
+      RAKSHA_SANDBOX_IMAGE: "raksha-sandbox:latest"   # carried in the bundle; target code runs here
+      RAKSHA_REQUIRE_SANDBOX: "1"                     # never run target code unsandboxed
+      # Scratch builds live on a path that is identical on the host and in this container: the
+      # sandbox containers are started by the HOST's docker daemon, which mounts host paths.
+      TMPDIR: "/var/lib/raksha-scratch"
       # no RAKSHA_INFERENCE_BASE_URL -> get_client() returns None -> model-free operation
-    volumes: ["./targets:/targets:ro", "./out:/out:rw"]
-    networks: ["sealed"]
+    volumes:
+      - "./targets:/targets:ro"
+      - "./out:/out:rw"
+      - "/var/lib/raksha-scratch:/var/lib/raksha-scratch:rw"
+      # the orchestrator (RAKSHA's own code, air-gap-guarded) starts the sandbox containers; target
+      # code itself never sees this socket — it runs inside those containers with --network=none
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    # "sealed" is internal (no route out) and carries the model traffic. An internal network cannot
+    # publish a port, so the console gets its own network, published on the HOST's loopback only.
+    # Untrusted target code never runs in this container's namespace: it runs in the network-less
+    # sandbox (RAKSHA_SANDBOX_IMAGE, --network=none).
+    networks: ["sealed", "console"]
+    ports: ["127.0.0.1:8080:8080"]
 
 networks:
+  console: {}
   sealed:
     internal: true

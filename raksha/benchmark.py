@@ -19,7 +19,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .finding import Finding, Status
+from .finding import INFERENCE_LANES, Finding, Status
+from .metrics import NOT_A_LANGUAGE
 
 
 @dataclass
@@ -63,16 +64,21 @@ def _median(xs: list[float]) -> float | None:
 @dataclass
 class BenchReport:
     results: list[CaseResult] = field(default_factory=list)
+    #: Clean artifacts scanned as negative controls, and the findings (all false positives) they drew.
+    negative_controls: int = 0
+    false_positives: int = 0
+    false_positive_notes: list[str] = field(default_factory=list)
+    provenance: str = ""
 
     def aggregates(self) -> dict:
         r = self.results
         real = [c for c in r if c.status != "ERROR"]
         fixed = [c for c in real if c.fixed]
         reported = [c for c in real if c.status in ("CONFIRMED", "PATCHED", "VERIFIED", "REPORT_ONLY")]
-        langs = sorted({c.language for c in real if c.language != "?"})
+        langs = sorted({c.language for c in real if c.language != "?"} - NOT_A_LANGUAGE)
         exploit = [c for c in reported if c.evidence == "exploit-replay"]
         match = [c for c in reported if c.evidence == "deterministic-match"]
-        zero_inf = [c for c in fixed if c.lane == "TEMPLATE"]
+        zero_inf = [c for c in fixed if c.lane and c.lane not in {l.value for l in INFERENCE_LANES}]
         return {
             "cases": len(r),
             "ran": len(real),
@@ -87,6 +93,14 @@ class BenchReport:
             "zero_inference_fix_pct": round(100.0 * len(zero_inf) / len(fixed), 1) if fixed else None,
             "median_time_to_pov_s": _median([c.time_to_pov_s for c in real]),
             "median_time_to_patch_s": _median([c.time_to_patch_s for c in real]),
+            # deep cases (build + hunt + repair + gate) and the build-free scan are different
+            # operations; a single median over both would be dominated by the scan rows
+            "median_end_to_end_deep_s": _median([c.wall_s for c in real
+                                                 if c.wall_s is not None and c.evidence == "exploit-replay"]),
+            "build_free_scan_s": next((c.wall_s for c in real if c.evidence == "deterministic-match"
+                                       and c.wall_s is not None), None),
+            "negative_controls": self.negative_controls,
+            "false_positives_on_controls": self.false_positives,
         }
 
     def markdown(self) -> str:
@@ -109,14 +123,21 @@ class BenchReport:
             "",
             "## Results",
             "",
-            "| Target | Lang | Bug | Status | Fixed | Evidence | Lane | t-PoV (s) | t-patch (s) |",
-            "|--------|------|-----|--------|-------|----------|------|-----------|-------------|",
+            "**Timing columns.** *End-to-end* is wall-clock for the whole case: build, hunt, repair "
+            "and the five-check gate (deep cases), or the whole estate scan (build-free). *Confirm* "
+            "and *patch* are measured from the finding record's creation; in these deep cases the "
+            "reproducer is seeded rather than discovered by a fuzzing campaign, so *confirm* is "
+            "record latency, not time-to-discovery — the end-to-end column is the honest speed number.",
+            "",
+            "| Target | Lang | Bug | Status | Fixed | Evidence | Lane | end-to-end (s) | confirm (s) | patch (s) |",
+            "|--------|------|-----|--------|-------|----------|------|----------------|-------------|-----------|",
         ]
         for c in self.results:
             lines.append(
                 f"| {c.name} | {c.language} | {c.bug_class} | {c.status} | "
                 f"{'yes' if c.fixed else ('report' if c.report_only else '—')} | "
                 f"{c.evidence or '—'} | {c.lane or '—'} | "
+                f"{c.wall_s if c.wall_s is not None else '—'} | "
                 f"{c.time_to_pov_s if c.time_to_pov_s is not None else '—'} | "
                 f"{c.time_to_patch_s if c.time_to_patch_s is not None else '—'} |")
         lines += [
@@ -132,8 +153,10 @@ class BenchReport:
             f"- Languages covered: **{a['language_count']}** ({', '.join(a['languages'])})",
             f"- Evidence: {a['evidence']['exploit_replay']} exploit-proven, "
             f"{a['evidence']['deterministic_match']} match-proven",
-            f"- Median time-to-PoV: **{a['median_time_to_pov_s']}s**  ·  "
-            f"median time-to-validated-patch: **{a['median_time_to_patch_s']}s**",
+            f"- Deep cases, median end-to-end (build → hunt → fix → five-check gate): "
+            f"**{a['median_end_to_end_deep_s']}s**",
+            f"- Build-free estate scan, all {a['evidence']['deterministic_match']} match-proven findings: "
+            f"**{a['build_free_scan_s']}s**",
             "",
             "## Losses, shown beside the wins",
             "",
@@ -148,8 +171,18 @@ class BenchReport:
             lines.append("- None on this set. The honest caveat above (small curated set) still applies.")
         lines += ["", "## Precision", "",
                   "100% of reported findings carry a replaying reproducer, by construction — the data "
-                  "model forbids reporting one that does not. This is a structural property, not a "
-                  "tuned result, and it holds on every set.", ""]
+                  "model forbids reporting one that does not. That is a structural property; it says "
+                  "every report is *evidenced*, not that no evidence is ever wrong. So false positives "
+                  "are measured separately, against negative controls: a clean estate built from the "
+                  "same shapes as the vulnerable one — fixed dependency versions on every patched "
+                  "release line, secrets read from the environment, references in config, AWS "
+                  "documentation keys, ranges in manifests, an authenticated API.",
+                  "",
+                  f"- Negative controls scanned: **{a['negative_controls']}** clean artifacts",
+                  f"- False positives on them: **{a['false_positives_on_controls']}**", ""]
+        lines += [f"  - {n}" for n in self.false_positive_notes]
+        if self.provenance:
+            lines += ["", "---", "", f"_{self.provenance}_", ""]
         return "\n".join(lines)
 
 
@@ -172,15 +205,91 @@ def deep_cases() -> list[tuple[str, Callable[[], Finding]]]:
     return [("c-overflow", run_c), ("py-cmdinject", run_python), ("java-log4shell", run_java)]
 
 
+#: The clean twin of the vulnerable estate: every file here must produce ZERO findings.
+NEGATIVE_CONTROLS: dict[str, str] = {
+    "log4j/pom.xml": "<project><dependencies><dependency><groupId>org.apache.logging.log4j</groupId>"
+                     "<artifactId>log4j-core</artifactId><version>2.17.1</version></dependency>"
+                     "<dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind"
+                     "</artifactId><version>2.12.6.1</version></dependency></dependencies></project>",
+    "log4j-backport/pom.xml": "<project><dependencies><dependency><groupId>org.apache.logging.log4j</groupId>"
+                              "<artifactId>log4j-core</artifactId><version>2.12.4</version></dependency>"
+                              "</dependencies></project>",
+    "web/package.json": '{"dependencies":{"lodash":"^4.17.20","minimist":"~1.2.6"}}',
+    "web/package-lock.json": '{"packages":{"node_modules/lodash":{"version":"4.17.21"},'
+                             '"node_modules/minimist":{"version":"1.2.6"}}}',
+    "py/requirements.txt": "pyyaml==5.4\nrequests==2.31.0\nflask>=2.0\n",
+    "py/pyproject.toml": '[build-system]\nrequires = ["setuptools>=61"]\n[project]\nname = "x"\n'
+                         'dependencies = ["requests>=2.25.1"]\n',
+    "go/go.mod": "module x\nrequire github.com/gin-gonic/gin v1.7.7\n",
+    "py/settings.py": 'import os\nDB_PASSWORD = os.environ["DB_PASSWORD"]\n'
+                      'token = make_token(user)\nsecret_key = settings.SECRET_KEY\npwd = os.getcwd()\n'
+                      'AWS_KEY = "AKIAIOSFODNN7EXAMPLE"\n',
+    "config/application.yml": "db:\n  password: ${DB_PASSWORD}\n  secret: SECRET_KEY_FROM_VAULT\n",
+    "config/app.properties": "api.key=changeme\nplaceholder.token=<your-token-here>\n",
+    "api/openapi.json": '{"openapi":"3.0.0","security":[{"bearer":[]}],"paths":{"/orders":'
+                        '{"post":{"responses":{}}}}}',
+}
+
+
+def negative_controls(report: BenchReport) -> None:
+    """Scan the clean estate; every finding on it is a false positive and is recorded by name."""
+    import pathlib
+    import tempfile
+    from .lanes import scan_target
+    root = pathlib.Path(tempfile.mkdtemp(prefix="raksha-negctl-"))
+    try:
+        for rel, text in NEGATIVE_CONTROLS.items():
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (root / rel).write_text(text)
+        found = scan_target(root).findings
+        report.negative_controls = len(NEGATIVE_CONTROLS)
+        report.false_positives = len(found)
+        report.false_positive_notes = [f"{f.target}: {f.message[:100]}" for f in found]
+    finally:
+        import shutil
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def _why_not_fixed(f: Finding) -> str:
+    """The honest reason a proven build-free finding carries no verified fix."""
+    if f.oracle.startswith("osv:"):
+        site = f.fix_site_set[0] if f.fix_site_set else None
+        bump = site.rationale if site and site.rationale else "no fixed version"
+        return (f"proven by version match; zero-inference patch prepared ({bump}) but not gate-verified "
+                "— the gate needs a build, and this case ran build-free")
+    if f.oracle.startswith("secrets:"):
+        return "proven by re-match; the fix is rotating the credential — an operator action, not a code patch"
+    if f.oracle.startswith("service:"):
+        return "proven from the API spec; the fix is an authorization policy change, reviewed by a human"
+    return f"status {f.status.value}"
+
+
 def main() -> int:
     """`python -m raksha.benchmark` — run the deep slices + build-free estate, write the report."""
     import pathlib
+    import subprocess
+    from datetime import datetime, timezone
     from .lanes import scan_target
+    repo = pathlib.Path(__file__).parents[1]
     report = run_cases(deep_cases())
-    estate = pathlib.Path(__file__).parents[1] / "demo-targets" / "mixed-estate"
+    estate = repo / "demo-targets" / "mixed-estate"
     if estate.exists():
-        for f in scan_target(estate).findings:
-            report.results.append(CaseResult.from_finding(f"estate:{f.oracle}", f))
+        t0 = time.monotonic()
+        scan = scan_target(estate)
+        wall = round(time.monotonic() - t0, 3)
+        for f in scan.findings:
+            site = f.fix_site_set[0] if f.fix_site_set else None
+            where = (f"{site.uri}:{site.start_line or site.symbol}" if site else f.target)
+            report.results.append(CaseResult.from_finding(
+                f"estate:{f.oracle.split(':', 1)[-1]}@{where}", f, wall_s=wall, note=_why_not_fixed(f)))
+    negative_controls(report)
+    try:
+        commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=repo,
+                                capture_output=True, text=True).stdout.strip() or "unknown"
+    except OSError:
+        commit = "unknown"
+    report.provenance = (f"Generated by `python -m raksha.benchmark` at commit {commit} on "
+                         f"{datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC. Re-run it to reproduce every number.")
     out = pathlib.Path(__file__).parents[1] / "docs" / "benchmark-report.md"
     out.write_text(report.markdown())
     a = report.aggregates()

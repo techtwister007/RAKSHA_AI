@@ -302,11 +302,41 @@ def three_language_session(repo_root: Path | None = None, *, include_java: bool 
     return s
 
 
+def finale_session(targets_dir: Path, out_dir: Path | None = None) -> Session:
+    """The session the deployment runs: every directory under `targets_dir` is ingested (build
+    attempted where a toolchain is present, build-free lanes always), and the jury submission plus a
+    sealed evidence bundle per reportable finding are written to `out_dir`."""
+    from .export import export
+    from .buildagent import ShellRunner
+    s = Session()
+    runner = ShellRunner()
+    try:
+        for root in sorted(p for p in targets_dir.iterdir() if p.is_dir()):
+            s.ingest(root, runner, name=root.name)
+    finally:
+        runner.cleanup()
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        export(list(s.findings.values()), out_dir / "submission")
+        s.evidence_root = out_dir / "evidence"
+        for fid, f in s.findings.items():
+            if f.is_reportable:
+                s.bundle_dir(fid)
+    return s
+
+
 def main() -> int:
     from console.server import serve  # local import so the package has no server dependency at import
     import os
     port = int(os.environ.get("RAKSHA_CONSOLE_PORT", "8080"))
-    return serve(demo_session(), port=port)
+    host = os.environ.get("RAKSHA_CONSOLE_HOST", "127.0.0.1")
+    targets = Path(os.environ.get("RAKSHA_TARGETS", "/targets"))
+    out = os.environ.get("RAKSHA_OUT")
+    if targets.is_dir() and any(p.is_dir() for p in targets.iterdir()):
+        session = finale_session(targets, Path(out) if out else None)
+    else:
+        session = demo_session()          # no targets mounted: the bundled demo estate
+    return serve(session, port=port, host=host)
 
 
 if __name__ == "__main__":
