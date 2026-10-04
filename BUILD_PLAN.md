@@ -97,8 +97,8 @@ kill-switches are in the campaign plan, Part 2.
 | 3 | Build-free lanes (supply-chain + secrets, every ecosystem), dependency-bump patch lane | A target that will not build still yields proven findings in seconds, any language | **done** (`raksha/lanes/`, `raksha/slice_buildfree.py`) |
 | 3b | Build agent (escalate → degrade), service lane (OpenAPI), jury exporter | build agent degrades to build-free on any failure; service findings; submission export | **done** (`raksha/buildagent.py`, `raksha/lanes/service.py`, `raksha/export.py`) |
 | 4 | Sandbox, offline bundle (GPU + CPU variants), cable-pull install, inference interface, air-gap guard | air-gap guard clean; sandbox refuses to run unisolated; bundle verifies/tamper-detects; model-free degrade works | **done** (`raksha/inference.py`, `raksha/airgap.py`, `raksha/sandbox.py`, `raksha/repair.py`, `deploy/`) |
-| 5 | Console screens 1, 3, 5; Scorecard live | Beats 2–5 of the arc need no narration; badges read 0 and are true | next |
-| 6 | C and Python slices — three languages on one screen | One C, Java and Python bug fixed in parallel by the same core | |
+| 5 | Console screens 1, 3, 5; Scorecard live | serves live board/scorecard/detail offline; badges read 0; air-gap guard covers it | **done** (`console/`, `raksha/orchestrator.py`) |
+| 6 | C and Python slices — three languages on one screen | One C, Java and Python bug fixed in parallel by the same core | next |
 | 7 | WOW: bad-patch rejection, ROE slider, vaccine (only if core untouched) | Each beat runs clean 10 times | |
 | 8 | Screens 2, 4, 6; Commander's Brief; rollback; risk register | A stranger verifies a bundle signature unaided | |
 | 9 | Our own numbers on ARVO / AutoPatchBench; self-score; licence register | Every number we will say traces to this run | |
