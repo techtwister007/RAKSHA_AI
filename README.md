@@ -18,7 +18,7 @@ real. Nothing unproven ever ships.
 |---|---|
 | `RAKSHA_AI_Dossier/` | The settled brief — competition decode, architecture, tool map, models, honest gaps. Read `README.md` there first. |
 | `BUILD_PLAN.md` | The execution plan: finale answers, settled decisions, phases, and the scoring ledger. |
-| `docs/` | The architecture sheet, campaign plan and plan map (HTML; also published as artifacts — links in `BUILD_PLAN.md`). |
+| `docs/` | The architecture sheet, campaign plan and plan map (HTML; also published as artifacts — links in `BUILD_PLAN.md`). **`docs/laptop-setup.md`: run the whole system on your own machine.** |
 | `raksha/` | The product. |
 | `tests/` | The invariant and keystone tests. |
 
