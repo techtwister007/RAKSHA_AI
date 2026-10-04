@@ -30,7 +30,8 @@ fixes and proves vulnerabilities across C, Python, Go, Rust, JavaScript/TypeScri
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
 Plan V2 Waves 0 and 1 are built (`PLAN_V2.md`, per-item status with evidence and caveats); Waves
-2–4 are next. Last verified run: **full suite passes**, air-gap guard clean, all slices `VERIFIED`.
+2–4 are next. Last verified run: **770 tests pass**, 0 fail, 11 skipped (opt-in; the deep and Java slices among them
+also pass when enabled), air-gap guard and pyflakes clean, all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5 and
 `docs/threat-model.md` (residual risks): the 36-hour rehearsal and the real-Docker sandbox need
 the finale hardware; the model lane has run only against a mock endpoint; no SMT solver is bundled
@@ -71,7 +72,7 @@ raksha/
 
 ```sh
 pip install -e '.[dev]'
-pytest                       # tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
+pytest                       # 770 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
 
 python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
 python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)

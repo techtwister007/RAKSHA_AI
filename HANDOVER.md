@@ -23,7 +23,9 @@ regenerated from the repository as the last step.
 
 Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24):
 
-- **full suite passes** (count recorded after the final run), air-gap guard clean.
+- **770 tests pass**, 0 fail, 11 skipped, with the slow Go/Rust/JS lanes enabled; the opt-in deep and
+  Java slices (20 tests) pass when enabled; still unrun here: the 5 z3 proofs (no solver bundled), the
+  multi-language benchmark and the slow mutation-factory test. Air-gap guard and pyflakes clean.
 - **Plan V2 Wave 0 + Wave 1 built** (`PLAN_V2.md` carries per-item status, proof and caveats): multi-bug
   gate semantics, evidence floor, release twin, rollback proof, three more oracle families, campaign
   loop, minimisation, real Python/Node coverage, **Java with no harness** (VERIFIED), contract
