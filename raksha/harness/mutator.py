@@ -32,6 +32,8 @@ class FuzzResult:
     executions: int = 0
     first_crash_execs: int | None = None                 # execs until the first crash (a speed signal)
     stopped_early: bool = False                          # the plateau rule returned the budget early
+    benign: list[bytes] = field(default_factory=list)    # B3: a capped sample of non-crashing inputs,
+                                                         # harvested as behavioural evidence for the gate
 
     @property
     def found(self) -> bool:
@@ -123,6 +125,9 @@ class Fuzzer:
                 break
         return result
 
+    #: how many distinct non-crashing inputs to keep as differential evidence for the gate (B3)
+    max_benign: int = 32
+
     def _check(self, data: bytes, result: FuzzResult, seen: set[bytes]) -> bool:
         result.executions += 1
         fired = self.run_one(data)
@@ -131,4 +136,6 @@ class Fuzzer:
             result.crashes.append(data)
             if result.first_crash_execs is None:
                 result.first_crash_execs = result.executions
+        elif not fired and len(result.benign) < self.max_benign and data not in result.benign:
+            result.benign.append(data)        # harvested: a normal-path input the patch must preserve
         return fired

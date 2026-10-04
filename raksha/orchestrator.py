@@ -258,7 +258,7 @@ class Session:
             seen.add(sig)
             self.emit("campaign_crash", target=name, finding=f.id, signature=sig, round=_round)
             _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
-                    corpus=corpus or [b"ok", b"test", b"\x01\x02"])
+                    corpus=(corpus or [b"ok", b"test", b"\x01\x02"]) + list(getattr(r, "benign_corpus", [])))
             self.add_finding(f); found.append(f)
             if hasattr(r, "cleanup"):
                 try: r.cleanup()
@@ -310,7 +310,7 @@ class Session:
         f = r.finding
         if repair_it:
             _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
-                    corpus=corpus or [b"ok", b"test", b"\x01\x02"])
+                    corpus=(corpus or [b"ok", b"test", b"\x01\x02"]) + list(getattr(r, "benign_corpus", [])))
             # Independent red team: once the gate says VERIFIED, try to falsify the fix. A patch
             # that cannot survive a fresh adversary is not actually proven. Bounded and offline.
             if f.status is Status.VERIFIED and red_team:

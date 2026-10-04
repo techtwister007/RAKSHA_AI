@@ -18,7 +18,7 @@ model are required. A model sharpens entry-point choice and the harness wrapper;
 from __future__ import annotations
 
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..finding import Finding, Reproducer, ReplayResult, utcnow
@@ -56,6 +56,7 @@ class AutofuzzResult:
     executions: int = 0
     tried: int = 0                        # entry points whose harness passed the quality gate
     note: str = ""
+    benign_corpus: list = field(default_factory=list)   # B3: non-crashing inputs for the gate's differential
 
     @property
     def found(self) -> bool:
@@ -110,7 +111,8 @@ def autofuzz(target_root: str | Path, *, max_entrypoints: int = 4, max_execs: in
             finding, crashing, target = result
             return AutofuzzResult(finding, ep, harness, crashing, target,
                                   executions=max_execs, tried=tried,
-                                  note=f"crash via synthesized harness for {ep.symbol}")
+                                  note=f"crash via synthesized harness for {ep.symbol}",
+                                  benign_corpus=list(getattr(finding, "_benign_corpus", [])))
     return AutofuzzResult(None, candidates[0], None, None, None, tried=tried,
                           note=f"no crash in {tried} harness(es) within the budget")
 
@@ -161,6 +163,7 @@ def _fuzz(ep, built, oracle, max_execs, seed_corpus):
     if not findings or _crash_is_in_harness(findings[0]):
         return None
     f = findings[0]
+    f._benign_corpus = list(res.benign)   # B3: carried out to the gate corpus by the caller
     f.attach_reproducer(Reproducer.from_bytes(
         crashing, target.run_cmd.split(), minimised=True, detail=f"autofuzz: synthesized harness for {ep.symbol}"))
     f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(),

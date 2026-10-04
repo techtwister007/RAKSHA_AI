@@ -155,8 +155,9 @@ def _runner(case: ArvoCase) -> Callable[[], Finding]:
         result = autofuzz(case.source_path, max_execs=case.max_execs, seed_corpus=seeds)
         if not result.found:
             raise RuntimeError(f"{case.name}: {result.note}")
+        gate_corpus = (seeds or []) + list(result.benign_corpus)   # B3: harvested normal-path inputs
         repair(result.finding, result.target, root=result.target.source_root,
-               reproducer=result.crashing_input, corpus=seeds or [])
+               reproducer=result.crashing_input, corpus=gate_corpus)
         return result.finding
     return run
 
