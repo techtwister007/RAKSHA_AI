@@ -1,6 +1,6 @@
 # RAKSHA AI — Plan V2: close every gap, add every feature
 
-**Status:** Waves 0, 1, 2, 3 and 4 built (2026-10-04); J3 reworded (see its line). Per-item status, with the
+**Status:** Waves 0, 1, 2, 3 and 4 built (2026-10-04); J3 reworded (see its line). Wave 5 planned, not started. Per-item status, with the
 evidence and the honest caveats, is in the *Wave 1 / 2 / 3 — status* blocks and the Wave 4 — status block below.
 **Scope rule:** every item from the two review passes is included — nothing dropped for cost.
 Breadth first; optimisation after. This document is the contract we execute from and tick off.
@@ -338,6 +338,101 @@ The console stops being a read-only board and becomes the thing a human runs.
 - **J10 ✓** `docs/claim-audit.md`; every claim reconciled to a built capability or reworded.
 - **J11 ✓** benchmark report (J4/J5), dossier `08_wow_factors.md` (Wave 4 additions, Hindi-PDF
   reworded), rehearsal runbook (three scripted beats).
+
+## Wave 5 — Project memory, self-learning and the owner's view
+
+The system already finds, fixes and proves. Wave 5 makes it *remember*: every project gets an
+identity and a signed, versioned history; recurring faults become guideline proposals for ACG; new
+frameworks are learned under probation; and each project owner — developer, commander or auditor —
+can see their application's security, colour-coded, whenever they want.
+
+**Ground rules that bind every item below (unchanged from the rest of the plan):**
+learning may *propose*, only the gate *decides*; nothing learned is trusted until a gate-verified
+case proves it; every lesson records where it came from and a human can roll it back; all learning
+and reporting stays on the box; every number is measured or null; colour is never the only signal
+(an icon or a word always accompanies it, for colour-blind readers and the projector theme).
+
+### Tier 1 — project identity and versioned reports (build first: highest value, builds on the journal and bundles)
+
+- **K1 Project identity.** A stable ID per project (name, owner unit, asset tier from the registry, a fingerprint of its code), the same across runs and paths; a project registry on the box.
+  **Done:** the same project scanned twice from different paths gets the same ID; a different project never does.
+- **K2 Versioned session report.** Each run of a project produces Report vN: found, fixed-and-proven, open, and a severity summary, signed and chained to v(N-1) like the journal so no finding can silently drop between versions.
+  **Done:** v2 verifies against v1's hash; removing a finding from v2 by hand fails verification.
+- **K3 The v(N-1) → vN diff.** 🟢 fixed since last (reproducer proven dead), 🔴 new since last (incl. anything a patch introduced), 🟠 still open (with runs-open count), 🔵 needs a human; one trend line ("Critical 3 → 1").
+  **Done:** a patched re-run shows its fixes green, a newly introduced defect red, and the trend line computed from the records.
+- **K4 Needs-a-human list.** Every item RAKSHA cannot or may not close itself, each with its reason (credential rotation, policy decision, gate could not certify, ROE recommend-only on a critical asset) and a checklist; marking one done triggers an automatic re-check.
+  **Done:** each reason class appears with its checklist; a marked-done item is re-verified on the next run, not taken on trust.
+- **K5 Owner's self-service view.** A per-project console page the owner opens any time: current state, version history, drill-down to any finding (plain-language by default, engineer view on request), colour-coded, with icons beside colour.
+  **Done:** an owner reaches any past version and any finding in two clicks; the page passes the high-contrast and colour-blind check.
+- **K6 One-page summary.** A print- and phone-friendly colour summary per version, in English and Hindi.
+  **Done:** the summary renders on a phone width and prints to one page; Hindi matches the console glossary.
+
+### Tier 2 — self-learning and recurring-fault analysis
+
+- **K7 Recurring-fault analytics.** Across sessions and projects: faults by family, language, framework, component and owner unit; recurrence after fix (regressions); trends over time.
+  **Done:** a seeded history yields the correct recurrence counts and flags a re-introduced fixed fault as a regression.
+- **K8 Guideline proposals for ACG.** The analytics turned into ranked draft guidelines: the rule, the evidence count, anonymised real examples, and the proven fix pattern — proposed, never adopted, until a human in ACG approves.
+  **Done:** a draft pack is generated from real history, each rule traceable to its findings; nothing changes RAKSHA's behaviour until approved.
+- **K9 Learning for new technology.** Unknown frameworks and libraries are logged as "unfamiliar surface"; candidate lessons (a new entry point to fuzz, a new dangerous call, a new fix template) are proposed, held on probation, promoted only after gate-verified cases, and demoted automatically when they cause false alarms.
+  **Done:** a probationary lesson is promoted after N verified cases and demoted after a false positive on a negative control; each step is in the record.
+- **K10 Learning-health dashboard.** What has been learned, what is on probation, what was demoted and why, who approved each promotion, and a one-click rollback.
+  **Done:** every lesson shows its provenance; a rollback restores prior behaviour, proven by re-running the case.
+- **K11 Poisoning defence.** Learning reads only gate-verified outcomes; a lesson learned from one project is not applied to another until it proves itself there; an outlier source is quarantined.
+  **Done:** a crafted project that tries to teach a bad fix pattern cannot get it promoted.
+
+### Tier 3 — the commander's and ACG's view
+
+- **K12 Mission-impact view.** Findings grouped by the operational function they put at risk (communications, logistics, command systems), from the asset registry, not by CWE.
+  **Done:** every finding on a registered asset lands under its mission function; unregistered ones are shown as such, never guessed.
+- **K13 Exposure-days.** How many days each serious weakness stayed open on each asset, by tier; fix-time against a tier-set deadline (SLA).
+  **Done:** computed from the versioned history; a fix closes the clock on the run that proves it.
+- **K14 Estate heat-map over time.** The estate as a grid of projects coloured by posture, with a time slider (reuses the time-lapse).
+  **Done:** the slider shows the estate as it stood at any past report version.
+- **K15 Readiness certificate.** A signed statement per project version ("as of v7: no open critical, all fixes proven, N items awaiting a human") fit for a deployment-approval file, verifiable with the verifier media.
+  **Done:** issued only when its conditions hold from the records; verifies on a clean machine.
+- **K16 Posture score.** One number per project with a trend, explained by what drives it — measured, never invented; null when there is too little evidence.
+  **Done:** the score's breakdown sums to the score; it reads null below the evidence floor.
+
+### Tier 4 — catching risk earlier
+
+- **K17 Attack-surface drift.** Alert when a new version adds a network listener, file upload, new external dependency or new privileged call — before any bug is found.
+  **Done:** a version that adds a socket listener is flagged on its first run.
+- **K18 Live component inventory.** Every library in every scanned project; when the offline advisory database is updated, every affected project is re-checked and its owner told "newly affected".
+  **Done:** a database update flags exactly the projects carrying the affected versions.
+- **K19 Secrets hygiene tracker.** Leaked credentials found, rotated or not, and days exposed.
+  **Done:** a rotated secret closes on the run that no longer matches it.
+- **K20 Pre-merge mode.** A lightweight check developers run before merging, stopping known patterns (including approved ACG guidelines) before they ship.
+  **Done:** a change re-introducing a known fault is stopped with the guideline that covers it.
+
+### Tier 5 — learning, trust and usability extras
+
+- **K21 Why-is-this-risky explainer.** For each finding: how an attacker would reach it, what they would gain, what the fix changes — plain language and Hindi, generated from the record, never speculative.
+  **Done:** every explainer cites the record fields it was built from.
+- **K22 Before/after fix view.** Side-by-side diff of every proven fix, so developers learn the pattern.
+  **Done:** shown for every verified finding with its gate result beside it.
+- **K23 Knowledge base.** Every verified fix searchable ("how did we fix this last time?").
+  **Done:** a search by fault family or component returns the past proven fixes with their bundles.
+- **K24 Ask-about-my-project (offline).** Questions answered only from the project's own signed reports, with the source report cited; "not in the record" when it is not.
+  **Done:** every answer cites a report version; an unanswerable question says so.
+- **K25 Role-based views.** Developer (code), commander (mission impact), auditor (proof chain) — the same data, three renderings.
+  **Done:** each role sees its view; none sees a fact the record does not hold.
+- **K26 Team scorecard.** Per team, privately: their most repeated faults and short lessons — framed as support, not blame.
+  **Done:** visible only to that team and its chain; built only from the records.
+- **K27 Digest and change alerts.** A weekly per-owner summary and a short notice when a new run differs from the last.
+  **Done:** a run with no change sends no alert; a run with a new critical does.
+- **K28 Compliance pack.** The quarter's signed versioned reports and certificates bundled for audit.
+  **Done:** the pack verifies end to end on the verifier media.
+- **K29 Data-handling statement.** Per report: what code was read, where it stayed, confirmation nothing left the box (from the egress counter and the journal).
+  **Done:** the statement's numbers match the run's egress counter and journal.
+- **K30 Drill mode.** Plant a known, harmless test weakness in a *copy* of a project to check the team's process (review, CI, response) catches it — a training exercise, copies only.
+  **Done:** a drill never touches the original tree; its outcome is recorded against the team's process, not the code.
+
+### Suggested order
+
+Tier 1 (K1–K6) first — it is what users see and it builds directly on the journal, bundles and
+console. Then K12, K13 and K17 (they make commanders care and catch risk early), then K15 and K2's
+chaining (approval-grade trust), then Tier 2 learning with K10/K11 landing **with** K9, never after
+it. The rest by value as time allows.
 
 ---
 

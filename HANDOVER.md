@@ -23,7 +23,7 @@ regenerated from the repository as the last step.
 
 Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24):
 
-- **840 tests pass**, 0 fail, 2 skipped, with every slow lane (Go/Rust/JS), the deep and Java slices
+- **846 tests pass**, 0 fail, 8 skipped, with every slow lane (Go/Rust/JS), the deep and Java slices
   and the z3 proofs enabled; still unrun here: the multi-language benchmark and one slow
   mutation-factory test. Air-gap guard and pyflakes clean.
 - **Plan V2 Wave 0 + Wave 1 built** (`PLAN_V2.md` carries per-item status, proof and caveats): multi-bug
