@@ -99,8 +99,31 @@ def red_round(finding: Finding, target: Target, *, reproducer: bytes, corpus: li
                 result.wins.append(data)
             return fired
 
+        variants = pov_neighbourhood(reproducer, n=rounds, seed=seed)
+
+        # (a0) B9 coverage-targeted: when the target reports coverage and we know the fix site,
+        # try first the variants that reach the fix-site line by a path the benign corpus does not
+        # — the inputs most likely to re-expose a patch that only silenced the observed one.
+        cov = getattr(target, "covered_lines", None)
+        sites = {s.start_line for s in finding.fix_site_set if s.start_line}
+        if cov is not None and sites:
+            try:
+                corpus_lines: set = set()
+                for c in corpus[:8]:
+                    corpus_lines |= {ln for _f, ln in cov(build, [c])}
+                probed = 0
+                for v in variants:
+                    if probed >= 20 or time.perf_counter() > deadline:
+                        break
+                    probed += 1
+                    reached = {ln for _f, ln in cov(build, [v])}
+                    if (reached & sites) and not (reached & sites).issubset(corpus_lines):
+                        attack(v, "coverage-targeted")
+            except Exception:  # noqa: BLE001 — coverage targeting is a best-effort optimisation
+                pass
+
         # (a) the reproducer's neighbourhood, wider than the gate's, from red's own seed
-        for v in pov_neighbourhood(reproducer, n=rounds, seed=seed):
+        for v in variants:
             if time.perf_counter() > deadline:
                 break
             attack(v, "neighbourhood")
