@@ -110,6 +110,25 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes | None = N
         artifacts["rollback.sh"] = rollback_script(finding).encode()
     if finding.regression_test:
         artifacts["regression_test"] = finding.regression_test.encode()
+    # D11: an in-toto / SLSA-provenance statement over this bundle's contents (hashed into the
+    # manifest below, so the signature covers it). C4: a VEX statement for a dependency finding.
+    try:
+        from .attest import attestation_for
+        _pre = {"artifacts": {n: _sha256_bytes(d) for n, d in artifacts.items()},
+                "finding_id": finding.id, "bug_class": finding.bug_class,
+                "status": finding.status.value, "target": finding.target}
+        artifacts["attestation.intoto.json"] = json.dumps(
+            attestation_for(_pre, environment()), indent=2, sort_keys=True).encode()
+    except Exception:  # noqa: BLE001 — provenance is additive; never fail the bundle over it
+        pass
+    try:
+        if finding.oracle.startswith("osv:"):
+            from .lanes.vex import vex_for
+            vx = vex_for([finding])
+            if vx:
+                artifacts["vex.json"] = json.dumps(vx, indent=2, sort_keys=True).encode()
+    except Exception:  # noqa: BLE001
+        pass
 
     for name, data in artifacts.items():
         (out / name).write_bytes(data)
@@ -136,6 +155,17 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes | None = N
         "signature": _sign({**hashes, MANIFEST: _sha256_bytes(manifest_bytes)}, key),
     }
     (out / SIGNATURE).write_text(json.dumps(signature, indent=2, sort_keys=True))
+    # D10: an additional signature using a post-quantum primitive when the library is bundled,
+    # else the same HMAC fallback with its alg named. Additive, so verify_bundle (HMAC) is unchanged.
+    try:
+        from . import pqsign
+        _all = {**hashes, MANIFEST: _sha256_bytes(manifest_bytes)}
+        material = "\n".join(f"{k}={_all[k]}" for k in sorted(_all)).encode()
+        pqsig = pqsign.sign(material, key)
+        pqsig["key_id"] = key_id
+        (out / "signature.pq.json").write_text(json.dumps(pqsig, indent=2, sort_keys=True))
+    except Exception:  # noqa: BLE001 — the PQ signature is additive to the HMAC one
+        pass
     return out
 
 
@@ -184,7 +214,7 @@ def verify_bundle(bundle_dir: str | Path, *, key: bytes | None = None) -> Verify
         if actual != recorded_hash:
             problems.append(f"CHANGED {name}")
     for extra in sorted(p.name for p in out.iterdir()
-                        if p.name not in listed and p.name not in (MANIFEST, SIGNATURE)):
+                        if p.name not in listed and p.name not in (MANIFEST, SIGNATURE, "signature.pq.json")):
         problems.append(f"UNEXPECTED {extra} (not in the signed manifest)")
 
     manifest_hash = _sha256_bytes(manifest_bytes)

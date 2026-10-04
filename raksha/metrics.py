@@ -326,6 +326,8 @@ def scorecard(
         "git_history_findings": len([f for f in reported if f.oracle.startswith("githistory:")]),
         # C5: defects that recur across two or more targets (one defect, many locations).
         "fleet_wide_defects": len(fleet) if fleet is not None else None,
+        # A10: machine-checked bound proofs by status across verified fixes (proved/unavailable/...).
+        "bound_proofs": _count(f.bound_proof["status"] for f in verified if f.bound_proof),
     }
 
     return Scorecard(

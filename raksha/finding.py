@@ -384,6 +384,9 @@ class Finding:
     #: D4: resources this finding's repair consumed, measured (getrusage deltas) around the gate.
     cpu_seconds: float | None = None
     peak_rss_kb: int | None = None
+    #: A10: the machine-checked bound-proof result for a bound-clamp fix, or None. Status is
+    #: "proved"/"refuted"/"unknown"/"unavailable" (the last when no solver is bundled).
+    bound_proof: dict | None = None
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
@@ -755,6 +758,7 @@ class Finding:
             },
             "reachability": self.reachability,
             "resource": {"cpu_seconds": self.cpu_seconds, "peak_rss_kb": self.peak_rss_kb},
+            "bound_proof": self.bound_proof,
             "assurance": {
                 "structure": self.structure,
                 "evidence_score": self.evidence_score,
