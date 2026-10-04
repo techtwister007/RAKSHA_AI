@@ -138,6 +138,8 @@ svg text{font-family:var(--display);fill:var(--ink)}
     <a href="#c3">3 The competition</a><a href="#c4">4 The problem</a><a href="#c5">5 Why today's AI falls short</a><a href="#c6">6 Our aim and promise</a><a href="#c7">7 Scope</a><a href="#c8">8 Ground rules</a>
     <div class="p">Part II · The solution at a glance</div>
     <a href="#c9">9 The core idea</a><a href="#c10">10 A finding's life story</a><a href="#c11">11 What makes it different</a><a href="#c12">12 Who uses it</a>
+    <div class="p">Part II-B · The journey, end to end</div>
+    <a href="#w0">W The example and timeline</a><a href="#w1">1 Media accepted</a><a href="#w2">2 Staged as data</a><a href="#w3">3 Project identified</a><a href="#w4">4 Build-free lanes</a><a href="#w5">5 Annotated and ranked</a><a href="#w6">6 Finding an entry point</a><a href="#w7">7 Harness written</a><a href="#w8">8 Fuzzing in the sandbox</a><a href="#w9">9 The alarm rings</a><a href="#w10">10 Confirming it is real</a><a href="#w11">11 Repair ladder and hygiene</a><a href="#w12">12 The five-check gate</a><a href="#w13">13 Extra proofs</a><a href="#w14">14 The red team</a><a href="#w15">15 Authority</a><a href="#w16">16 Evidence and memory</a><a href="#w17">17 Report v1</a><a href="#w18">18 Owner acts, v2</a><a href="#w19">19 Learning</a>
     <div class="p">Part III · The architecture</div>
     <a href="#c13">13 The big picture</a><a href="#c14">14 Getting code in</a><a href="#c15">15 Build-free lanes</a><a href="#c16">16 Deep lanes</a><a href="#c17">17 Oracles</a><a href="#c18">18 The finding record</a><a href="#c19">19 The repair ladder</a><a href="#c20">20 Patch hygiene</a><a href="#c21">21 The five-check gate</a><a href="#c22">22 Extra proofs</a><a href="#c23">23 The red team</a><a href="#c24">24 The AI models</a><a href="#c25">25 Evidence bundle</a><a href="#c26">26 Session journal</a><a href="#c27">27 Sandbox and air gap</a><a href="#c28">28 Rules of engagement</a><a href="#c29">29 Risk and scoring</a><a href="#c30">30 Post-quantum readiness</a>
     <div class="p">Part IV · Memory and learning</div>
@@ -151,7 +153,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
     <div class="p">Part VIII · Present and ideal state</div>
     <a href="#c55">55 Built, wave by wave</a><a href="#c56">56 What is left</a><a href="#c57">57 Present vs ideal state</a><a href="#c58">58 Future ideas</a><a href="#c59">59 Your suggestions</a>
     <div class="p">Appendices</div>
-    <a href="#ga">A Glossary</a><a href="#gb">B Project map</a><a href="#gc">C Commands</a><a href="#gd">D Settings</a><a href="#ge">E Evidence index</a><a href="#gf">F Sources</a>
+    <a href="#ga">A Glossary</a><a href="#gb">B Project map</a><a href="#gc">C Commands</a><a href="#gd">D Settings</a><a href="#ge">E Evidence index</a><a href="#gf">F Sources</a><a href="#gg">G Open-source tools</a>
   </div>
 </nav>
 <main>
@@ -303,6 +305,151 @@ svg text{font-family:var(--display);fill:var(--ink)}
 </tbody></table></div>
 <div class="takeaways"><span class="t">Key takeaways</span><ul><li>Find, fix, prove: in that order, with proof at every step.</li><li>Seven ideas set RAKSHA apart; all are built.</li><li>Five kinds of people use it, each with their own view.</li></ul></div>
 <div class="note"><span class="t">Your notes · Part II</span><div class="lines"></div></div>
+
+<div class="part" id="partW"><div class="k">Part II-B</div><h1>The journey, end to end</h1><p class="lede">One example codebase followed through every stage of the pipeline: what happens inside, how it moves to the next stage, and what you see on the console meanwhile.</p></div>
+
+<h2 id="w0"><span class="n">W</span>The example</h2>
+<p>A unit hands over a small project called <b>signals-parser</b> on a USB stick. It contains:</p>
+<ul>
+<li><code>src/tlv.c</code>: a C function that reads incoming messages. It copies each message into a fixed 16-byte buffer without checking the length (a real weakness: a longer message overwrites memory next to the buffer).</li>
+<li><code>config/app.properties</code>: a database password written in plain text.</li>
+<li><code>requirements.txt</code>: a Python helper that pins <code>pyyaml==5.3.1</code>, a version with a published advisory.</li>
+</ul>
+<p>The asset registry lists signals-parser as <b>mission-critical</b>, mission function "message parsing", owner unit "Signals". The finale box has a C compiler and no model server running (so we can see the AI-free path).</p>
+<div class="box plain"><span class="t">In plain words</span><p>Three different problems in one project: a memory bug that only shows up when the code runs, a leaked password, and an old library. Watch how each is handled differently, and what a person sees at each step.</p></div>
+
+<h3>The timeline at a glance</h3>
+<div class="tw"><table><thead><tr><th>Time</th><th>Stage</th><th>Status of findings</th><th>What you see</th></tr></thead><tbody>
+<tr><td class="num">0 s</td><td>1 · Media accepted</td><td>—</td><td>"accepted"; the time-to-first-finding clock starts</td></tr>
+<tr><td class="num">≈1 s</td><td>2 · Staged as data</td><td>—</td><td>"staged 14 files"</td></tr>
+<tr><td class="num">≈1 s</td><td>3 · Project identified</td><td>—</td><td>project ID, tier mission-critical</td></tr>
+<tr><td class="num">≈4 s</td><td>4–5 · Build-free lanes</td><td>password, library: CONFIRMED</td><td>amber card, first finding, clock stops</td></tr>
+<tr><td class="num">≈5 s</td><td>6–7 · Entry point, harness</td><td>—</td><td>"harness synthesized for parse_record"</td></tr>
+<tr><td class="num">≈6 s</td><td>8–10 · Fuzzing, alarm, confirm</td><td>memory bug: SUSPECTED → CONFIRMED</td><td>"CWE-121 confirmed at src/tlv.c:11"</td></tr>
+<tr><td class="num">≈7 s</td><td>11 · Repair ladder, hygiene</td><td>PATCHED</td><td>candidate on trial</td></tr>
+<tr><td class="num">≈7–12 s</td><td>12–13 · Gate, extra proofs</td><td>VERIFIED</td><td>five green ticks</td></tr>
+<tr><td class="num">≈16 s</td><td>14 · Red team</td><td>VERIFIED (held)</td><td>"red team held"</td></tr>
+<tr><td class="num">≈17 s</td><td>15–17 · Authority, evidence, report v1</td><td>3 items need a human</td><td>Approve buttons, brief, signed report</td></tr>
+<tr><td class="num">later</td><td>18 · Owner acts, run again</td><td>report v2</td><td>green ✓ fixed lines, certificate</td></tr>
+</tbody></table></div>
+<p class="meta">Times are typical of the demo machine for a project this small; a large codebase takes minutes to hours, with the same stages.</p>
+
+<h2 id="w1"><span class="n">1</span>Media accepted</h2>
+<p><b>You do:</b> on the console's Demo Beats screen, type the USB path (for example <code>/media/usb/signals-parser</code>) and press <b>Ingest</b>. (At the finale, targets placed in <code>/targets</code> are picked up the same way at start.)</p>
+<p><b>Inside:</b> the intake desk checks the path is a real folder under an allowed media root, and that no other intake is running. If either check fails you get a one-line reason and nothing else happens.</p>
+<p><b>You see:</b> "accepted", and a clock "time to first finding: 0.3 s and counting".</p>
+<p><b>Moves on when:</b> the checks pass; a background worker takes over so the console never freezes.</p>
+
+<h2 id="w2"><span class="n">2</span>Staged as data</h2>
+<p><b>Inside:</b> every file is copied into a private scratch folder, as plain data. Shortcuts and special files are skipped and counted. Execute permissions are dropped, so nothing on the stick can be run by accident. Limits stop a huge or hostile medium (file count, total size, size per file, folder depth); if a limit is hit the copy stops there and the record says "truncated".</p>
+<p><b>You see:</b> event log line "signals-parser: staged 14 files (9,812 bytes); 0 links skipped".</p>
+
+<h2 id="w3"><span class="n">3</span>Project identified</h2>
+<p><b>Inside:</b> RAKSHA looks in its project store. No project called signals-parser with this file layout exists, so it mints <code>PRJ-signals-parser-…</code>. It looks the name up in the asset registry: mission-critical, Signals, "message parsing". That tier caps the rules of engagement at <b>R1 (recommend)</b>: RAKSHA may prove and draft fixes, but applies nothing.</p>
+<p><b>You see:</b> nothing yet on the board; the ID appears with the first report (Stage 17).</p>
+
+<h2 id="w4"><span class="n">4</span>Build-free lanes run</h2>
+<p><b>Inside:</b> every file is read once, by every lane at the same time:</p>
+<ul>
+<li><b>Secrets lane</b> matches <code>db.password=…</code> in <code>config/app.properties</code>. It records the rule, file and line, and a masked preview (only the first and last characters). Its reproducer is a re-check command: run the same detector on the same line again.</li>
+<li><b>Supply lane</b> parses <code>requirements.txt</code>, finds <code>pyyaml 5.3.1</code>, and checks the offline advisory database: it is inside a known affected range, fixed in 5.4. It also checks whether the code actually imports it (reachability) and prepares a version-bump patch.</li>
+<li><b>Crypto, config, API and binary lanes</b> find nothing here.</li>
+</ul>
+<p>Because each match can be re-run exactly, these two findings go straight to <b>CONFIRMED</b>.</p>
+<p><b>You see:</b> a new <b>amber</b> card on the Mission Board, "signals-parser · build-free mode, still finding". Event log: "build-free scan complete (2 findings, 2 proven)" and "first finding on the board 3.9 s after the media went in". The clock stops.</p>
+
+<h2 id="w5"><span class="n">5</span>Findings annotated and ranked</h2>
+<p><b>Inside:</b> duplicates from different lanes are merged. Each finding gets its asset tier, a CVSS 3.1 score, ATT&amp;CK and D3FEND labels, and a place in the risk register (severity × mission tier × known-exploited data).</p>
+<p><b>You see:</b> Live Pipeline shows two findings in the CONFIRMED column; the risk register lists them in fix-first order.</p>
+
+<h2 id="w6"><span class="n">6</span>Deep lane: finding an entry point</h2>
+<p><b>Inside:</b> RAKSHA reads the C source (never running it yet) looking for functions that take input, here <code>parse_record(const char *data, int len)</code>. It scores candidates by shape and name. With a model server running, the model would also help rank them; here the deterministic ranking is used.</p>
+<p><b>You see:</b> "signals-parser: looking for an entry point to fuzz (no harness shipped)".</p>
+
+<h2 id="w7"><span class="n">7</span>Harness written and checked</h2>
+<p><b>Inside:</b> RAKSHA writes a small C driver that feeds bytes to <code>parse_record</code>, using random file and symbol names for this run. It compiles the driver with the target code and the memory-error detector, inside the sandbox. A two-part quality check follows: it must compile, and it must run one ordinary input cleanly. A driver that fails is discarded and the next entry point is tried.</p>
+<p><b>You see:</b> "harness synthesized for parse_record (c/c++); quality gate passed".</p>
+
+<h2 id="w8"><span class="n">8</span>Fuzzing in the sandbox</h2>
+<p><b>Inside:</b> the driver starts once and then forks a fresh child process for each input, so each test is isolated but fast. Inputs are generated by small changes to a seed set (flip a byte, grow, shrink, repeat, insert boundary values). Each child has no network and is cut off after 2 seconds if it hangs. The search stops when a crash appears or the budget is spent.</p>
+<p><b>You see:</b> Scorecard execution count climbing; the target card stays amber.</p>
+
+<h2 id="w9"><span class="n">9</span>The alarm rings</h2>
+<p><b>Inside:</b> one input longer than 16 bytes makes the copy write past the buffer. AddressSanitizer, the memory alarm compiled into the build, stops the child and prints exactly what happened and where: <i>stack-buffer-overflow in parse_record, src/tlv.c line 11</i>. The finding is born as <b>SUSPECTED</b>.</p>
+
+<h2 id="w10"><span class="n">10</span>Confirming it is real</h2>
+<p><b>Inside:</b> before anything is reported:</p>
+<ol>
+<li>The input is replayed in a fresh one-shot run; the alarm must ring again (twice).</li>
+<li><b>Attribution:</b> if the crash were inside RAKSHA's own driver, it would be dropped. It is in <code>tlv.c</code>, the target's code.</li>
+<li><b>Minimise:</b> the input is shrunk to the smallest one that still rings the alarm, so the evidence is easy to read.</li>
+<li><b>Contract check:</b> if the function stated a precondition no real caller can break, it would stay suspected with the reason. Not the case here.</li>
+</ol>
+<p>Status becomes <b>CONFIRMED</b>, and the reproducer is stored with a fingerprint.</p>
+<p><b>You see:</b> event log, highlighted: "signals-parser: CWE-121 confirmed at src/tlv.c:11; reproducer of 17 bytes replays". The finding appears in Finding Detail.</p>
+
+<h2 id="w11"><span class="n">11</span>The repair ladder and patch hygiene</h2>
+<p><b>Inside:</b></p>
+<ol>
+<li><b>Template:</b> the "bound the copy to the buffer size" template matches this shape and produces a two-line change.</li>
+<li><b>Fix memory:</b> checked for a past proven fix of the same kind (none yet). With a model server, a model candidate would come next, only if cheaper rungs fail.</li>
+<li><b>Hygiene:</b> the candidate touches only <code>src/tlv.c</code> (the fix site), adds 2 lines (limit 150), and adds no command, network or code-loading call. Admitted.</li>
+</ol>
+<p>Status becomes <b>PATCHED</b> (on trial).</p>
+<p><b>You see:</b> the Live Pipeline card moves to PATCHED.</p>
+
+<h2 id="w12"><span class="n">12</span>The five-check gate</h2>
+<p><b>Inside:</b> two scratch copies are built in the sandbox, the original and the patched.</p>
+<div class="tw"><table><thead><tr><th>Check</th><th>What happens</th><th>Here</th></tr></thead><tbody>
+<tr><td>1 COMPILES</td><td>Both copies build</td><td>pass</td></tr>
+<tr><td>2 POV_DEAD</td><td>The 17-byte reproducer runs on the patched copy; the alarm must stay silent</td><td>pass</td></tr>
+<tr><td>3 DIFFERENTIAL_CORPUS</td><td>Normal inputs run three times on the original (unstable ones set aside), then on both copies; outputs must match exactly; the project's own tests must pass; it must not be much slower</td><td>pass: 5 inputs identical, tests pass</td></tr>
+<tr><td>4 COVERAGE_HELD</td><td>The patched line must still be reached by normal inputs (the feature was fixed, not deleted)</td><td>pass</td></tr>
+<tr><td>5 CLEAN_REFUZZ</td><td>24 close variations of the reproducer and a fresh fuzzing pass on the patched copy; the same weakness must not return, and no new kind of crash may appear</td><td>pass</td></tr>
+</tbody></table></div>
+<p><b>You see:</b> in Finding Detail, the gate strip fills with five green ticks, one by one. Had any check failed, it would turn red with the reason, and the ladder would try the next candidate (up to three rounds).</p>
+
+<h2 id="w13"><span class="n">13</span>Extra proofs</h2>
+<p><b>Inside:</b> the fix is re-checked on an optimised release build; the Z3 solver proves the new bound always holds; undoing the patch is shown to restore the exact original bytes. Each proof is added to the record as extra evidence.</p>
+
+<h2 id="w14"><span class="n">14</span>The red team</h2>
+<p><b>Inside:</b> an independent round tries to show the fix does not hold, with its own wider set of test inputs (including many input lengths) for a few seconds. It finds nothing. Had it succeeded, the record would show the fix as broken.</p>
+<p><b>You see:</b> "independent red team held; no input broke it (277 attempts)". Status: <b>VERIFIED</b>.</p>
+
+<h2 id="w15"><span class="n">15</span>Authority: who may apply it</h2>
+<p><b>Inside:</b> signals-parser is mission-critical, so the fix is <b>recommend only</b>: it needs two human approvals and is never applied by RAKSHA.</p>
+<p><b>You see:</b> in Finding Detail, the split-screen replay (original: alarm rings; patched: silent), the two-line patch, the gate record, the red-team result, and <b>Approve</b> / <b>Reject</b> buttons with "2 signatures required". The Commander's Brief tab has the same finding as a short staff paper, in English or <span class="hi">हिन्दी</span>.</p>
+
+<h2 id="w16"><span class="n">16</span>Evidence sealed, memory updated</h2>
+<p><b>Inside:</b> an evidence bundle is written and signed for each of the three findings. Every step above is in the hash-chained journal. The proven fix is stored in fix memory, and a vaccine sweep checks other codebases for the same mistake.</p>
+<p><b>You see:</b> Evidence Vault lists the three; pressing <b>Verify</b> re-checks every byte. The Scorecard updates precision, fixes, timings and model calls (0).</p>
+
+<h2 id="w17"><span class="n">17</span>Report v1</h2>
+<p><b>Inside:</b> the first signed project report is written:</p>
+<ul>
+<li><b>Needs a human (3):</b> rotate the database password (with a checklist); approve the prepared pyyaml upgrade (it needs a build); approve the proven memory fix (recommend-only asset).</li>
+<li>Posture score, exposure clocks started, the secret recorded as exposed, the library inventory and attack surface noted.</li>
+</ul>
+<p><b>You see:</b> Projects screen: signals-parser · v1 · score · 3 need you. One-page summaries in English and Hindi. The readiness certificate is refused while a critical item is open.</p>
+
+<h2 id="w18"><span class="n">18</span>The owner acts, and RAKSHA checks</h2>
+<p><b>The owner:</b> applies the approved patch, rotates the password and removes it from the file, bumps pyyaml to 5.4, and marks the items done. Then runs signals-parser again.</p>
+<p><b>Inside:</b> the same pipeline runs. The secrets and supply lanes no longer match, which is itself proof. The memory bug is not re-found. Report v2 is written, chained to v1, and the marked-done items are re-checked rather than trusted.</p>
+<p><b>You see:</b> report v2: <span class="chip c-built">✓ fixed</span> password, <span class="chip c-built">✓ fixed</span> pyyaml, <span class="chip c-plain" style="color:var(--ink2);border-color:var(--ink2);background:var(--eng-bg)">? not re-found</span> memory bug (shown honestly: a crash not seen again is not counted as proven fixed unless its old reproducer is replayed), "confirmed closed by this run" for each marked item, the trend line, and now a readiness certificate.</p>
+
+<h2 id="w19"><span class="n">19</span>Learning, quietly</h2>
+<p>The two reports are added to the learning history: one memory fault, one secret, one dependency, owner unit Signals. If the same family keeps recurring across projects, a draft guideline appears on the Learning screen for ACG to approve. From now on, the pre-merge check can stop the same mistake before it ships.</p>
+
+<h3>When things go differently</h3>
+<ul>
+<li><b>No crash found in the budget:</b> the card stays amber; the build-free findings stand; the record says the deep lane found nothing (never "secure").</li>
+<li><b>No fix passes the gate:</b> after three rounds the finding is REPORT ONLY, with the reason for each refusal, and goes on the needs-a-human list.</li>
+<li><b>The red team breaks a fix:</b> the record shows it broken; the fix is not offered for approval.</li>
+<li><b>A toolchain is missing:</b> that language's deep lane is skipped and says so; build-free lanes still run.</li>
+<li><b>With a model server:</b> stages 6 and 11 can call the model for ranking and fix candidates; everything after it is unchanged, because the gate decides.</li>
+</ul>
+<div class="takeaways"><span class="t">Key takeaways</span><ul><li>Fast proven findings in seconds, deep ones as the fuzzing finds them.</li><li>Every stage leaves a visible trace on the console and in the journal.</li><li>Nothing is applied without the authority the asset allows, and every claim can be replayed.</li></ul></div>
+<div class="note"><span class="t">Your notes · the journey</span><div class="lines"></div></div>
 
 <div class="part" id="part3"><div class="k">Part III</div><h1>The architecture, layer by layer</h1><p class="lede">How code goes in, how weaknesses are found and proven, how fixes are made and judged, and how everything is kept sealed and recorded.</p></div>
 
@@ -825,6 +972,97 @@ python -m pytest                       # the test suite</pre>
 
 <h2 id="gf">F · Sources</h2>
 <ul><li>AI Kavach problem statement (competition brief, dossier file 01)</li><li>DARPA AI Cyber Challenge (AIxCC), the modern cyber-reasoning reference</li><li>MITRE CWE, ATT&amp;CK, D3FEND; FIRST CVSS; OSV advisory database</li><li>ARVO and AutoPatchBench (external benchmarks, for the ideal state)</li></ul>
+
+<h2 id="gg">G · Open-source tools and repositories</h2>
+<p>RAKSHA's own code uses only the Python standard library at run time. Everything below is a tool RAKSHA <i>drives</i> (runs as a separate program), a data source it carries offline, or something used only while developing. Each row says why it is used and whether it is in use today.</p>
+<div class="legend">
+  <div class="box built"><span class="t">Used today</span><p>Invoked by the committed code.</p></div>
+  <div class="box partial"><span class="t">Optional / planned</span><p>Supported seam or part of the full deployment; not required today.</p></div>
+  <div class="box eng"><span class="t">Development only</span><p>Used to build, test or measure; not shipped to the box.</p></div>
+</div>
+
+<h3>Languages and toolchains</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why we use it</th><th>Status</th></tr></thead><tbody>
+<tr><td>Python 3.11 (CPython)</td><td><a href="https://github.com/python/cpython">python/cpython</a></td><td>RAKSHA itself, and the Python deep lane; standard library only, so the box needs no extra packages</td><td><span class="chip c-built">today</span></td></tr>
+<tr><td>GCC</td><td><a href="https://github.com/gcc-mirror/gcc">gcc-mirror/gcc</a></td><td>Builds C targets with the memory alarm (AddressSanitizer) and coverage (gcov)</td><td><span class="chip c-built">today</span></td></tr>
+<tr><td>LLVM / Clang (sanitizers, libFuzzer)</td><td><a href="https://github.com/llvm/llvm-project">llvm/llvm-project</a></td><td>The sanitizer alarms (ASan, UBSan, LSan, TSan) and an optional faster fuzzing engine</td><td><span class="chip c-built">today</span> (sanitizers) · <span class="chip c-part">optional</span> (libFuzzer)</td></tr>
+<tr><td>OpenJDK + Apache Maven</td><td><a href="https://github.com/openjdk/jdk">openjdk/jdk</a> · <a href="https://github.com/apache/maven">apache/maven</a></td><td>The Java deep lane: compile the synthesized driver, run project tests</td><td><span class="chip c-built">today</span></td></tr>
+<tr><td>Go</td><td><a href="https://github.com/golang/go">golang/go</a></td><td>Go's built-in fuzzing and coverage for the Go lane</td><td><span class="chip c-part">needs toolchain</span></td></tr>
+<tr><td>Rust / Cargo</td><td><a href="https://github.com/rust-lang/rust">rust-lang/rust</a> · <a href="https://github.com/rust-lang/cargo">rust-lang/cargo</a></td><td>The Rust lane: build, fuzz, catch panics</td><td><span class="chip c-part">needs toolchain</span></td></tr>
+<tr><td>Node.js</td><td><a href="https://github.com/nodejs/node">nodejs/node</a></td><td>The JavaScript/TypeScript lane and its dangerous-call guard</td><td><span class="chip c-part">needs toolchain</span></td></tr>
+<tr><td>Git, GNU patch</td><td><a href="https://github.com/git/git">git/git</a></td><td>Applying and reversing patches exactly; the git-history secrets lane</td><td><span class="chip c-built">today</span></td></tr>
+</tbody></table></div>
+
+<h3>Proof, signing and formats</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>Z3 SMT solver</td><td><a href="https://github.com/Z3Prover/z3">Z3Prover/z3</a></td><td>Mathematical proofs that a fix's bound always holds, and reachability before and after</td><td><span class="chip c-built">today</span> (optional extra, baked into the image)</td></tr>
+<tr><td>SARIF 2.1.0 schema</td><td><a href="https://github.com/oasis-tcs/sarif-spec">oasis-tcs/sarif-spec</a></td><td>Standard format so other security tools can read RAKSHA's findings</td><td><span class="chip c-built">today</span></td></tr>
+<tr><td>CycloneDX</td><td><a href="https://github.com/CycloneDX/specification">CycloneDX/specification</a></td><td>Standard software bill of materials from the binary lane</td><td><span class="chip c-built">today</span></td></tr>
+<tr><td>in-toto</td><td><a href="https://github.com/in-toto/in-toto">in-toto/in-toto</a></td><td>Standard provenance statement inside each evidence bundle</td><td><span class="chip c-built">today</span> (format) · <span class="chip c-part">planned</span> (tooling)</td></tr>
+<tr><td>Sigstore cosign</td><td><a href="https://github.com/sigstore/cosign">sigstore/cosign</a></td><td>Public-key signing of bundles in production</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Open Quantum Safe (liboqs)</td><td><a href="https://github.com/open-quantum-safe/liboqs">open-quantum-safe/liboqs</a></td><td>A post-quantum signature next to the standard one, when the library is present</td><td><span class="chip c-part">optional</span></td></tr>
+</tbody></table></div>
+
+<h3>Models and serving</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>vLLM</td><td><a href="https://github.com/vllm-project/vllm">vllm-project/vllm</a></td><td>Serves the coding model on the box's GPU, offline, with an OpenAI-compatible interface</td><td><span class="chip c-part">deployment</span></td></tr>
+<tr><td>llama.cpp</td><td><a href="https://github.com/ggml-org/llama.cpp">ggml-org/llama.cpp</a></td><td>Runs a model on CPU when no GPU is available</td><td><span class="chip c-part">fallback</span></td></tr>
+<tr><td>Qwen coder models</td><td><a href="https://github.com/QwenLM/Qwen3-Coder">QwenLM/Qwen3-Coder</a></td><td>Open-weight coding model for fix candidates (Apache-2.0)</td><td><span class="chip c-part">deployment</span></td></tr>
+<tr><td>Foundation-sec-8B (Cisco)</td><td>model weights on Hugging Face</td><td>Smaller security-tuned model for the advisor role</td><td><span class="chip c-part">planned</span></td></tr>
+</tbody></table></div>
+
+<h3>Isolation</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>Docker (Moby)</td><td><a href="https://github.com/moby/moby">moby/moby</a></td><td>The sandbox containers (no network, dropped capabilities) and the sealed deployment</td><td><span class="chip c-built">today</span> (when provisioned)</td></tr>
+<tr><td>gVisor</td><td><a href="https://github.com/google/gvisor">google/gvisor</a></td><td>A stronger container sandbox for untrusted code</td><td><span class="chip c-part">planned</span></td></tr>
+</tbody></table></div>
+
+<h3>Fuzzing engines and detectors (full deployment)</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>AFL++</td><td><a href="https://github.com/AFLplusplus/AFLplusplus">AFLplusplus/AFLplusplus</a></td><td>A mature coverage-guided C/C++ fuzzer that plugs into RAKSHA's fuzzer seam</td><td><span class="chip c-part">optional</span></td></tr>
+<tr><td>honggfuzz</td><td><a href="https://github.com/google/honggfuzz">google/honggfuzz</a></td><td>Alternative C/C++ engine</td><td><span class="chip c-part">optional</span></td></tr>
+<tr><td>Jazzer / Jazzer.js</td><td><a href="https://github.com/CodeIntelligenceTesting/jazzer">CodeIntelligenceTesting/jazzer</a></td><td>JVM and Node fuzzing with built-in security detectors (the Log4Shell demo uses its detector style)</td><td><span class="chip c-built">today</span> (demo API) · <span class="chip c-part">optional</span></td></tr>
+<tr><td>Atheris</td><td><a href="https://github.com/google/atheris">google/atheris</a></td><td>Coverage-guided Python fuzzing</td><td><span class="chip c-part">optional</span></td></tr>
+<tr><td>OSS-Fuzz (PySecSan)</td><td><a href="https://github.com/google/oss-fuzz">google/oss-fuzz</a></td><td>Origin of the Python security-sanitizer approach RAKSHA extends</td><td><span class="chip c-built">today</span> (approach)</td></tr>
+</tbody></table></div>
+
+<h3>Static analysis, dependencies, secrets, config (full deployment)</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>OSV-Scanner / OSV data</td><td><a href="https://github.com/google/osv-scanner">google/osv-scanner</a> · <a href="https://github.com/google/osv.dev">google/osv.dev</a></td><td>The open advisory database RAKSHA carries offline for the supply lane</td><td><span class="chip c-built">today</span> (data) · <span class="chip c-part">optional</span> (scanner)</td></tr>
+<tr><td>Semgrep</td><td><a href="https://github.com/semgrep/semgrep">semgrep/semgrep</a></td><td>Pattern rules; a home for vaccine rules and approved guidelines</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Joern</td><td><a href="https://github.com/joernio/joern">joernio/joern</a></td><td>A deeper code property graph than RAKSHA's built-in structure lane</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Gitleaks</td><td><a href="https://github.com/gitleaks/gitleaks">gitleaks/gitleaks</a></td><td>A second opinion for the secrets lane</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Checkov</td><td><a href="https://github.com/bridgecrewio/checkov">bridgecrewio/checkov</a></td><td>Infrastructure-as-code checks beyond the built-in config lane</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Syft</td><td><a href="https://github.com/anchore/syft">anchore/syft</a></td><td>Software bill of materials from images and binaries</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Open Policy Agent</td><td><a href="https://github.com/open-policy-agent/opa">open-policy-agent/opa</a></td><td>Rules of engagement as policy code</td><td><span class="chip c-part">planned</span></td></tr>
+</tbody></table></div>
+
+<h3>Reference data (carried offline)</h3>
+<div class="tw"><table><thead><tr><th>Source</th><th>Where</th><th>Why</th></tr></thead><tbody>
+<tr><td>CWE</td><td><a href="https://cwe.mitre.org">cwe.mitre.org</a></td><td>Standard names for weakness types</td></tr>
+<tr><td>CVSS</td><td><a href="https://www.first.org/cvss/">first.org/cvss</a></td><td>Standard severity scores</td></tr>
+<tr><td>EPSS</td><td><a href="https://www.first.org/epss/">first.org/epss</a></td><td>Likelihood a weakness gets exploited, for prioritising</td></tr>
+<tr><td>CISA KEV</td><td><a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog">cisa.gov</a></td><td>Weaknesses known to be exploited in the wild, for prioritising</td></tr>
+<tr><td>MITRE ATT&amp;CK</td><td><a href="https://github.com/mitre/cti">mitre/cti</a></td><td>Attacker technique labels</td></tr>
+<tr><td>MITRE D3FEND</td><td><a href="https://d3fend.mitre.org">d3fend.mitre.org</a></td><td>Matching defensive technique labels</td></tr>
+</tbody></table></div>
+
+<h3>Benchmarks (for the ideal state)</h3>
+<div class="tw"><table><thead><tr><th>Source</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>ARVO (reproduced OSS-Fuzz bugs)</td><td>Real public bugs with gold patches; the loader seam is built</td><td><span class="chip c-gap">runner not built</span></td></tr>
+<tr><td>AutoPatchBench (in <a href="https://github.com/meta-llama/PurpleLlama">meta-llama/PurpleLlama</a>)</td><td>Scoring automatic patches</td><td><span class="chip c-part">planned</span></td></tr>
+</tbody></table></div>
+
+<h3>Development only</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th></tr></thead><tbody>
+<tr><td>pytest</td><td><a href="https://github.com/pytest-dev/pytest">pytest-dev/pytest</a></td><td>The 863-test suite</td></tr>
+<tr><td>Playwright + Chromium</td><td><a href="https://github.com/microsoft/playwright-python">microsoft/playwright-python</a></td><td>Driving the console in a headless browser to check every screen; rendering this book's PDF</td></tr>
+<tr><td>flawfinder</td><td><a href="https://github.com/david-a-wheeler/flawfinder">david-a-wheeler/flawfinder</a></td><td>The static-scanner baseline for C in the comparison table</td></tr>
+<tr><td>Bandit</td><td><a href="https://github.com/PyCQA/bandit">PyCQA/bandit</a></td><td>The static-scanner baseline for Python in the comparison table</td></tr>
+<tr><td>pyflakes</td><td><a href="https://github.com/PyCQA/pyflakes">PyCQA/pyflakes</a></td><td>Keeps the code free of unused or undefined names</td></tr>
+</tbody></table></div>
+<p>Licences for each are tracked in <code>THIRD_PARTY.md</code>; anything marked "confirm" there must be checked against the exact version before the bundle is handed over.</p>
+
 <p class="meta">End of the book.</p>
 
 </div>
