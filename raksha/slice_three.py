@@ -59,6 +59,16 @@ def run_python() -> Finding:
                   [b"status", b"report", b"deploy", b"health"], ["python3", "fuzz_cmd.py", "repro"])
 
 
+def run_java() -> Finding:
+    """Drive the Java/Log4Shell target through the gate. Requires Maven and a warm local repo."""
+    from .slice_java import TARGET, REPRODUCER, BENIGN_CORPUS
+    from .adapters.java import MavenReplayTarget, dependency_bump_patch
+    from .oracles import JazzerOracle
+    return _drive("audit-svc", MavenReplayTarget(TARGET), JazzerOracle(), REPRODUCER,
+                  lambda: dependency_bump_patch((TARGET / "pom.xml").read_text(), "2.17.1"),
+                  BENIGN_CORPUS, ["java", "ReplayDriver", "repro"])
+
+
 def run_all(include_java: bool = True) -> list[Finding]:
     results: list[Finding] = []
     for label, fn in [("C / gcc+ASan", run_c), ("Python / PySecSan", run_python)]:
@@ -73,13 +83,7 @@ def run_all(include_java: bool = True) -> list[Finding]:
     if include_java and shutil.which("mvn"):
         print(f"  {B}Java / Jazzer{O} … (Maven)", end=" ", flush=True)
         try:
-            from .slice_java import TARGET, REPRODUCER, BENIGN_CORPUS
-            from .adapters.java import MavenReplayTarget, dependency_bump_patch
-            from .oracles import JazzerOracle
-            t = MavenReplayTarget(TARGET)
-            f = _drive("audit-svc", t, JazzerOracle(), REPRODUCER,
-                       lambda: dependency_bump_patch((TARGET / "pom.xml").read_text(), "2.17.1"),
-                       BENIGN_CORPUS, ["java", "ReplayDriver", "repro"])
+            f = run_java()
             print(f"{f.bug_class}  " + (G + "VERIFIED" + O if f.status is Status.VERIFIED else A + f.status.value + O))
             results.append(f)
         except Exception as e:  # noqa: BLE001

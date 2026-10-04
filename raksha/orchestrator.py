@@ -144,16 +144,18 @@ def three_language_session(repo_root: Path | None = None, *, include_java: bool 
     from .slice_three import run_c, run_python
     repo_root = repo_root or Path(__file__).parents[1]
     s = Session()
-    for name, fn, lang in [("c-overflow", run_c, "c/c++"), ("py-cmdinject", run_python, "python")]:
+    deep = [("c-overflow", run_c, "c/c++"), ("py-cmdinject", run_python, "python")]
+    if include_java:
+        try:
+            from .slice_three import run_java
+            deep.append(("audit-svc", run_java, "java"))
+        except ImportError:
+            pass
+    for name, fn, lang in deep:
         try:
             f = fn()
             s.attach_target(name, [f], build_status="green", languages=[lang])
         except Exception:  # noqa: BLE001 — a slice that will not run is simply absent from the board
-            pass
-    if include_java:
-        try:
-            from .slice_three import run_all
-        except Exception:  # noqa: BLE001
             pass
     estate = repo_root / "demo-targets" / "mixed-estate"
     if estate.exists():
