@@ -309,6 +309,11 @@ class Session:
         name = name or root.name
         r = _dispatch_autofuzz(root)
         if not r.found:
+            demoted = list(getattr(r, "demoted", []))
+            if demoted:   # B7: shown as SUSPECTED with the contract reason, never reported
+                t = self.attach_target(name, demoted, build_status="amber", roe=roe)
+                t.note = f"autofuzz: {r.note}"
+                return t
             t = Target(name=name, build_status="amber", roe_level=roe,
                        note=f"autofuzz found no crash: {r.note}")
             self.targets.append(t)
@@ -634,6 +639,10 @@ def _dispatch_autofuzz(root: Path):
     if has("go.mod") and shutil.which("go"):
         from .adapters.go_fuzz import go_autofuzz
         return go_autofuzz(root)
+    # Java (B5): a JDK compiles the synthesized driver; Maven only runs the project's own tests
+    if (has("pom.xml", "build.gradle") or globx("*.java")) and shutil.which("javac"):
+        from .adapters.java_driver import java_autofuzz
+        return java_autofuzz(root)
     # JavaScript / TypeScript
     if (has("package.json") or globx("*.js")) and shutil.which("node"):
         from .adapters.js_sink import js_autofuzz
@@ -690,7 +699,8 @@ def autofuzz_session(repo_root: Path | None = None) -> Session:
     repo_root = repo_root or Path(__file__).parents[1]
     s = Session()
     for name, corpus in [("c-nolibfuzzer", [b"\x01\x04abcd", b"\x02zz"]),
-                         ("py-noharness", [b"10 m to ft", b"warm"])]:
+                         ("py-noharness", [b"10 m to ft", b"warm"]),
+                         ("java-noharness", [b"\x02ab", b"\x00xy", b"\x03abc", b"\x01z"])]:
         root = repo_root / "demo-targets" / name
         if root.exists():
             try:

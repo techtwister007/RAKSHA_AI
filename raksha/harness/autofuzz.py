@@ -28,6 +28,7 @@ from ..oracles.base import Oracle
 from .entrypoints import Entrypoint, discover, rank_with_model
 from .forkserver import ForkClient, asan_env
 from .mutator import Fuzzer
+from ..contract import demotion_reason
 from ..minimise import minimise
 from ..signature import _owned as _owned_frames
 
@@ -57,6 +58,7 @@ class AutofuzzResult:
     tried: int = 0                        # entry points whose harness passed the quality gate
     note: str = ""
     benign_corpus: list = field(default_factory=list)   # B3: non-crashing inputs for the gate's differential
+    demoted: list = field(default_factory=list)         # B7: SUSPECTED contract-violation crashes, with reasons
 
     @property
     def found(self) -> bool:
@@ -99,6 +101,7 @@ def autofuzz(target_root: str | Path, *, max_entrypoints: int = 4, max_execs: in
         return AutofuzzResult(None, None, None, None, None, note="no fuzzable entry point found")
 
     tried = 0
+    demoted: list[Finding] = []
     for ep in candidates[:max_entrypoints]:
         harness = synthesize(ep)
         quality, built = quality_gate(harness, root)
@@ -109,12 +112,19 @@ def autofuzz(target_root: str | Path, *, max_entrypoints: int = 4, max_execs: in
         result = _fuzz(ep, built, oracle, max_execs, seed_corpus)
         if result is not None:
             finding, crashing, target = result
+            if finding.contract:
+                demoted.append(finding)
+                continue
             return AutofuzzResult(finding, ep, harness, crashing, target,
                                   executions=max_execs, tried=tried,
                                   note=f"crash via synthesized harness for {ep.symbol}",
-                                  benign_corpus=list(getattr(finding, "_benign_corpus", [])))
-    return AutofuzzResult(None, candidates[0], None, None, None, tried=tried,
-                          note=f"no crash in {tried} harness(es) within the budget")
+                                  benign_corpus=list(getattr(finding, "_benign_corpus", [])),
+                                  demoted=demoted)
+    note = f"no crash in {tried} harness(es) within the budget"
+    if demoted:
+        note += f"; {len(demoted)} contract-violation crash(es) held at SUSPECTED"
+    return AutofuzzResult(None, candidates[0], None, None, None, tried=tried, note=note,
+                          demoted=demoted)
 
 
 def _fuzz(ep, built, oracle, max_execs, seed_corpus):
@@ -164,6 +174,12 @@ def _fuzz(ep, built, oracle, max_execs, seed_corpus):
         return None
     f = findings[0]
     f._benign_corpus = list(res.benign)   # B3: carried out to the gate corpus by the caller
+    # B7: a direct call that broke a stated precondition no input-facing caller can break stays
+    # SUSPECTED with the reason; the caller keeps looking at the next entry point.
+    reason = demotion_reason(work, ep.path, ep.symbol)
+    if reason:
+        f.contract = reason
+        return f, crashing, target
     f.attach_reproducer(Reproducer.from_bytes(
         crashing, target.run_cmd.split(), minimised=True, detail=f"autofuzz: synthesized harness for {ep.symbol}"))
     f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(),

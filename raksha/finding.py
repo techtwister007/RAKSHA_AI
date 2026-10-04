@@ -373,6 +373,9 @@ class Finding:
     perf_delta: float | None = None
     #: Compensating controls proposed when (or in addition to) a code patch: isolate, restrict, ...
     remediation: list[dict] = field(default_factory=list)
+    #: B7: why a direct-call crash was held at SUSPECTED — the function states a precondition the
+    #: harness broke, and no input-facing caller reaches it. None when no demotion applied.
+    contract: str | None = None
     #: Attack chains (ids) this finding is a link of.
     chain_ids: list[str] = field(default_factory=list)
     #: Mission-impact tier of the asset this finding sits on, from the asset registry.
@@ -767,6 +770,7 @@ class Finding:
                 "frontier": list(self.frontier),
                 "perf_delta": self.perf_delta,
                 "remediation": list(self.remediation),
+                "contract": self.contract,
                 "chain_ids": list(self.chain_ids),
                 "mission_impact": self.mission_impact,
             },

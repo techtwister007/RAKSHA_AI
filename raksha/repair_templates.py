@@ -190,6 +190,9 @@ def generic_templates(finding: Finding, root: Path):
     if finding.language == "rust" and cwe in ("CWE-125", "CWE-787", "CWE-129", "CWE-190"):
         from .adapters.rust_fuzz import rust_bound_index
         out.append(lambda: rust_bound_index(finding, root))
+    if finding.language == "java" and cwe in ("CWE-125", "CWE-787", "CWE-129"):
+        from .adapters.java_driver import java_bound_index
+        out.append(lambda: java_bound_index(finding, root))
     if finding.language == "javascript" and cwe in ("CWE-78", "CWE-77", "CWE-94"):
         from .adapters.js_sink import js_shell_safe
         out.append(lambda: js_shell_safe(finding, root))
