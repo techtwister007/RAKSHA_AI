@@ -21,14 +21,33 @@ SANITIZER_CWE: dict[str, str] = {
     "stack-overflow": "CWE-674",
     "negative-size-param": "CWE-1284",
     "dynamic-stack-buffer-overflow": "CWE-121",
+    "bad-free": "CWE-590",
+    "stack-use-after-return": "CWE-562",
+    "stack-use-after-scope": "CWE-416",
+    "stack-buffer-underflow": "CWE-124",
+    "container-overflow": "CWE-119",
+    "allocation-size-too-big": "CWE-789",
+    "calloc-overflow": "CWE-190",
+    "memcpy-param-overlap": "CWE-475",
     "unknown-crash": "CWE-noinfo",
     "SEGV": "CWE-476",
+    "wild-write": "CWE-787",
+    "wild-read": "CWE-125",
+    "out-of-bounds-read": "CWE-125",
     "FPE": "CWE-369",
+    # libFuzzer's own aborts (no sanitizer report)
+    "libfuzzer-timeout": "CWE-400",
+    "libfuzzer-out-of-memory": "CWE-789",
+    "libfuzzer-deadly-signal": "CWE-noinfo",
     # UBSan
     "signed-integer-overflow": "CWE-190",
     "shift-exponent": "CWE-1335",
     "division-by-zero": "CWE-369",
     "null-pointer-dereference": "CWE-476",
+    "unsigned-integer-overflow": "CWE-190",
+    "index-out-of-bounds": "CWE-129",
+    "misaligned-pointer": "CWE-704",
+    "float-cast-overflow": "CWE-681",
     # MSan
     "use-of-uninitialized-value": "CWE-457",
 }
@@ -56,7 +75,16 @@ JAZZER_CWE: dict[str, str] = {
     "integer overflow": "CWE-190",
     "out of memory": "CWE-789",
     "stack overflow": "CWE-674",
-    "timeout": "CWE-1333",
+    "unrestricted class loading": "CWE-470",
+    "arbitrary class loading": "CWE-470",
+    "native library loading": "CWE-114",
+    "timeout": "CWE-400",       # a hang / resource exhaustion — not ReDoS unless the title says so
+}
+
+#: Jazzer's umbrella titles. Consulted only when no specific title above matched, so a "Remote Code
+#: Execution" whose detail line says "Deserialization of arbitrary classes" is CWE-502, not generic.
+JAZZER_GENERIC_CWE: dict[str, str] = {
+    "remote code execution": "CWE-94",
 }
 
 # PySecSan detector names -> CWE.
@@ -92,8 +120,9 @@ def cwe_for_sanitizer(kind: str) -> str:
 
 
 def cwe_for_jazzer(title: str) -> str:
-    """CWE for a Jazzer sanitizer title."""
-    return _longest_substring_match(title, JAZZER_CWE) or "CWE-noinfo"
+    """CWE for a Jazzer sanitizer title (specific titles first, then umbrella ones)."""
+    return (_longest_substring_match(title, JAZZER_CWE)
+            or _longest_substring_match(title, JAZZER_GENERIC_CWE) or "CWE-noinfo")
 
 
 def cwe_for_pysecsan(detector: str) -> str:

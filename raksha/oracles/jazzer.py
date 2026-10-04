@@ -22,9 +22,11 @@ from .base import Oracle, abort_signature, excerpt, seed_fix_site
 _EXCEPTION = re.compile(
     r"==\s*Java Exception:\s*(?P<exc>[\w.$]+)(?::\s*(?P<title>.*))?"
 )
+# Java 9+ prefixes frames with a module and/or class loader ("java.base/", "app//").
 _FRAME = re.compile(
-    r"^\s+at\s+(?P<fqn>[\w.$<>]+)\((?P<file>[^:)]+)(?::(?P<line>\d+))?\)"
+    r"^\s+at\s+(?:[\w.\-$@]*/{1,2})?(?P<fqn>[\w.$<>]+)\((?P<file>[^:)]+)(?::(?P<line>\d+))?\)"
 )
+_CAUSED_BY = re.compile(r"^\s*Caused by:\s*(?P<exc>[\w.$]+)", re.MULTILINE)
 _ARTIFACT = re.compile(r"Test unit written to\s+(?P<path>\S+)")
 
 #: Jazzer encodes severity in the exception class name.
@@ -41,17 +43,28 @@ class JazzerOracle(Oracle):
     language = "java"
 
     def parse(self, raw: str, *, target: str) -> list[Finding]:
-        match = _EXCEPTION.search(raw)
-        if not match:
-            return []
+        """One finding per `== Java Exception` banner (a --keep_going run can report several)."""
+        banners = list(_EXCEPTION.finditer(raw))
+        findings = []
+        for i, match in enumerate(banners):
+            end = banners[i + 1].start() if i + 1 < len(banners) else len(raw)
+            findings.append(self._one(raw, raw[match.start():end], match, target=target))
+        return findings
 
+    def _one(self, raw: str, section: str, match: re.Match[str], *, target: str) -> Finding:
         exc = match.group("exc")
-        title = (match.group("title") or "").strip()
+        # A Jazzer title can run over several lines: "Remote Code Execution" then the line that
+        # says WHAT executed ("Deserialization of arbitrary classes..."). Read up to the stack.
+        title_lines = [(match.group("title") or "").strip()]
+        for line in section.splitlines()[1:4]:
+            if _FRAME.match(line) or not line.strip() or line.lstrip().startswith("=="):
+                break
+            title_lines.append(line.strip())
+        title = " ".join(t for t in title_lines if t)
         # Only the stack that FOLLOWS the exception banner is this finding's trace. Output can
         # contain earlier stacks (e.g. a logged warning with its own `at ...` lines); taking
-        # frames from the whole text would localise to the wrong place. This also matches real
-        # Jazzer output, which prints the banner and then the stack.
-        frames = self._frames(raw[match.start():])
+        # frames from the whole text would localise to the wrong place.
+        frames = self._frames(section)
         is_security_issue = "FuzzerSecurityIssue" in exc
 
         if is_security_issue:
@@ -59,11 +72,15 @@ class JazzerOracle(Oracle):
             bug_class = cwe_for_jazzer(title or exc)
             message = f"Jazzer {exc.rsplit('.', 1)[-1]}: {title or exc}"
         else:
-            # An uncaught ordinary exception. Real, reportable once it replays, but not
-            # a security issue by itself -- do not inflate its severity.
+            # An uncaught ordinary exception. Real, reportable once it replays, but not a security
+            # issue by itself -- do not inflate its severity. A wrapper's root cause ("Caused by:")
+            # is what actually went wrong, so it decides the class when it is recognisable.
+            causes = [m.group("exc") for m in _CAUSED_BY.finditer(section)]
+            root = next((c for c in reversed(causes) if _cwe_for_jvm_exception(c) != "CWE-noinfo"), exc)
             severity = "low"
-            bug_class = _cwe_for_jvm_exception(exc)
-            message = f"Uncaught {exc}" + (f": {title}" if title else "")
+            bug_class = _cwe_for_jvm_exception(root) if root != exc else _cwe_for_jvm_exception(exc)
+            message = f"Uncaught {exc}" + (f": {title}" if title else "") + \
+                (f" (caused by {root.rsplit('.', 1)[-1]})" if root != exc else "")
 
         finding = Finding(
             oracle=f"{self.name}:{exc.rsplit('.', 1)[-1]}",
@@ -74,7 +91,7 @@ class JazzerOracle(Oracle):
             severity=severity,
             frames=frames,
             abort_signature=abort_signature(bug_class, frames),
-            raw_excerpt=excerpt(raw),
+            raw_excerpt=excerpt(section),
         )
 
         artifact = _ARTIFACT.search(raw)
@@ -82,7 +99,7 @@ class JazzerOracle(Oracle):
             finding.artifact_hint = artifact.group("path")
 
         seed_fix_site(finding, frames)
-        return [finding]
+        return finding
 
     @staticmethod
     def _frames(raw: str) -> list[Frame]:
@@ -131,6 +148,7 @@ _JVM_EXCEPTION_CWE = {
     "OutOfMemoryError": "CWE-789",
     "StackOverflowError": "CWE-674",
     "ClassCastException": "CWE-704",
+    "StringIndexOutOfBoundsException": "CWE-125",
     "NumberFormatException": "CWE-20",
 }
 

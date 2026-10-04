@@ -19,20 +19,25 @@ from typing import Callable
 
 from .target import BuildResult, Target
 
+#: Only what is noise BY CONSTRUCTION. Every mask hides real output from the comparison, so an
+#: over-broad one lets a bad patch through; genuine non-determinism beyond these is caught by the
+#: pre-flight and quarantined by name instead.
 _DEFAULT_PATTERNS: tuple[tuple[str, str], ...] = (
     # ISO-8601 timestamps, with or without fraction / zone
-    (r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?", "<TS>"),
-    # UUIDs
+    (r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?", "<TS>"),
+    # UUIDs (random by design)
     (r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b", "<UUID>"),
-    # hex addresses and long hex tokens (pointers, hashes)
-    (r"\b0x[0-9a-fA-F]{4,}\b", "<ADDR>"),
-    (r"\b[0-9a-fA-F]{32,}\b", "<HEX>"),
-    # temp paths
-    (r"/tmp/[\w.\-/]+", "<TMP>"),
-    # durations: "took 12ms", "in 0.34s", "elapsed=1.2 s"
-    (r"\b\d+(?:\.\d+)?\s?(?:ms|µs|us|ns|s|sec|seconds)\b", "<DUR>"),
-    # PIDs / thread ids in the common forms
-    (r"\b(?:pid|tid|thread)[=: ]\s?\d+\b", "<PID>"),
+    # pointers: 0x + at least 8 hex digits (a short 0x1234 is a value, not an address)
+    (r"\b0x[0-9a-fA-F]{8,}\b", "<ADDR>"),
+    # JVM identity hash in a default toString: Object@1b6d3586
+    (r"(?<=@)[0-9a-f]{6,8}\b", "<IDHASH>"),
+    # names minted by mkdtemp/tempfile — only the random component, the rest of the path is kept
+    (r"/tmp/(?:tmp[A-Za-z0-9_]{6,}|raksha-[A-Za-z0-9_\-]+)", "/tmp/<TMP>"),
+    # a duration only where a timing word introduces it: "took 12ms", "elapsed=1.2 s", "in 0.34s"
+    (r"(?i)\b(took|elapsed|duration|latency|time|in)([=: ]\s*)\d+(?:\.\d+)?\s?(?:ms|µs|us|ns|s|sec|secs|seconds)\b",
+     "\\1\\2<DUR>"),
+    # process / thread ids in their keyed forms
+    (r"\b(?:pid|tid|thread-id)[=: ]\s?\d+\b", "<PID>"),
 )
 
 
@@ -54,6 +59,24 @@ class Canonicaliser:
         if self.sort_lines:
             text = "\n".join(sorted(text.splitlines()))
         return text.encode("utf-8")
+
+
+#: Crash output from a program with no sanitizer attached. Without these, an input that genuinely
+#: crashes on the baseline would be treated as ordinary behaviour — and a correct patch that fixes
+#: that crash would then be rejected for "changing" it.
+_CRASH_BANNER = re.compile(
+    r"Traceback \(most recent call last\)|Exception in thread \"|Segmentation fault|core dumped"
+    r"|^panic: |thread '[^']*' panicked at|Fatal Python error|terminate called after throwing"
+    r"|SIGSEGV|SIGABRT|SIGBUS|SIGILL|SIGFPE",
+    re.MULTILINE,
+)
+
+
+def _aborted(r, is_abort) -> bool:
+    """A run aborted if it timed out, died on a signal, printed a crash banner, or an oracle fired.
+    A plain non-zero exit (a validation reject, a usage error) is NOT an abort — it is behaviour."""
+    signalled = r.exit_code < 0 or 128 < r.exit_code < 160   # subprocess: -N; via a shell: 128+N
+    return bool(r.timed_out or signalled or _CRASH_BANNER.search(r.text) or is_abort(r.text))
 
 
 @dataclass(frozen=True)
@@ -95,7 +118,7 @@ def preflight(
         aborted = False
         for _ in range(runs):
             r = target.run(baseline, data)
-            if r.timed_out or is_abort(r.text):
+            if _aborted(r, is_abort):
                 aborted = True
                 break
             # The signature is output AND exit code, so an error-path input with a stable

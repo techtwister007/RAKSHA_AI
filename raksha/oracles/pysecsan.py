@@ -29,13 +29,14 @@ from .base import Oracle, abort_signature, excerpt, seed_fix_site
 
 _ATHERIS_BANNER = re.compile(r"===\s*Uncaught Python exception:\s*===")
 
-# Tolerant PySecSan matcher -- see the UNPROVEN note in the module docstring.
-# Accepts e.g. "PySecSan: command injection detected in subprocess.Popen",
-# "=== PySecSan: SQL injection ===", "PySecSanSinkException: path traversal ...".
+# PySecSan detector shapes. Only a line that REPORTS a detection counts: "<detector> detected", a
+# "=== ... ===" detection banner, or a PySecSan exception line. A status line such as
+# "PySecSan: enabled" or "PySecSan: hooks installed" is not a finding — the gate calls this parser to
+# ask "did the attack still fire?", and an info line answering yes would fail every correct patch.
 _PYSECSAN = re.compile(
-    r"(?:^|\W)PySecSan\w*(?:Exception)?\s*[:=\-]*\s*"
-    r"(?P<detector>[A-Za-z][A-Za-z /_-]{2,60}?)"
-    r"(?:\s+detected|\s*===|\s*--|\s*:|\s*$)",
+    r"PySecSan\w*\s*[:=\-]+\s*(?P<detector>[A-Za-z][A-Za-z /_-]{2,60}?)\s+detected\b"
+    r"|===\s*(?:BUG DETECTED:\s*)?PySecSan\w*\s*:\s*(?P<detector2>[A-Za-z][A-Za-z /_-]{2,60}?)\s*==="
+    r"|^\s*\w*PySecSan\w*(?:Exception|Error)\s*:\s*(?P<detector3>[A-Za-z][A-Za-z /_-]{2,60}?)\s*$",
     re.MULTILINE,
 )
 _SINK = re.compile(r"(?:in|sink)\s+(?P<sink>[\w.]+\(?\)?)", re.IGNORECASE)
@@ -45,7 +46,8 @@ _TB_FRAME = re.compile(
     r'^\s*File\s+"(?P<uri>[^"]+)",\s+line\s+(?P<line>\d+),\s+in\s+(?P<symbol>\S+)'
 )
 # The exception line that follows the Atheris banner, e.g. "ValueError: bad input".
-_EXC_LINE = re.compile(r"^(?P<exc>[A-Za-z_][\w.]*(?:Error|Exception|Exit|Warning))(?::\s*(?P<detail>.*))?$")
+# Any exception type — custom ones (myapp.errors.ParseFailure) included — but not the traceback header.
+_EXC_LINE = re.compile(r"^(?!Traceback\b)(?P<exc>[A-Za-z_][\w.]*)(?::\s*(?P<detail>.*))?$")
 
 
 class PySecSanOracle(Oracle):
@@ -61,7 +63,8 @@ class PySecSanOracle(Oracle):
         frames = self._frames(raw)
 
         if detector_match:
-            detector = detector_match.group("detector").strip().rstrip(":-= ")
+            detector = next(g for g in detector_match.group("detector", "detector2", "detector3") if g)
+            detector = detector.strip().rstrip(":-= ")
             bug_class = cwe_for_pysecsan(detector)
             sink = _SINK.search(raw)
             message = f"PySecSan: {detector}"
@@ -85,7 +88,9 @@ class PySecSanOracle(Oracle):
             message=message,
             severity=severity,
             frames=frames,
-            abort_signature=abort_signature(bug_class, frames),
+            # the exception type is part of the identity: a KeyError and a ValueError raised at the
+            # same line are two different defects
+            abort_signature=abort_signature(f"{bug_class}:{message.split(':', 1)[0]}", frames),
             raw_excerpt=excerpt(raw),
         )
         seed_fix_site(finding, frames)

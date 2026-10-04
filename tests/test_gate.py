@@ -211,9 +211,23 @@ def test_a_truly_nondeterministic_input_is_quarantined_and_counted_not_failed():
 
 def test_canonicaliser_strips_noise_by_construction():
     c = Canonicaliser()
-    a = c.canon(b"done at 2026-10-03T12:00:00Z id=1b4e28ba-2fa1-11d2-883f-0016d3cca427 took 12ms 0xdeadbeef /tmp/x1")
-    b = c.canon(b"done at 2026-10-03T12:00:09Z id=5c1e0f00-9d4a-4c0d-9a1b-0123456789ab took 40ms 0xcafebabe /tmp/x2")
+    a = c.canon(b"done at 2026-10-03T12:00:00Z id=1b4e28ba-2fa1-11d2-883f-0016d3cca427 took 12ms "
+                b"0x7ffd5a3c1e20 /tmp/tmpab12cd34/out Obj@1b6d3586")
+    b = c.canon(b"done at 2026-10-03T12:00:09Z id=5c1e0f00-9d4a-4c0d-9a1b-0123456789ab took 40ms "
+                b"0x7ffc0b9e4410 /tmp/tmpzz98yy76/out Obj@7a81197d")
     assert a == b
+
+
+@pytest.mark.parametrize("before,after", [
+    (b"count: 3 s", b"count: 4 s"),                   # a number followed by "s" is not a duration
+    (b"crc=0x1234", b"crc=0x1235"),                   # a short hex value is data, not a pointer
+    (b"sha=" + b"ab" * 32, b"sha=" + b"cd" * 32),     # a hash is output: a patch that breaks it must show
+    (b"open /tmp/safe.txt", b"open /tmp/x/../../etc/passwd"),   # path behaviour is never masked
+    (b"thread 1 exited", b"thread 2 exited"),
+])
+def test_canonicaliser_does_not_hide_behaviour(before, after):
+    c = Canonicaliser()
+    assert c.canon(before) != c.canon(after)
 
 
 # ---------------------------------------------------------------- the model's own test

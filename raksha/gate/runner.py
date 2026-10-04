@@ -155,7 +155,9 @@ def run_gate(
     if new:
         return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
                      f"fresh campaign found {len(new)} abort(s) on the patched build")
-    finding.record_gate(GateCheck.CLEAN_REFUZZ, True, detail=f"{int(refuzz_seconds)}s campaign, nothing new")
+    finding.record_gate(GateCheck.CLEAN_REFUZZ, True,
+                        detail=f"fresh fuzzing pass on the patched build found nothing new "
+                               f"({len(crashes)} crash candidate(s) checked, budget {int(refuzz_seconds)}s)")
 
     # The model's test, if any: verified or discarded, never assumed.
     if regression_test is not None:

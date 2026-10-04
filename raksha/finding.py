@@ -142,7 +142,7 @@ EXPLOIT_REPLAY = "exploit-replay"          # a crafted input replays and an orac
 DETERMINISTIC_MATCH = "deterministic-match"  # a detector deterministically re-matches (dep CVE, secret)
 
 #: Frames from language runtimes and fuzzing harnesses: never the bug's own code, so never its identity.
-_RUNTIME_FRAME_PREFIXES = (
+RUNTIME_FRAME_PREFIXES = (
     "java.", "javax.", "jdk.", "sun.", "com.sun.", "com.code_intelligence.jazzer", "kotlin.",
     "__libc_", "__interceptor_", "__asan_", "__sanitizer", "LLVMFuzzer", "fuzzer::",
 )
@@ -330,21 +330,15 @@ class Finding:
     _status: Status = Status.SUSPECTED
 
     def __post_init__(self) -> None:
+        # Own the history list: dataclasses.replace() hands the same list to the copy, and a shared
+        # history would let one record's transitions rewrite another's.
+        self.history = list(self.history)
         if self.history:
-            # A record reconstructed from its own history (e.g. deserialised): accept its
-            # birth state only if it is consistent with that history's final state. Anything
-            # else is a forged record and is refused — the invariant is closed at construction,
-            # not merely in the transition methods.
-            if self.history[-1].to_status is not self._status:
-                raise InvariantViolation(
-                    f"finding {self.id}: declared status {self._status.value} does not match "
-                    f"its history (ends at {self.history[-1].to_status.value})"
-                )
+            self._check_reconstructed()
             return
         # A freshly constructed finding is born SUSPECTED and nothing else. Every other state
         # is reachable only through the transition methods, which enforce "no reproducer, no
-        # report". Passing `_status=` to the constructor to skip that is the one bypass this
-        # guard exists to forbid.
+        # report". Passing `_status=` to the constructor to skip that is a bypass this guard forbids.
         if self._status is not Status.SUSPECTED:
             raise InvariantViolation(
                 f"finding {self.id}: a finding's only legal birth state is SUSPECTED, not "
@@ -354,6 +348,30 @@ class Finding:
         self.history.append(
             Transition(None, Status.SUSPECTED, self.created_at, "created")
         )
+
+    def _check_reconstructed(self) -> None:
+        """A record rebuilt from its own history (e.g. deserialised) must be one the transition
+        methods could have produced: born SUSPECTED, every step legal, ending at the declared
+        status, and carrying the evidence that status requires. Anything else is a forged record."""
+        def forged(why: str) -> InvariantViolation:
+            return InvariantViolation(f"finding {self.id}: reconstructed record refused — {why}")
+
+        first = self.history[0]
+        if first.from_status is not None or first.to_status is not Status.SUSPECTED:
+            raise forged("history does not begin with a SUSPECTED birth")
+        for prev, step in zip(self.history, self.history[1:]):
+            if step.from_status is not prev.to_status or step.to_status not in _ALLOWED[prev.to_status]:
+                raise forged(f"illegal step {prev.to_status.value} -> {step.to_status.value}")
+        if self.history[-1].to_status is not self._status:
+            raise forged(f"declared status {self._status.value} does not match its history "
+                         f"(ends at {self.history[-1].to_status.value})")
+        if self._status is not Status.SUSPECTED and not (
+                self.reproducer is not None and self.replay_before is not None
+                and self.replay_before.oracle_fired):
+            raise forged(f"{self._status.value} without a reproducer that replayed and fired")
+        if self._status is Status.VERIFIED and not (
+                self.gate_passed and self.replay_after is not None and not self.replay_after.oracle_fired):
+            raise forged("VERIFIED without all five gate checks passed and the PoV dead")
 
     # ---------------------------------------------------------------- status
 
@@ -553,7 +571,7 @@ class Finding:
                 self.oracle, self.bug_class, self.abort_signature or "", loc.uri or self.target,
                 loc.line or "", loc.symbol))
         else:
-            own = [f for f in self.frames if not f.symbol.startswith(_RUNTIME_FRAME_PREFIXES)] or self.frames
+            own = [f for f in self.frames if not f.symbol.startswith(RUNTIME_FRAME_PREFIXES)] or self.frames
             top = [own[0].normalised() + f":{own[0].line or ''}"] if own else []
             top += [f.normalised() for f in own[1:depth]]
             material = "|".join([self.bug_class, *top])

@@ -19,7 +19,7 @@ from __future__ import annotations
 import hashlib
 from abc import ABC, abstractmethod
 
-from ..finding import Finding, FixSite, Frame
+from ..finding import RUNTIME_FRAME_PREFIXES, Finding, FixSite, Frame
 
 
 class Oracle(ABC):
@@ -41,9 +41,13 @@ def abort_signature(bug_class: str, frames: list[Frame], depth: int = 3) -> str:
     """A stable signature for the abort, used for dedup and for before/after comparison.
 
     Deliberately ignores addresses, PIDs and build paths — all of which change between
-    runs and would make two sightings of one bug look like two bugs.
+    runs and would make two sightings of one bug look like two bugs. Runtime and fuzzer frames
+    are skipped: two command injections in different callers both pass through
+    ProcessBuilder.start, and must not share a signature.
     """
-    top = [f.normalised() for f in frames[:depth]]
+    own = [f for f in frames if not f.symbol.startswith(RUNTIME_FRAME_PREFIXES)
+           and not _is_tool_frame(f)] or frames
+    top = [f.normalised() for f in own[:depth]]
     return hashlib.sha256("|".join([bug_class, *top]).encode()).hexdigest()[:16]
 
 

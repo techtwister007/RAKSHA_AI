@@ -13,7 +13,8 @@ import pytest
 
 from raksha import inference
 from raksha.finding import (
-    Finding, GateCheck, InvariantViolation, RepairLane, Status, Transition, utcnow,
+    Finding, GateCheck, InvariantViolation, RepairLane, ReplayResult, Reproducer, Status, Transition,
+    utcnow,
 )
 from raksha.gate.differential import Canonicaliser, differential, preflight
 from raksha.gate.runner import decide, run_gate
@@ -43,12 +44,38 @@ def test_a_reconstructed_record_must_match_its_history():
     now = utcnow()
     good = [Transition(None, Status.SUSPECTED, now, "created"),
             Transition(Status.SUSPECTED, Status.CONFIRMED, now, "replayed")]
+    evidence = dict(reproducer=Reproducer.from_bytes(b"x", ["./r"]),
+                    replay_before=ReplayResult(oracle_fired=True, at=now))
     f = Finding(oracle="o", bug_class="b", language="c", target="t", message="m",
-                history=list(good), _status=Status.CONFIRMED)
-    assert f.status is Status.CONFIRMED            # consistent reconstruction is allowed
+                history=list(good), _status=Status.CONFIRMED, **evidence)
+    assert f.status is Status.CONFIRMED            # consistent, evidenced reconstruction is allowed
     with pytest.raises(InvariantViolation):        # history says CONFIRMED, label says VERIFIED
         Finding(oracle="o", bug_class="b", language="c", target="t", message="m",
-                history=list(good), _status=Status.VERIFIED)
+                history=list(good), _status=Status.VERIFIED, **evidence)
+    with pytest.raises(InvariantViolation):        # consistent history, but no evidence behind it
+        Finding(oracle="o", bug_class="b", language="c", target="t", message="m",
+                history=list(good), _status=Status.CONFIRMED)
+
+
+def test_a_forged_one_step_history_cannot_mint_a_verified_finding():
+    forged = [Transition(None, Status.VERIFIED, utcnow(), "forged")]
+    with pytest.raises(InvariantViolation):
+        Finding(oracle="o", bug_class="b", language="c", target="t", message="m",
+                history=forged, _status=Status.VERIFIED)
+    skip = [Transition(None, Status.SUSPECTED, utcnow()), Transition(Status.SUSPECTED, Status.VERIFIED, utcnow())]
+    with pytest.raises(InvariantViolation):        # SUSPECTED -> VERIFIED skips the gate
+        Finding(oracle="o", bug_class="b", language="c", target="t", message="m",
+                history=skip, _status=Status.VERIFIED)
+
+
+def test_replace_does_not_share_history():
+    import dataclasses
+    f = Finding(oracle="o", bug_class="b", language="c", target="t", message="m")
+    g = dataclasses.replace(f)
+    g.attach_reproducer(Reproducer.from_bytes(b"x", ["./r"]))
+    g.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow()))
+    g.confirm()
+    assert f.status is Status.SUSPECTED and len(f.history) == 1
 
 
 # ---------------------------------------------------------------- CLEAN_REFUZZ fails closed (H2)

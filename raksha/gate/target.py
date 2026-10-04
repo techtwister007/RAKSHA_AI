@@ -179,7 +179,7 @@ class CommandTarget:
         The gate reads this: a target with no refuzz command cannot satisfy CLEAN_REFUZZ, and
         the gate must fail that check closed rather than record a campaign that never ran.
         """
-        return self.refuzz_cmd is not None
+        return bool(self.refuzz_cmd and self.refuzz_cmd.strip())
 
     def refuzz(self, build: BuildResult, seconds: float) -> list[str]:
         assert build.root is not None
