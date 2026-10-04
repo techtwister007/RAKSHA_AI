@@ -67,6 +67,25 @@ class Scorecard:
         }
 
 
+def _severity_summary(findings) -> dict:
+    from .cvss import attack_map, derive
+    sev: dict[str, int] = {}
+    techs: dict[str, int] = {}
+    mapped = 0
+    for f in findings:
+        try:
+            s31, tm = derive(f)["cvss31"], attack_map(f)
+        except Exception:  # noqa: BLE001
+            continue
+        sev[s31["severity"]] = sev.get(s31["severity"], 0) + 1
+        if tm["attack"]:
+            mapped += 1
+        for t in tm["attack"]:
+            techs[t["id"]] = techs.get(t["id"], 0) + 1
+    return {"derived_cvss31_by_severity": sev, "findings_with_attack_technique": mapped,
+            "attack_techniques": dict(sorted(techs.items(), key=lambda kv: -kv[1]))}
+
+
 def _calibration_summary() -> dict | None:
     from .evidence import calibration
     c = calibration()
@@ -317,6 +336,8 @@ def scorecard(
         "parliament_quorum": max((p.get("quorum", 0) for p in parl), default=0),
         # G6: fusion reliabilities measured on the labelled corpus (None if never generated)
         "evidence_calibration": _calibration_summary(),
+        # G7: derived severity language (labelled derived on every record)
+        **_severity_summary(findings),
         # G4: how many distinct models actually voted (roles on one model are not independent), and
         # the widest measured disagreement; None when no panel sat
         "parliament_independent_models": max((p.get("independent_models", 0) for p in parl), default=0),

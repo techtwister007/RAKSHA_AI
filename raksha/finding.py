@@ -284,6 +284,15 @@ class Transition:
     mono: float | None = None
 
 
+def _severity_language(f) -> dict:
+    """G7: derived CVSS vectors and the ATT&CK / D3FEND mapping, labelled as derived."""
+    from .cvss import attack_map, derive
+    try:
+        return {"severity_vector": derive(f), "techniques": attack_map(f)}
+    except Exception:  # noqa: BLE001
+        return {"severity_vector": None, "techniques": None}
+
+
 def _method_cycles(f) -> list[dict]:
     """G5: the hypothesis → experiment → observation → conclusion cycles the record supports."""
     from .method import cycles
@@ -783,6 +792,7 @@ class Finding:
             "reach_proof": self.reach_proof,
             "retrieved_from": self.retrieved_from,
             "method": _method_cycles(self),
+            **_severity_language(self),
             "assurance": {
                 "structure": self.structure,
                 "evidence_score": self.evidence_score,
@@ -855,13 +865,17 @@ class Finding:
                 loc["logicalLocations"] = [{"name": f.symbol}]
             locations.append(loc)
 
+        proof = self.proof_block()
+        sv = proof.get("severity_vector")
         return {
             "ruleId": self.bug_class,
             "level": _SARIF_LEVEL.get(self.severity.lower(), "warning"),
             "message": {"text": self.message},
             "locations": locations,
             "partialFingerprints": {"raksha/dedupKey": self.dedup_key()},
-            "properties": {PROOF_KEY: self.proof_block()},
+            "properties": {PROOF_KEY: proof,
+                           # the property SARIF consumers (e.g. code scanning) rank by; derived CVSS 3.1
+                           **({"security-severity": str(sv["cvss31"]["base_score"])} if sv else {})},
         }
 
 

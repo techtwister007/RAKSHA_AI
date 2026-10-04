@@ -51,6 +51,8 @@ class Asset:
     tier: str
     mission_function: str
     owner_unit: str
+    #: G7: how an attacker reaches it — network | adjacent | local | physical — or None (unknown).
+    exposure: str | None = None
 
     def __post_init__(self) -> None:
         if self.tier not in TIERS:
@@ -124,7 +126,8 @@ class Registry:
 def load(path: str | Path | None = None) -> Registry:
     p = Path(path) if path else _DEFAULT_PATH
     data = json.loads(p.read_text())
-    assets = [Asset(a["name"], a["pattern"], a["tier"], a.get("mission_function", ""), a.get("owner_unit", ""))
+    assets = [Asset(a["name"], a["pattern"], a["tier"], a.get("mission_function", ""), a.get("owner_unit", ""),
+                    a.get("exposure"))
               for a in data.get("assets", [])]
     return Registry(assets=assets, path=p)
 
@@ -142,3 +145,5 @@ def annotate(findings: list[Finding], registry: Registry, *, target: str | None 
             if asset is not None:
                 break
         f.mission_impact = asset.tier if asset else DEFAULT_TIER
+        if asset is not None and asset.exposure:
+            f.exposure = asset.exposure
