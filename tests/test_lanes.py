@@ -55,6 +55,33 @@ def test_parse_requirements_and_go_and_npm():
     assert npm[0].package == "lodash" and npm[0].version == "4.17.20"
 
 
+def test_parse_package_json_reads_range_floors():
+    deps = {d.package: d.version for d in
+            supply.parse_package_json('{"dependencies":{"lodash":"^4.17.20"},'
+                                      '"devDependencies":{"minimist":"~1.2.5"}}', "package.json")}
+    assert deps == {"lodash": "4.17.20", "minimist": "1.2.5"}   # range floor, so no-lockfile still finds
+
+
+def test_parse_pyproject_pep621_and_poetry():
+    text = ('[project]\ndependencies = ["requests==2.25.1", "flask>=2.0"]\n'
+            '[tool.poetry.dependencies]\npython = "^3.11"\npyyaml = "^5.3.1"\n')
+    deps = {d.package: d.version for d in supply.parse_pyproject(text, "pyproject.toml")}
+    assert deps["requests"] == "2.25.1" and deps["pyyaml"] == "5.3.1" and "python" not in deps
+
+
+def test_parse_go_mod_handles_single_line_require():
+    deps = supply.parse_go_mod("module x\nrequire github.com/gin-gonic/gin v1.6.3\n", "go.mod")
+    assert deps and deps[0].package == "github.com/gin-gonic/gin" and deps[0].version == "1.6.3"
+
+
+def test_new_ecosystem_manifests_produce_findings():
+    # package.json / pyproject carrying a DB-known vulnerable version must yield findings
+    pj = supply.scan_dependencies(supply.parse_package_json('{"dependencies":{"lodash":"^4.17.20"}}', "package.json"))
+    assert pj and pj[0].language == "javascript"
+    pp = supply.scan_dependencies(supply.parse_pyproject('[project]\ndependencies=["pyyaml==5.3.1"]\n', "pyproject.toml"))
+    assert pp and pp[0].language == "python"
+
+
 # ---------------------------------------------------------------- the supply lane
 
 def test_scan_finds_vulnerable_deps_across_ecosystems():
@@ -117,6 +144,22 @@ def test_secrets_are_redacted_in_the_record():
 def test_low_entropy_values_are_not_flagged_as_secrets():
     # a repetitive value is almost certainly not a real secret
     assert secrets.scan_text('api_key = "aaaaaaaaaaaaaaaa"\n', "x.env") == []
+
+
+def test_dotted_api_key_names_are_detected():
+    # api.key (Spring/.properties form) and an unquoted assignment were both missed before
+    (f,) = secrets.scan_text("api.key=A1b2C3d4E5f6G7h8X9\n", "application.properties")
+    assert f.oracle == "secrets:generic-api-key"
+
+
+def test_secrets_scanned_in_c_rust_and_key_files(tmp_path):
+    # the scan must reach C/Rust source and bare key files, not only scripting languages
+    from raksha.lanes.buildfree import _SECRET_EXT, _SECRET_NAMES
+    assert ".c" in _SECRET_EXT and ".rs" in _SECRET_EXT and ".pem" in _SECRET_EXT
+    assert "id_rsa" in _SECRET_NAMES
+    (tmp_path / "creds.c").write_text('const char* k = "AKIAIOSFODNN7EXAMPLE";\n')
+    res = scan_target(tmp_path)
+    assert any(f.oracle == "secrets:aws-access-key-id" for f in res.findings)
 
 
 # ---------------------------------------------------------------- bump patches

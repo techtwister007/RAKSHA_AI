@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from raksha.buildagent import BuildAgent, BuildSystem, detect_build_system
+from raksha.orchestrator import Session
 
 
 class ScriptedRunner:
@@ -83,8 +84,23 @@ def test_unknown_error_degrades_to_build_free(tmp_path):
     assert "build-free" in out.summary
 
 
-def test_persistent_known_error_gives_up_after_max_attempts(tmp_path):
+def test_persistent_known_error_degrades_on_no_progress(tmp_path):
+    # A recognised error whose remedy changes nothing: retry once (the fix may land between
+    # attempts), but a second identical failure is no progress — degrade instead of burning the
+    # whole attempt budget on builds that cannot succeed.
     _mk(tmp_path, "pom.xml")
     runner = ScriptedRunner([(1, "Could not resolve artifact x:y:1")] * 10)
-    out = BuildAgent(runner, max_attempts=3).build(tmp_path)
-    assert not out.ok and out.degraded and out.attempts == 3
+    out = BuildAgent(runner, max_attempts=5).build(tmp_path)
+    assert not out.ok and out.degraded and out.attempts == 2
+    assert "no progress" in out.log
+
+
+def test_orchestrator_degrades_a_failed_build_to_build_free(tmp_path):
+    # The degrade claim, wired end to end: a target that will not build still lands proven
+    # findings on the board, because ingest() consumes the agent's degraded outcome.
+    (tmp_path / "go.mod").write_text("module x\n\nrequire github.com/gin-gonic/gin v1.6.3\n")
+    runner = ScriptedRunner([(1, "BUILD FAILURE: toolchain not present")])
+    t = Session().ingest(tmp_path, runner, name="unbuildable")
+    assert t.build_status == "amber"                 # degraded, not red
+    assert "degraded to build-free" in t.note
+    assert t.finding_ids                             # the vulnerable gin dep is still found

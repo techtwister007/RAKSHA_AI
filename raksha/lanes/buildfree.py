@@ -19,9 +19,24 @@ from pathlib import Path
 from ..finding import Finding, dedup
 from . import secrets, service, supply, vulndb
 
-#: Files worth reading for secrets. Skips binaries and the usual noise directories.
-_SECRET_EXT = {".java", ".py", ".js", ".ts", ".go", ".rb", ".php", ".xml", ".yaml", ".yml",
-               ".json", ".properties", ".env", ".cfg", ".ini", ".conf", ".txt", ".sh", ".tf", ".toml"}
+#: Files worth reading for secrets. Covers every language with source here (C/C++, Rust, C#,
+#: Kotlin, Scala, Swift included, not only the three with deep adapters), config, and the files
+#: that most often hold key material. "Secrets in any file" must mean any file.
+_SECRET_EXT = {
+    # source
+    ".java", ".kt", ".scala", ".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rb", ".php",
+    ".c", ".h", ".cc", ".cpp", ".hpp", ".rs", ".cs", ".swift", ".m", ".pl", ".lua", ".groovy",
+    # config / text
+    ".xml", ".yaml", ".yml", ".json", ".properties", ".env", ".cfg", ".ini", ".conf", ".txt",
+    ".sh", ".bash", ".zsh", ".ps1", ".tf", ".tfvars", ".toml", ".md",
+    # key material
+    ".pem", ".key", ".crt", ".p12", ".pfx", ".keystore", ".jks", ".ovpn",
+}
+#: Secret-bearing files identified by exact name rather than extension (often extensionless).
+_SECRET_NAMES = {
+    "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", ".npmrc", ".pypirc", ".netrc",
+    ".git-credentials", ".htpasswd", "credentials", "Dockerfile", ".dockercfg",
+}
 _SKIP_DIRS = {".git", "node_modules", "target", "build", "dist", "vendor", "__pycache__", ".venv"}
 _MAX_FILE_BYTES = 2_000_000
 
@@ -60,7 +75,7 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
         if name in supply._PARSERS:
             manifests += 1
             deps.extend(supply.parse_manifest(name, text, rel))
-        if secrets_on and path.suffix in _SECRET_EXT:
+        if secrets_on and (path.suffix in _SECRET_EXT or name in _SECRET_NAMES):
             findings.extend(secrets.scan_text(text, rel))
         if _looks_like_openapi(name, text):
             findings.extend(service.scan_openapi(text, rel))

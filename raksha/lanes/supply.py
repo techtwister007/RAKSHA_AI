@@ -48,14 +48,79 @@ def parse_maven(text: str, path: str) -> list[Dependency]:
     return deps
 
 
+def _norm_pypi(name: str) -> str:
+    return name.lower().replace("_", "-")
+
+
+def _base_version(spec: str) -> str | None:
+    """The concrete version a range spec is anchored on, for deterministic matching.
+
+    A manifest range like "^4.17.20" or ">=2.25.1" has a concrete lower bound; if that bound is
+    in a vulnerable range, the declared dependency is vulnerable. We match that bound and say so.
+    Returns None when no numeric version can be read (e.g. "*", a git URL, "latest").
+    """
+    m = re.search(r"(\d+(?:\.\d+)*(?:[.\-+][0-9A-Za-z.\-]+)?)", spec or "")
+    return m.group(1) if m else None
+
+
 def parse_requirements(text: str, path: str) -> list[Dependency]:
     deps = []
     for i, raw in enumerate(text.splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
-        m = re.match(r"^([A-Za-z0-9_.\-]+)\s*==\s*([A-Za-z0-9_.\-+]+)", line)
+        # name, optional [extras], then an == pin (the only form a concrete version can be read from)
+        m = re.match(r"^([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*==\s*([A-Za-z0-9_.\-+]+)", line)
         if m:
-            deps.append(Dependency("PyPI", m.group(1).lower().replace("_", "-"), m.group(2), path, i))
+            deps.append(Dependency("PyPI", _norm_pypi(m.group(1)), m.group(2), path, i))
     return deps
+
+
+def parse_pyproject(text: str, path: str) -> list[Dependency]:
+    """PEP-621 (`dependencies = ["name==x"]`) and Poetry (`name = "^x"`) dependency tables.
+
+    Regex-parsed to keep the lane dependency-free and consistent across Python versions. Only
+    dependencies carrying a readable version are emitted; the base version is matched.
+    """
+    deps: list[Dependency] = []
+    # PEP-621 / PEP-508 strings inside any `dependencies = [ ... ]` array.
+    for m in re.finditer(r"""["']([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*(==|>=|~=|>)\s*([0-9][\w.\-+]*)""", text):
+        deps.append(Dependency("PyPI", _norm_pypi(m.group(1)), m.group(3), path))
+    # Poetry table: `name = "^1.2.3"` under [tool.poetry.dependencies] / group dev deps.
+    in_poetry = False
+    for i, raw in enumerate(text.splitlines(), 1):
+        s = raw.strip()
+        if s.startswith("["):
+            in_poetry = "poetry" in s and "dependencies" in s
+            continue
+        if not in_poetry:
+            continue
+        pm = re.match(r"""^([A-Za-z0-9_.\-]+)\s*=\s*["']([^"']+)["']""", s)
+        if pm and pm.group(1).lower() != "python":
+            base = _base_version(pm.group(2))
+            if base:
+                deps.append(Dependency("PyPI", _norm_pypi(pm.group(1)), base, path, i))
+    return _dedup_deps(deps)
+
+
+def parse_package_json(text: str, path: str) -> list[Dependency]:
+    """npm manifest. Versions are ranges, so match the range's concrete lower bound."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    deps: list[Dependency] = []
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        for name, spec in (data.get(section) or {}).items():
+            base = _base_version(spec if isinstance(spec, str) else "")
+            if base:
+                deps.append(Dependency("npm", name, base, path))
+    return _dedup_deps(deps)
+
+
+def _dedup_deps(deps: list[Dependency]) -> list[Dependency]:
+    seen: dict[tuple[str, str, str], Dependency] = {}
+    for d in deps:
+        seen.setdefault((d.ecosystem, d.package, d.version), d)
+    return list(seen.values())
 
 
 def parse_package_lock(text: str, path: str) -> list[Dependency]:
@@ -78,8 +143,11 @@ def parse_package_lock(text: str, path: str) -> list[Dependency]:
 def parse_go_mod(text: str, path: str) -> list[Dependency]:
     deps = []
     for i, raw in enumerate(text.splitlines(), 1):
-        m = re.match(r"^\s*([\w./\-]+)\s+v([0-9][\w.\-+]*)", raw)
-        if m and m.group(1) != "go":
+        # Strip a leading `require` so both the single-line form (`require mod vX`) and the
+        # block form (indented `mod vX` inside `require ( ... )`) are parsed.
+        line = re.sub(r"^\s*require\s+", "", raw)
+        m = re.match(r"^\s*([\w./\-]+)\s+v([0-9][\w.\-+]*)", line)
+        if m and m.group(1) not in ("go", "module", "require", "replace", "exclude"):
             deps.append(Dependency("Go", m.group(1), m.group(2), path, i))
     return deps
 
@@ -87,6 +155,8 @@ def parse_go_mod(text: str, path: str) -> list[Dependency]:
 _PARSERS = {
     "pom.xml": parse_maven,
     "requirements.txt": parse_requirements,
+    "pyproject.toml": parse_pyproject,
+    "package.json": parse_package_json,
     "package-lock.json": parse_package_lock,
     "go.mod": parse_go_mod,
 }

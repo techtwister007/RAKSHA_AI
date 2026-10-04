@@ -42,7 +42,8 @@ _RULES = [
          re.compile(r"(?i)(?:password|passwd|pwd)\s*[=:]\s*['\"]?([^'\"\s]{8,})['\"]?"),
          "Hardcoded password", min_entropy=3.0),
     Rule("generic-api-key", "CWE-798", "high",
-         re.compile(r"(?i)(?:api[_-]?key|secret|token)\s*[=:]\s*['\"]([A-Za-z0-9_\-]{16,})['\"]"),
+         re.compile(r"(?i)(?:api[._-]?key|apikey|access[._-]?token|auth[._-]?token|secret|token)"
+                    r"\s*[=:]\s*['\"]?([A-Za-z0-9_\-]{16,})['\"]?"),
          "Hardcoded API key or token", min_entropy=3.0),
     Rule("jdbc-password", "CWE-798", "high",
          re.compile(r"(?i)jdbc:[^\s'\"]*password=([^\s'\"&]{4,})"), "Password in JDBC URL"),

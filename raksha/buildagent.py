@@ -156,6 +156,7 @@ class BuildAgent:
         cmd = _STANDARD_BUILD[system]
         applied: list[str] = []
         logs: list[str] = []
+        no_cmd_seen: set[str] = set()   # remedies that changed nothing; a repeat means no progress
         for attempt in range(1, self.max_attempts + 1):
             code, out = self.runner.run(cmd, root)
             logs.append(f"[attempt {attempt}] exit={code}\n{out[-600:]}")
@@ -168,12 +169,24 @@ class BuildAgent:
                 logs.append("unknown build error → degrade (model remedy hook not yet active)")
                 break
             applied.append(remedy.id)
-            extra = remedy.action(remedy.pattern.search(out), root)
             logs.append(f"remedy: {remedy.id} — {remedy.description}")
+            extra = remedy.action(remedy.pattern.search(out), root)
             if extra:
                 code2, out2 = self.runner.run(extra, root)
                 logs.append(f"[remedy cmd] exit={code2}\n{out2[-300:]}")
-                cmd = extra if code2 == 0 else cmd
+                if code2 == 0 and extra != cmd:
+                    cmd = extra                 # progress: a new build command to try
+                    continue
+                logs.append(f"remedy {remedy.id} command made no progress → degrade")
+                break
+            # A recognised error with nothing to change in this environment: retry once (the
+            # fix may land between attempts, e.g. an offline-mirror warm-up), but if the same
+            # dead-end remedy fires again, retrying the identical build just repeats the error —
+            # so degrade instead of burning the whole attempt budget on no progress.
+            if remedy.id in no_cmd_seen:
+                logs.append(f"remedy {remedy.id} recurred with no progress → degrade")
+                break
+            no_cmd_seen.add(remedy.id)
         return BuildOutcome(False, True, system, attempt, applied, "\n".join(logs))
 
     @staticmethod

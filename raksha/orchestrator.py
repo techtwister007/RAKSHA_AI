@@ -67,7 +67,7 @@ class Session:
         self.findings[f.id] = f
 
     def ingest_build_free(self, root: str | Path, *, name: str | None = None,
-                          roe: RoeLevel = RoeLevel.R1) -> Target:
+                          roe: RoeLevel = RoeLevel.R1, note: str | None = None) -> Target:
         """Ingest a target directory through the build-free lanes and add it to the board."""
         root = Path(root)
         name = name or root.name
@@ -79,12 +79,39 @@ class Session:
             return t
         langs = sorted({f.language for f in result.findings})
         t = Target(name=name, languages=langs, build_status="amber", roe_level=roe,
-                   note="build-free mode, still finding")
+                   note=note or "build-free mode, still finding")
         for f in result.findings:
             self.add_finding(f)
             t.finding_ids.append(f.id)
         self.targets.append(t)
         return t
+
+    def ingest(self, root: str | Path, runner=None, *, name: str | None = None,
+               roe: RoeLevel = RoeLevel.R1) -> Target:
+        """Ingest a target the way the finale does: try to build, and on any build failure fall
+        through to the build-free lanes. This is the graceful-degradation claim, actually wired —
+        the build agent's `degraded` flag is consumed here, not merely set and dropped.
+
+        `runner` executes the build commands; when None (no toolchain wired, as in this container)
+        the agent still degrades cleanly to build-free, which is the behaviour that must never fail.
+        """
+        from .buildagent import BuildAgent
+        root = Path(root)
+        name = name or root.name
+        if runner is not None:
+            outcome = BuildAgent(runner).build(root)
+            if outcome.ok:
+                # A built target would additionally run the deep lanes; the build-free lanes still
+                # run so the record stream is never empty. Board shows green.
+                t = self.ingest_build_free(root, name=name, roe=roe,
+                                           note=f"built ({outcome.summary}); build-free lanes also run")
+                t.build_status = "green"
+                return t
+            # Build failed → degrade. Exactly the path the dossier calls the choice that turns
+            # 36% into 85%: a target that will not build still yields proven findings.
+            return self.ingest_build_free(root, name=name, roe=roe,
+                                          note=f"build failed, degraded to build-free ({outcome.summary})")
+        return self.ingest_build_free(root, name=name, roe=roe)
 
     def attach_target(self, name: str, findings: list[Finding], *, build_status: str = "green",
                       roe: RoeLevel = RoeLevel.R1, languages: list[str] | None = None) -> Target:
