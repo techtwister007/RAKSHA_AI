@@ -165,9 +165,13 @@ harness: `raksha/harness/` discovers the input-boundary function, synthesizes a 
 driver with a two-check quality gate, and fuzzes it (our stdlib mutation engine behind a fork
 server for C/Python; native `go test -fuzz` for Go). `autorepair.py` then runs the repair ladder —
 generic templates (zero inference), the model lane through the one inference interface when
-`RAKSHA_INFERENCE_BASE_URL` is set, and a mitigation floor — gating each candidate. Rust remains the
-one deep language still on the build-free tier (cargo-fuzz adapter is the next addition behind the
-same oracle API).
+`RAKSHA_INFERENCE_BASE_URL` is set, and a mitigation floor — gating each candidate. Six languages now run the deep loop with no hand-written harness — C, Python, Go (own/native
+fuzzing), Rust (`cargo test` panics), JavaScript/TypeScript (an offline Node sink guard), and Java
+(the shipped Jazzer driver) — the orchestrator dispatching by what each target ships. The repair
+ladder gained a zero-inference retrieval lane (a fix learned once is re-targeted to the next
+occurrence), model-written regression tests verified by the gate, and a mutation factory that
+measures whether the templates generalise. Build-free gained a crypto/PQC lane and a 28-advisory
+OSV-shaped DB; external scanners attach as take lanes behind flags.
 
 **Vetted against an external critical review on 2026-10-04** — point-by-point verdict, the five
 changes it caused, and what was deliberately rejected: `docs/external-review-vetting.md`.

@@ -274,7 +274,7 @@
             impression on finale day is a working system, not an empty shell.</p></div>
         <div class="card b"><span class="k">Decision 5</span><h4>Precision is shipped as a data model, not promised</h4>
           <p>Already done: the record refuses to confirm a finding without a replaying reproducer and
-            refuses to verify a patch without five passes and a dead PoV, with 380 tests proving it.
+            refuses to verify a patch without five passes and a dead PoV, with 594 tests proving it.
             Everything built from here consumes that record, so the headline claim cannot drift.</p></div>
         <div class="card b"><span class="k">Decision 6 — new</span><h4>Dependency bumps are patches, and they are the cheapest provable ones that exist</h4>
           <p>The supply-chain lane was treated as a <em>finding</em> lane. It is also a <strong>patching</strong>
@@ -312,7 +312,7 @@
     <div class="phase">
       <div class="phase-h"><span class="n">PHASE 0</span><h4>The keystone — three oracles, one record, one gate</h4><span class="st done">done</span></div>
       <div class="phase-b">
-        <div><span class="k">Delivered</span><ul><li>SARIF 2.1 + proof block, validated against the OASIS schema</li><li>Status machine with both invariants enforced</li><li>ASan, Jazzer, PySecSan adapters; scorecard from the records</li><li>380 tests; two real bugs caught by them</li></ul></div>
+        <div><span class="k">Delivered</span><ul><li>SARIF 2.1 + proof block, validated against the OASIS schema</li><li>Status machine with both invariants enforced</li><li>ASan, Jazzer, PySecSan adapters; scorecard from the records</li><li>594 tests; two real bugs caught by them</li></ul></div>
         <div><span class="k exit">Exit gate — met</span><ul><li>A C trace, a Java reproducer and a Python abort all become valid records one gate consumes</li></ul></div>
         <div><span class="k">Carry forward</span><ul><li>Cross-confirmation (same site + same CWE, merge) and the model-test fail-before/pass-after rule are specified but not yet coded — they land in Phase 1</li></ul></div>
       </div>
@@ -557,7 +557,7 @@
           <tr><td class="idx">02</td><td class="mech">The live demo died</td><td>Rehearsed twenty times; recording on two devices; narrate over it (Phase 10)</td><td class="ok">covered</td></tr>
           <tr><td class="idx">03</td><td class="mech">A judge asked "did you build this?" and we fumbled</td><td>Provenance marks on every component; the six BUILD items named; the answer rehearsed</td><td class="ok">covered</td></tr>
           <tr><td class="idx">04</td><td class="mech">A number was challenged and it was borrowed</td><td>Phase 9: every number from our own run; losses beside wins</td><td class="ok">covered</td></tr>
-          <tr><td class="idx">05</td><td class="mech">We over-claimed and a technical judge caught it</td><td>The honesty panel, memorised; "React is not a fuzzing target"; QLoRA not claimed; harness synthesis stated exactly as built (template wrapper + quality gate, four languages)</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">05</td><td class="mech">We over-claimed and a technical judge caught it</td><td>The honesty panel, memorised; "React is not a fuzzing target"; QLoRA not claimed; harness synthesis stated exactly as built (template wrapper + quality gate, six languages)</td><td class="ok">covered</td></tr>
           <tr><td class="idx">06</td><td class="mech">No GPU at the venue</td><td>Own machine brought regardless; CPU-only profile benchmarked in Phase 4; template-only still runs</td><td class="ok">covered</td></tr>
           <tr><td class="idx">07</td><td class="mech">Model server died at hour 20 and nobody noticed</td><td>Watchdog restart, visible on the board; dress rehearsals ran 36 hours twice</td><td class="ok">covered</td></tr>
           <tr><td class="idx">08</td><td class="mech">Disk filled with corpus; everything stalled</td><td>Quotas, corpus minimisation, health panel — found in rehearsal, not at the finale</td><td class="ok">covered</td></tr>

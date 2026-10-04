@@ -106,6 +106,8 @@ individually-moderate weaknesses reaches a mission-critical function.
 
 ## 6. Structural intelligence — code-property-graph lane — **NOW (lite) + ROADMAP (GNN)**
 
+- **NOW**: deep find→fix→prove now spans **six languages** (C, Python, Go, Rust, JavaScript/TypeScript
+  through synthesized harnesses; Java via the shipped driver), each through the one gate.
 - **NOW**: a CPG-lite lane builds a source→sink graph and finds taint paths (Python via the real
   `ast`; C/Go via body analysis), producing *suspected* findings that exist to be cross-confirmed by
   a dynamic lane and to feed triage — a perception channel independent of the LLM.
@@ -118,6 +120,8 @@ individually-moderate weaknesses reaches a mission-critical function.
   ranked down, not dressed up as an exploit); the signed evidence bundle is content-addressed and
   now **names the environment** (interpreter, platform, toolchain versions) the proof was made in,
   so a finding reproduced here and not there is distinguishable from a flaky one.
+- **NOW**: external scanners (Semgrep / Gitleaks / OSV-Scanner) plug in as "take" lanes behind flags,
+  cross-confirming our own findings when their binaries are carried; our lanes stay the floor.
 - **ROADMAP**: call-graph-level reachability; a full build-provenance graph (source → compiler →
   binary) and binary/source correspondence for when the customer ships binaries, not source.
 

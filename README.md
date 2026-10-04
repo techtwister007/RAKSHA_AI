@@ -26,10 +26,10 @@ real. Nothing unproven ever ships.
 ## Status
 
 **All phases built** (phase table and exit gates in `BUILD_PLAN.md`). The system finds,
-fixes and proves vulnerabilities across C, Java, Python and Go through one gate — including
+fixes and proves vulnerabilities across C, Python, Go, Rust, JavaScript/TypeScript and Java through one gate — including
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
-Last verified run: **516 tests pass**, lint and air-gap guard clean, all slices `VERIFIED`.
+Last verified run: **594 tests pass**, lint and air-gap guard clean, all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5: the
 36-hour rehearsal and the real-Docker sandbox need the finale hardware; the model lane has run
 only against a mock endpoint; JS/TS and Rust are build-free only; fix templates are few and the
@@ -69,7 +69,7 @@ raksha/
 
 ```sh
 pip install -e '.[dev]'
-pytest                       # 516 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
+pytest                       # 594 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
 
 python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
 python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)
