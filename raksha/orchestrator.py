@@ -15,9 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .finding import Finding, RoeLevel, Status
+from datetime import datetime
+
+from .finding import Finding, RoeLevel, Status, utcnow
 from .lanes import scan_target
-from .metrics import scorecard
+from .metrics import live_counters, scorecard
 
 
 @dataclass
@@ -63,6 +65,10 @@ class Session:
     vaccine_variants: int | None = None
     #: Where sealed evidence bundles are kept (one directory per finding); created on first use.
     evidence_root: Path | None = None
+    #: When the run began, and the live counters at that moment: the scorecard reports this run's
+    #: own wall-clock, model calls, tokens and executions — not the whole process's.
+    started_at: datetime = field(default_factory=utcnow)
+    counter_baseline: dict = field(default_factory=live_counters)
 
     # -- ingest -------------------------------------------------------------------------------
     def add_finding(self, f: Finding) -> None:
@@ -101,13 +107,19 @@ class Session:
         root = Path(root)
         name = name or root.name
         if runner is not None:
-            outcome = BuildAgent(runner).build(root)
+            try:
+                outcome = BuildAgent(runner).build(root)
+            except Exception as e:  # noqa: BLE001 — a build that cannot even start degrades too
+                return self.ingest_build_free(root, name=name, roe=roe,
+                                              note=f"build could not start ({type(e).__name__}: {e}), "
+                                                   "degraded to build-free")
             if outcome.ok:
                 # A built target would additionally run the deep lanes; the build-free lanes still
                 # run so the record stream is never empty. Board shows green.
                 t = self.ingest_build_free(root, name=name, roe=roe,
                                            note=f"built ({outcome.summary}); build-free lanes also run")
-                t.build_status = "green"
+                if t.build_status != "red":          # a target we could not read stays red
+                    t.build_status = "green"
                 return t
             # Build failed → degrade. Exactly the path the dossier calls the choice that turns
             # 36% into 85%: a target that will not build still yields proven findings.
@@ -131,7 +143,8 @@ class Session:
         return [t.card(self.findings) for t in self.targets]
 
     def scorecard(self) -> dict:
-        return scorecard(self.findings.values(), vaccine_variants=self.vaccine_variants).as_dict()
+        return scorecard(self.findings.values(), vaccine_variants=self.vaccine_variants,
+                         started_at=self.started_at, counter_baseline=self.counter_baseline).as_dict()
 
     def run_vaccine_sweep(self, codebases: dict[str, Path]) -> int:
         """Mine a vaccine rule from every VERIFIED fix, sweep the codebases, record the count.
@@ -147,7 +160,10 @@ class Session:
             rule = extract_rule(f)
             if rule is None:
                 continue
-            total += len(sweep(rule, codebases))
+            # the codebase the fix came from is not "the fleet": re-finding the original bug there
+            # (the source tree is unpatched — the gate patches a copy) would be a self-hit
+            others = {name: root for name, root in codebases.items() if name != f.target}
+            total += len(sweep(rule, others))
         self.vaccine_variants = total
         return total
 
@@ -172,7 +188,11 @@ class Session:
 
     def finding_detail(self, finding_id: str) -> dict | None:
         f = self.findings.get(finding_id)
-        return f.proof_block() if f else None
+        if f is None:
+            return None
+        detail = f.proof_block()
+        detail["patch_diff"] = f.patch_diff     # shown on the detail screen, rendered as text
+        return detail
 
     def risk_register(self) -> list[dict]:
         from .risk import register
@@ -274,7 +294,9 @@ def three_language_session(repo_root: Path | None = None, *, include_java: bool 
         s.ingest_build_free(estate, name="mixed-estate")
     # One verified fix, fleet-wide: sweep the demo targets for the same mistake and record the
     # variant count, so the scalability row on the Scorecard is a live number, not a claim.
-    codebases = {p.name: p for p in (repo_root / "demo-targets").glob("*") if p.is_dir()}
+    targets = repo_root / "demo-targets"
+    codebases = {p.name: p for p in targets.glob("*") if p.is_dir() and p.name != "fleet"}
+    codebases.update({p.name: p for p in (targets / "fleet").glob("*") if p.is_dir()})
     if codebases:
         s.run_vaccine_sweep(codebases)
     return s

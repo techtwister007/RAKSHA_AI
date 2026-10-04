@@ -199,7 +199,7 @@ def test_speed_emits_time_to_first_finding_and_first_window():
     f = confirmed_finding()
     card = scorecard([f], gpu_probe=lambda: None).as_dict()
     assert card["speed"]["time_to_first_proven_finding_seconds"] is not None
-    assert card["speed"]["findings_in_first_10min"] == 1
+    assert card["speed"]["proven_findings_in_first_10min"] == 1
 
 
 # ---------------------------------------------------------------- orchestrator wiring (C5/M3)
@@ -252,3 +252,25 @@ def test_vaccine_sweep_populates_the_scalability_metric(tmp_path):
     s.add_finding(f)
     n = s.run_vaccine_sweep({"svc": tmp_path})
     assert n >= 1 and s.scorecard()["scalability"]["vaccine_variants_found"] == n
+
+
+@pytest.mark.parametrize("source,flagged", [
+    ("import socketserver\n", False), ("from urllib.parse import urlsplit\n", False),
+    ("import requests_toolbelt\n", False), ("# we never curl anything\nimport subprocess\n", False),
+    ("import os, socket\n", True), ("from http import client\n", True), ("from xmlrpc import client\n", True),
+    ("x = __import__('socket')\n", True), ("import subprocess\nsubprocess.run(\n  ['curl', 'http://x'])\n", True),
+])
+def test_airgap_guard_parses_python_instead_of_grepping_it(tmp_path, source, flagged):
+    from raksha import airgap
+    (tmp_path / "m.py").write_text(source)
+    assert bool(airgap.check_python(tmp_path)) is flagged
+
+
+@pytest.mark.parametrize("html,flagged", [
+    ("<img src=https://x/y.png>", True), ("<style>b{background:url(https://x/b.png)}</style>", True),
+    ('<script>xhr.open("GET","https://x")</script>', True), ("<script>fetch('/api/snapshot')</script>", False),
+])
+def test_airgap_html_forms(tmp_path, html, flagged):
+    from raksha import airgap
+    (tmp_path / "p.html").write_text(html)
+    assert bool(airgap.check_shipped_html([tmp_path])) is flagged

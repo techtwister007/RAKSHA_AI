@@ -19,6 +19,7 @@ Probes are injected, so the logic is unit-testable with fakes; the real probes r
 from __future__ import annotations
 
 import shutil
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -84,20 +85,73 @@ def mem_used_pct() -> float:
 
 
 def dir_bytes(path: str | Path) -> int:
+    """Total size under `path`. Files that vanish mid-walk (a fuzzer rotating its corpus) are
+    skipped, not fatal — a probe must never crash the run it is watching."""
     root = Path(path)
+    total = 0
     if not root.exists():
         return 0
-    return sum(p.stat().st_size for p in root.rglob("*") if p.is_file())
+    for p in root.rglob("*"):
+        try:
+            if p.is_file():
+                total += p.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def corpus_bytes() -> int:
+    """Size of the fuzzing corpus directory (RAKSHA_CORPUS_DIR), or 0 when none is configured."""
+    import os
+    path = os.environ.get("RAKSHA_CORPUS_DIR")
+    return dir_bytes(path) if path else 0
+
+
+def stuck_children() -> int:
+    """Descendant processes that are zombies (never reaped) or stuck in uninterruptible sleep — the
+    process states a wedged subprocess actually leaves behind. Read from /proc; 0 where unavailable."""
+    import os
+    me = os.getpid()
+    try:
+        entries = [d for d in os.listdir("/proc") if d.isdigit()]
+    except OSError:
+        return 0
+    parent: dict[int, int] = {}
+    state: dict[int, str] = {}
+    for pid in entries:
+        try:
+            raw = Path(f"/proc/{pid}/stat").read_text()
+            after = raw[raw.rindex(")") + 2:].split()      # fields after "(comm)"
+            state[int(pid)], parent[int(pid)] = after[0], int(after[1])
+        except (OSError, ValueError, IndexError):
+            continue
+    def descends(pid: int) -> bool:
+        seen = 0
+        while pid in parent and seen < 64:
+            pid = parent[pid]
+            if pid == me:
+                return True
+            seen += 1
+        return False
+    return sum(1 for pid, st in state.items() if st in ("Z", "D") and descends(pid))
+
+
+def model_alive() -> bool:
+    """True when no model server is configured (nothing to be dead) or it answers."""
+    from .inference import model_server_alive
+    return model_server_alive() is not False
 
 
 @dataclass
 class HealthMonitor:
     caps: HealthCaps = field(default_factory=HealthCaps)
-    disk_probe: Callable[[], float] = disk_free_pct
+    # real probes by default; tests inject fakes. The disk probe watches the temp directory, which is
+    # where every scratch build and refuzz campaign is written.
+    disk_probe: Callable[[], float] = field(default=lambda: disk_free_pct(tempfile.gettempdir()))
     mem_probe: Callable[[], float] = mem_used_pct
-    corpus_probe: Callable[[], int] = lambda: 0
-    stuck_probe: Callable[[], int] = lambda: 0
-    model_probe: Callable[[], bool] = lambda: True
+    corpus_probe: Callable[[], int] = corpus_bytes
+    stuck_probe: Callable[[], int] = stuck_children
+    model_probe: Callable[[], bool] = model_alive
     _started: float = field(default_factory=time.monotonic)
 
     def check(self) -> HealthSnapshot:

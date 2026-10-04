@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from ..sandbox import run_untrusted
+
 
 @dataclass(frozen=True)
 class BuildResult:
@@ -100,26 +102,40 @@ class CommandTarget:
     timeout: float = 120.0
     env: dict[str, str] = field(default_factory=dict)
 
-    def _sh(self, cmd: str, cwd: Path, *, stdin: bytes | None = None, timeout: float | None = None) -> RunResult:
+    def _sh(self, cmd: str, cwd: Path, *, stdin: bytes | None = None, timeout: float | None = None,
+            untrusted: bool = True) -> RunResult:
+        """Run a command. Target code (build, run, tests, coverage, refuzz) goes through the
+        sandbox door; RAKSHA's own housekeeping (copying the tree, applying the patch) does not."""
+        env = {**os.environ, **self.env}
+        if untrusted:
+            code, out, err, timed_out = run_untrusted(cmd, str(cwd), stdin=stdin,
+                                                      timeout=timeout or self.timeout, env=env)
+            return RunResult(code, out, err, timed_out=timed_out)
         try:
             proc = subprocess.run(
                 cmd, shell=True, cwd=str(cwd), input=stdin, capture_output=True,
-                timeout=timeout or self.timeout, env={**os.environ, **self.env},
+                timeout=timeout or self.timeout, env=env,
             )
             return RunResult(proc.returncode, proc.stdout, proc.stderr)
         except subprocess.TimeoutExpired as e:
             return RunResult(-1, e.stdout or b"", e.stderr or b"", timed_out=True)
 
+    def discard(self, build: BuildResult) -> None:
+        """Remove a build's scratch copy. A 36-hour run builds thousands of them."""
+        _discard(build)
+
     def build(self, patch_diff: str | None) -> BuildResult:
         label = "patched" if patch_diff else "vulnerable"
         root = Path(tempfile.mkdtemp(prefix=f"raksha-{label}-"))
-        copy = self._sh(f"cp -a {shlex.quote(str(self.source_root))}/. {shlex.quote(str(root))}/", root)
+        copy = self._sh(f"cp -a {shlex.quote(str(self.source_root))}/. {shlex.quote(str(root))}/", root,
+                        untrusted=False)
         if copy.exit_code != 0:
             return BuildResult(False, label, copy.text)
         if patch_diff:
             patch = root / ".raksha.patch"
             patch.write_text(patch_diff)
-            applied = self._sh(self.apply_patch_cmd.format(patch=shlex.quote(str(patch))), root)
+            applied = self._sh(self.apply_patch_cmd.format(patch=shlex.quote(str(patch))), root,
+                               untrusted=False)
             if applied.exit_code != 0:
                 return BuildResult(False, label, "patch did not apply:\n" + applied.text)
         built = self._sh(self.build_cmd.format(root=shlex.quote(str(root))), root)
@@ -190,3 +206,18 @@ class CommandTarget:
                                         out=shlex.quote(str(out))),
                  build.root, timeout=seconds + 60)
         return [p.read_text(errors="replace") for p in sorted(out.iterdir()) if p.is_file()]
+
+
+def _discard(build: BuildResult) -> None:
+    """Delete a build's scratch directory if it is one RAKSHA created under the temp dir."""
+    import shutil
+    root = build.root
+    if root is None:
+        return
+    tmp = Path(tempfile.gettempdir()).resolve()
+    try:
+        resolved = Path(root).resolve()
+    except OSError:
+        return
+    if resolved.parent == tmp and resolved.name.startswith("raksha-"):
+        shutil.rmtree(resolved, ignore_errors=True)

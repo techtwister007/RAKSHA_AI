@@ -128,3 +128,48 @@ def test_rehearsal_drives_the_watchdog_over_components():
     r = Rehearsal(targets=[Path("x")], components=[comp], health_every_s=10.0, clock=lambda: next(ticks))
     rep = r.run(duration_s=3, work=lambda t: 0)
     assert rep.restarts >= 1 and comp.restarts >= 1
+
+
+# ---------------------------------------------------------------- endurance of the harness itself
+
+def test_timeline_is_bounded_over_a_long_run():
+    from raksha.rehearse import TIMELINE_LIMIT
+    ticks = iter(i * 0.0001 for i in range(10_000_000))
+    r = Rehearsal(targets=[Path("x")], health_every_s=1e9, clock=lambda: next(ticks),
+                  iteration_timeout_s=None)
+    rep = r.run(duration_s=8, work=lambda t: 0)
+    assert rep.iterations > TIMELINE_LIMIT * 5 and len(rep.timeline) <= TIMELINE_LIMIT
+
+
+def test_a_wedged_iteration_is_abandoned_not_waited_on():
+    import time
+    calls = {"n": 0}
+    def work(_):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            time.sleep(5)          # wedged target
+        return 0
+    r = Rehearsal(targets=[Path("w")], health_every_s=1e9, iteration_timeout_s=0.2)
+    rep = r.run(duration_s=0.6, work=work)
+    assert rep.timeouts == 1 and rep.iterations >= 1 and not rep.survived
+
+
+def test_a_failing_probe_is_an_incident_not_a_crash():
+    def boom():
+        raise FileNotFoundError("corpus file vanished")
+    m = HealthMonitor(disk_probe=lambda: 80.0, mem_probe=lambda: 10.0, corpus_probe=boom,
+                      stuck_probe=lambda: 0, model_probe=lambda: True)
+    ticks = iter(i * 0.1 for i in range(100000))
+    rep = Rehearsal(targets=[Path("x")], monitor=m, health_every_s=1.0,
+                    clock=lambda: next(ticks)).run(duration_s=3, work=lambda t: 0)
+    assert not rep.survived and "probe failed" in rep.summary()
+
+
+def test_stuck_probe_sees_an_unreaped_child():
+    import subprocess
+    import time
+    from raksha.health import stuck_children
+    p = subprocess.Popen(["true"])
+    time.sleep(0.3)
+    assert stuck_children() >= 1
+    p.wait()

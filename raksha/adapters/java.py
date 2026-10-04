@@ -16,11 +16,11 @@ import difflib
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 
-from ..gate.target import BuildResult, RunResult, TestResult
+from ..gate.target import BuildResult, RunResult, TestResult, _discard
+from ..sandbox import run_untrusted
 
 _PROP = "log4j.version"
 
@@ -65,12 +65,13 @@ class MavenReplayTarget:
 
     # -- helpers ---------------------------------------------------------------------------
     def _sh(self, cmd: str, cwd: Path, *, timeout: float | None = None, stdin: bytes | None = None) -> RunResult:
-        try:
-            p = subprocess.run(cmd, shell=True, cwd=str(cwd), input=stdin, capture_output=True,
-                               timeout=timeout or self.timeout, env=os.environ)
-            return RunResult(p.returncode, p.stdout, p.stderr)
-        except subprocess.TimeoutExpired as e:
-            return RunResult(-1, e.stdout or b"", e.stderr or b"", timed_out=True)
+        """Maven builds, tests and the replay driver are target code: through the sandbox door."""
+        code, out, err, timed_out = run_untrusted(cmd, str(cwd), stdin=stdin,
+                                                  timeout=timeout or self.timeout, env=dict(os.environ))
+        return RunResult(code, out, err, timed_out=timed_out)
+
+    def discard(self, build: BuildResult) -> None:
+        _discard(build)
 
     def _cp(self, root: Path) -> str:
         return f"target/classes:target/test-classes:{(root / 'cp.txt').read_text().strip()}"

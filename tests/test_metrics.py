@@ -141,9 +141,16 @@ def test_report_only_is_counted_as_a_real_result():
     assert card["precision"]["reports_with_reproducer_pct"] == 100.0
 
 
-def test_posture_badges_are_always_zero():
-    card = scorecard([]).as_dict()
-    assert card["posture"] == {"network_interfaces": 0, "cloud_calls": 0}
+def test_posture_badges_are_measured_not_asserted(tmp_path):
+    from raksha.metrics import live_counters
+    from raksha.sandbox import run_untrusted
+    base = live_counters()
+    card = scorecard([], counter_baseline=base).as_dict()
+    assert card["posture"]["network_interfaces"] == 0 and card["posture"]["cloud_calls"] == 0
+    run_untrusted("true", str(tmp_path))          # target code run on the host, no sandbox
+    card = scorecard([], counter_baseline=base).as_dict()
+    assert card["posture"]["network_interfaces"] == "unenforced"
+    assert card["posture"]["unsandboxed_runs"] == 1
 
 
 def test_inference_spent_on_a_rejected_patch_stays_visible():

@@ -32,6 +32,8 @@ def _drive(name, target, oracle, reproducer, patch_fn, corpus, replay_cmd):
     if not vuln.ok:
         raise RuntimeError(f"{name}: vulnerable build failed:\n{vuln.log}")
     findings = oracle.parse(target.run(vuln, reproducer).text, target=name)
+    if hasattr(target, "discard"):
+        target.discard(vuln)
     if not findings:
         raise RuntimeError(f"{name}: oracle saw nothing")
     f = findings[0]

@@ -57,6 +57,7 @@ def run() -> int:
         print(f"  {R}target did not build:{O}\n{vuln.log}")
         return 1
     replay = target.run(vuln, REPRODUCER)
+    target.discard(vuln)
     findings = JazzerOracle().parse(replay.text, target="audit-svc")
     if not findings:
         print(f"  {R}oracle saw nothing — is the build really vulnerable?{O}")

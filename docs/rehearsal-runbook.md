@@ -16,7 +16,9 @@ manual intervention** — that is the exit gate for Phase 10.
    `NETWORK INTERFACES: 0 · CLOUD CALLS: 0`.
 2. Verify the bundle: `python3 deploy/bundle_manifest.py verify <bundle>`.
 3. Pick a **fresh** target the system has not seen (not a demo target).
-4. Set caps for the box in `HealthCaps` (disk, memory, corpus size, stuck-process count).
+4. Set caps for the box in `HealthCaps` (disk, memory, corpus size, stuck-process count), point
+   `RAKSHA_CORPUS_DIR` at the fuzzing corpus, and provision the sandbox
+   (`RAKSHA_SANDBOX_IMAGE`, and `RAKSHA_REQUIRE_SANDBOX=1` so nothing runs unsandboxed).
 5. Start the recorder for the final demo arc at a safe point (see "The recording").
 
 ## Running
@@ -31,18 +33,24 @@ python3 -c "from pathlib import Path; from raksha.rehearse import Rehearsal; \
 ```
 
 The harness loops the pipeline over the target(s), samples health on a fixed cadence, runs the
-watchdog over the supervised components (model server, fuzzers), and records a timeline. It never
-crashes on a bad iteration — a failure is recorded and the loop continues.
+watchdog over the supervised components you pass it (`components=[...]`: the model server and
+fuzzer processes, each with `is_alive()` / `restart()`), and records a bounded timeline. It never
+crashes on a bad iteration — a failure or a wedged target is recorded and the loop continues.
 
 ## What to watch for (the endurance failures)
 
 | Symptom | Caught by | Response |
 |---|---|---|
-| Memory creeping up | `HealthMonitor` mem cap | restart the leaking component via the watchdog; note it |
-| Disk filling with corpus | `HealthMonitor` corpus cap | `afl-cmin` minimisation; the alert fires before the disk is full |
-| Stuck subprocesses | `HealthMonitor` stuck-proc probe | watchdog reaps and restarts |
-| Model server dies (~hour 20) | `model_probe` + `Watchdog` | restart vLLM; meanwhile the pipeline degrades to template/retrieval — the gate never needed a model |
-| A target wedges the loop | per-iteration try/except | recorded as an error; the loop moves to the next target |
+| Memory creeping up | `HealthMonitor` mem cap (`/proc/meminfo`) | restart the leaking component via the watchdog; note it |
+| Disk filling | disk probe on the temp dir (where scratch builds and refuzz output land) | the gate deletes its scratch builds as it goes; the alert fires before the disk is full |
+| Corpus growing | corpus probe on `RAKSHA_CORPUS_DIR` | `afl-cmin` minimisation |
+| Stuck subprocesses | stuck probe: zombie / uninterruptible children, read from `/proc` | watchdog reaps and restarts |
+| Model server dies (~hour 20) | model probe (`GET /models` through the inference interface) + `Watchdog` | restart vLLM; meanwhile the pipeline degrades to template/retrieval — the gate never needed a model |
+| A target wedges the loop | per-iteration timeout (`iteration_timeout_s`, default 600s) | recorded as a timeout; the iteration is abandoned and the loop moves to the next target |
+| A probe itself fails | the sample is wrapped | recorded as a health incident; the run continues |
+
+The harness keeps a bounded timeline (the last 2,000 events) and a bounded incident log, so a
+36-hour run does not become the memory leak it is hunting; every incident is still counted.
 
 A restart you can see on the Mission Board is a feature. A silent hang is the thing that loses the
 run — so every restart is a visible timeline event, and `survived` is false if any error occurred or

@@ -117,9 +117,35 @@ def test_sandbox_wraps_with_no_network():
     joined = " ".join(argv)
     assert "--network=none" in joined
     assert "--cap-drop=ALL" in joined
-    assert "--read-only" in joined
-    assert ":ro" in joined                     # target mounted read-only
+    assert "--read-only" in joined             # the image root is immutable
+    assert "/host/target:/work:rw" in joined   # the per-build scratch copy is writable (builds write)
+    assert "seccomp=default" not in joined     # not a docker keyword; the default profile is implicit
     assert argv[0] == "docker" and "mvn test" in argv[-1]
+
+
+def test_untrusted_runs_are_counted_and_unsandboxed_runs_are_visible(monkeypatch, tmp_path):
+    from raksha import sandbox
+    monkeypatch.delenv("RAKSHA_SANDBOX_IMAGE", raising=False)
+    monkeypatch.delenv("RAKSHA_REQUIRE_SANDBOX", raising=False)
+    before = sandbox.execution_counts()["unsandboxed_runs"]
+    code, out, _, _ = sandbox.run_untrusted("echo hi", str(tmp_path))
+    assert code == 0 and out.strip() == b"hi"
+    assert sandbox.execution_counts()["unsandboxed_runs"] == before + 1
+
+
+def test_required_sandbox_refuses_to_run_unsandboxed(monkeypatch, tmp_path):
+    from raksha import sandbox
+    monkeypatch.delenv("RAKSHA_SANDBOX_IMAGE", raising=False)
+    monkeypatch.setenv("RAKSHA_REQUIRE_SANDBOX", "1")
+    code, _, err, _ = sandbox.run_untrusted("touch ran", str(tmp_path))
+    assert code == 126 and b"SANDBOX REQUIRED" in err and not (tmp_path / "ran").exists()
+
+
+def test_provisioned_sandbox_remaps_paths_into_the_jail(monkeypatch, tmp_path):
+    from raksha import sandbox
+    box = sandbox.Sandbox.from_env({"RAKSHA_SANDBOX_IMAGE": "raksha-tools:1"})
+    argv = box.wrap(f"./harness {tmp_path}/in".replace(str(tmp_path), "/work"), mount=str(tmp_path))
+    assert "raksha-tools:1" in argv and argv[-1].endswith("./harness /work/in")
 
 
 def test_network_interfaces_badge_is_zero():

@@ -29,7 +29,24 @@ class VramReading:
         return {"used_mb": self.used_mb, "total_mb": self.total_mb, "used_pct": self.used_pct}
 
 
+_CACHE: tuple[float, VramReading | None] | None = None
+_CACHE_SECONDS = 10.0
+
+
 def vram() -> VramReading | None:
+    """Current VRAM use, cached briefly: the console polls every few seconds and must not fork
+    nvidia-smi on every poll."""
+    import time
+    global _CACHE
+    now = time.monotonic()
+    if _CACHE is not None and now - _CACHE[0] < _CACHE_SECONDS:
+        return _CACHE[1]
+    reading = _read_vram()
+    _CACHE = (now, reading)
+    return reading
+
+
+def _read_vram() -> VramReading | None:
     """Current VRAM use across GPUs, or None when no GPU / no nvidia-smi is available."""
     exe = shutil.which("nvidia-smi")
     if not exe:

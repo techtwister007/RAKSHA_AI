@@ -63,6 +63,13 @@ def completion_tokens_used() -> int:
     return _COMPLETION_TOKENS
 
 
+def counters() -> dict[str, int]:
+    """A snapshot of the live counters. A session records one at start and reports the difference,
+    so two sessions in one process (or a test) never see each other's calls or tokens."""
+    return {"inference_calls": _INFERENCE_CALLS, "egress_calls": _EGRESS_CALLS,
+            "completion_tokens": _COMPLETION_TOKENS}
+
+
 def reset_counters() -> None:
     """Zero the live counters (used by tests and at the start of a fresh run)."""
     global _INFERENCE_CALLS, _EGRESS_CALLS, _COMPLETION_TOKENS
@@ -80,18 +87,16 @@ def _is_loopback(host: str) -> bool:
         return "." not in host
 
 
-def _is_local(host: str) -> bool:
-    """Whether `sealed` mode permits this host.
+def _is_local(host: str, allowlist: tuple[str, ...] = ()) -> bool:
+    """Whether a host is inside the sealed deployment (and so not egress).
 
-    Loopback / dotless service names always. Private-range (RFC-1918) and explicitly
-    allowlisted internal FQDNs are permitted too — a sealed deployment may serve the model on
-    an internal host — but everything else (any public host) is refused. The allowlist is the
-    escape hatch for a named internal server without disabling the guard entirely.
+    Loopback / dotless service names always. Private-range (RFC-1918) addresses and hosts the
+    operator explicitly allowlisted (RAKSHA_INFERENCE_ALLOWLIST) too — a sealed deployment may serve
+    the model on an internal host. Everything else (any public host) is outside. Sealed mode refuses
+    to talk to an outside host, and the egress counter counts calls to one, so the two agree: a
+    legitimate internal model server never shows up as a cloud call.
     """
-    if _is_loopback(host):
-        return True
-    allow = {h.strip() for h in os.environ.get("RAKSHA_INFERENCE_ALLOWLIST", "").split(",") if h.strip()}
-    if host in allow:
+    if _is_loopback(host) or host in allowlist:
         return True
     try:
         return ipaddress.ip_address(host).is_private
@@ -107,6 +112,7 @@ class InferenceConfig:
     advisor_model: str = _DEFAULT_MODELS[ADVISOR]
     timeout: float = 120.0
     sealed: bool = True  # at the finale: refuse any non-local endpoint
+    allowlist: tuple[str, ...] = ()  # named internal model hosts (RAKSHA_INFERENCE_ALLOWLIST)
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> "InferenceConfig":
@@ -118,6 +124,7 @@ class InferenceConfig:
             advisor_model=env.get("RAKSHA_ADVISOR_MODEL", _DEFAULT_MODELS[ADVISOR]),
             timeout=float(env.get("RAKSHA_INFERENCE_TIMEOUT", "120")),
             sealed=env.get("RAKSHA_SEALED", "1") != "0",
+            allowlist=tuple(h.strip() for h in env.get("RAKSHA_INFERENCE_ALLOWLIST", "").split(",") if h.strip()),
         )
 
     def model_for(self, role: str) -> str:
@@ -127,7 +134,7 @@ class InferenceConfig:
         if not self.base_url:
             return
         host = urlparse(self.base_url).hostname or ""
-        if self.sealed and not _is_local(host):
+        if self.sealed and not _is_local(host, self.allowlist):
             raise InferenceError(
                 f"sealed mode refuses a non-local inference endpoint: {self.base_url!r}. "
                 "The model server must be on the sealed deployment (loopback / internal). "
@@ -163,7 +170,7 @@ class InferenceClient:
         global _INFERENCE_CALLS, _EGRESS_CALLS, _COMPLETION_TOKENS
         host = urlparse(self.config.base_url).hostname or ""
         _INFERENCE_CALLS += 1
-        if not _is_loopback(host):
+        if not _is_local(host, self.config.allowlist):
             _EGRESS_CALLS += 1
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
@@ -177,6 +184,22 @@ class InferenceClient:
         except (TypeError, ValueError):
             pass
         return [c["message"]["content"] for c in data.get("choices", [])]
+
+
+def model_server_alive(config: InferenceConfig | None = None, timeout: float = 3.0) -> bool | None:
+    """Liveness of the configured model server (GET /models), or None when none is configured —
+    a model-free run has no server to be dead. Lives here because this is the only module allowed
+    to touch the network."""
+    config = config or InferenceConfig.from_env()
+    if not config.base_url:
+        return None
+    try:
+        config.validate()
+        url = config.base_url.rstrip("/") + "/models"
+        with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310 (allowlisted module)
+            return 200 <= resp.status < 300
+    except Exception:  # noqa: BLE001 — any failure is "not alive"
+        return False
 
 
 def get_client(config: InferenceConfig | None = None) -> InferenceClient | None:

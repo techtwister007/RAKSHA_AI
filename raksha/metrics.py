@@ -21,7 +21,10 @@ from typing import Any, Callable, Iterable
 
 from .finding import INFERENCE_LANES, Finding, GateCheck, Status, reportable
 from .gpu import VramReading, vram
-from .inference import completion_tokens_used, egress_call_count, inference_call_count
+from . import inference, sandbox
+
+#: Record "languages" that are really lanes, not languages: a secret ("any") or an API spec ("api").
+NOT_A_LANGUAGE = frozenset({"any", "api"})
 
 #: Findings produced within this window of the first finding count toward the "fast opening
 #: move" metric — the dossier's "time-to-first-finding matters more than depth".
@@ -56,18 +59,27 @@ class Scorecard:
         }
 
 
+def live_counters() -> dict[str, int]:
+    """Process-wide inference and execution counters, for a session to snapshot at its start."""
+    return {**inference.counters(), **sandbox.execution_counts()}
+
+
 def scorecard(
     findings: Iterable[Finding],
     *,
     vaccine_variants: int | None = None,
     gpu_probe: Callable[[], VramReading | None] = vram,
+    started_at=None,
+    counter_baseline: dict[str, int] | None = None,
 ) -> Scorecard:
     """Compute the full scorecard for a set of findings.
 
     `vaccine_variants` is the count of fleet variants found per verified fix by the vaccine
     sweep (held by the session, not the records), surfaced here so Screen 5 shows every ledger
     row. `gpu_probe` reads live VRAM; it returns None off-GPU, and the metric is then honestly
-    absent rather than a faked zero.
+    absent rather than a faked zero. `started_at` is when the run began (so time-to-first-finding is
+    wall-clock from the start, build and fuzzing included); `counter_baseline` is the live-counter
+    snapshot taken then, so this run reports only its own model calls, tokens and executions.
     """
     findings = list(findings)
     reported = reportable(findings)
@@ -93,7 +105,7 @@ def scorecard(
     # The dossier's headline speed number: wall-clock from the run's first finding to the first
     # one that became reportable. Taken from created_at (the run's t0) to the earliest CONFIRMED
     # transition among reported findings — derived from the records, not a stopwatch guess.
-    t0 = min((f.created_at for f in findings), default=None)
+    t0 = started_at or min((f.created_at for f in findings), default=None)
     first_proven_at = min(
         (f._transition_at(Status.CONFIRMED) for f in reported
          if f._transition_at(Status.CONFIRMED) is not None),
@@ -102,8 +114,9 @@ def scorecard(
     time_to_first_finding = (
         round((first_proven_at - t0).total_seconds(), 2) if t0 and first_proven_at else None
     )
-    findings_in_first_window = (
-        len([f for f in findings if (f.created_at - t0).total_seconds() <= FIRST_WINDOW_SECONDS])
+    proven_in_first_window = (
+        len([f for f in reported
+             if (f._transition_at(Status.CONFIRMED) or f.created_at) - t0 <= _window()])
         if t0 else 0
     )
     speed = {
@@ -111,7 +124,7 @@ def scorecard(
         "median_time_to_pov_seconds": _median(pov_times),
         "median_time_to_validated_patch_seconds": _median(patch_times),
         "fastest_pov_seconds": round(min(pov_times), 2) if pov_times else None,
-        "findings_in_first_10min": findings_in_first_window,
+        "proven_findings_in_first_10min": proven_in_first_window,
         "samples": {"pov": len(pov_times), "patch": len(patch_times)},
     }
 
@@ -151,7 +164,7 @@ def scorecard(
         # Cross-confirmation: a static SUSPECTED finding promoted because another lane's
         # reproducer landed on the same fix site with the same CWE. Counted from the merge
         # record on the survivor, so the precision ledger row is a measurement.
-        "static_findings_promoted": len([f for f in findings if f.merged_from]),
+        "static_findings_promoted": sum(len(f.merged_from) for f in findings),
         "unproven_findings_suppressed": len(by_status[Status.SUSPECTED]),
     }
 
@@ -165,9 +178,10 @@ def scorecard(
     }
 
     # ---- Scalability: languages, not thread count ------------------------
-    languages = sorted({f.language for f in findings})
+    languages = sorted({f.language for f in findings} - NOT_A_LANGUAGE)
     scalability = {
         "languages_covered": languages,
+        "language_agnostic_lanes": sorted({f.language for f in findings} & NOT_A_LANGUAGE),
         "language_count": len(languages),
         "targets": sorted({f.target for f in findings}),
         "target_count": len({f.target for f in findings}),
@@ -188,7 +202,10 @@ def scorecard(
     inference_fixes = [l for l in fix_lanes if l in INFERENCE_LANES]
     zero_inference_fixes = [l for l in fix_lanes if l not in INFERENCE_LANES]
     verified_via_model = len([f for f in verified if f.repair_lane in INFERENCE_LANES])
-    tokens_total = completion_tokens_used()
+    now = live_counters()
+    base = counter_baseline or {}
+    run = {k: now[k] - base.get(k, 0) for k in now}
+    tokens_total = run["completion_tokens"]
     vram_reading = gpu_probe()
     resource = {
         "fixes_by_lane": _count(l.value for l in fix_lanes),
@@ -202,16 +219,22 @@ def scorecard(
         "tokens_per_validated_patch": (
             round(tokens_total / verified_via_model, 1) if verified_via_model else None
         ),
-        "inference_calls": inference_call_count(),
+        "inference_calls": run["inference_calls"],
         # Live VRAM, or None off-GPU — honestly absent rather than a faked zero.
         "vram": vram_reading.as_dict() if vram_reading else None,
     }
 
     # ---- Posture: badges backed by live counters, not constants ----------
-    # network_interfaces is the sandbox's enforced invariant (no NIC in the jail); cloud_calls
-    # is a live counter of calls that left the box, so a breach would show here instead of the
-    # badge simply asserting zero.
-    posture = {"network_interfaces": 0, "cloud_calls": egress_call_count()}
+    # network_interfaces: target code that ran with a network interface. Zero only when every
+    # execution of target code went through the network-less sandbox; any run on the host makes the
+    # badge read "unenforced" rather than claim an isolation that did not happen. cloud_calls: model
+    # calls that left the sealed deployment.
+    posture = {
+        "network_interfaces": 0 if run["unsandboxed_runs"] == 0 else "unenforced",
+        "cloud_calls": run["egress_calls"],
+        "sandboxed_runs": run["sandboxed_runs"],
+        "unsandboxed_runs": run["unsandboxed_runs"],
+    }
 
     return Scorecard(
         performance=performance,
@@ -222,6 +245,11 @@ def scorecard(
         resource=resource,
         posture=posture,
     )
+
+
+def _window():
+    from datetime import timedelta
+    return timedelta(seconds=FIRST_WINDOW_SECONDS)
 
 
 def _pct(numerator: int, denominator: int) -> float | None:

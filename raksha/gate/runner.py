@@ -82,18 +82,38 @@ def run_gate(
     regression_test: str | None = None,
     preflight_runs: int = 3,
 ) -> GateVerdict:
-    """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict."""
+    """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict.
+
+    The two scratch builds the gate makes are discarded when it returns: an endurance run gates
+    thousands of candidates, and leaving two full copies of the target per candidate fills the disk.
+    """
     if finding.status is not Status.PATCHED or not finding.patch_diff:
         raise ValueError("run_gate needs a PATCHED finding carrying a patch_diff")
-    oracles = tuple(oracles)
     verdict = GateVerdict(passed=True)
+    try:
+        return _judge(finding, target, verdict, reproducer=reproducer, corpus=corpus,
+                      refuzz_seconds=refuzz_seconds, oracles=tuple(oracles), canon=canon,
+                      coverage_tolerance=coverage_tolerance, regression_test=regression_test,
+                      preflight_runs=preflight_runs)
+    finally:
+        discard = getattr(target, "discard", None)
+        if discard is not None:
+            for build in (verdict.before, verdict.after):
+                if build is not None:
+                    discard(build)
+
+
+def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer: bytes,
+           corpus: list[bytes], refuzz_seconds: float, oracles: tuple, canon: Canonicaliser | None,
+           coverage_tolerance: int, regression_test: str | None, preflight_runs: int) -> GateVerdict:
 
     # 1 ── COMPILES
     before = target.build(None)
+    verdict.before = before
     if not before.ok:
         return _fail(finding, verdict, GateCheck.COMPILES, "baseline does not build: " + before.log[-400:])
     after = target.build(finding.patch_diff)
-    verdict.before, verdict.after = before, after
+    verdict.after = after
     if not after.ok:
         return _fail(finding, verdict, GateCheck.COMPILES, "patched build fails: " + after.log[-400:])
     finding.record_gate(GateCheck.COMPILES, True, detail="patched build ok")

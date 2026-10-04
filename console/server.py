@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 from pathlib import Path
 
 CONSOLE_DIR = Path(__file__).parent
@@ -43,25 +44,33 @@ def make_handler(session):
             self._send(code, json.dumps(obj).encode(), "application/json")
 
         def do_GET(self):  # noqa: N802 (http.server API)
-            if self.path in ("/", "/index.html"):
+            # A failure while building a response is a 500 the console can show — never a dropped
+            # connection that looks like the system died.
+            try:
+                self._route(urlsplit(self.path).path)
+            except Exception as e:  # noqa: BLE001
+                self._json(500, {"error": f"{type(e).__name__}: {e}"})
+
+        def _route(self, path: str) -> None:
+            if path in ("/", "/index.html"):
                 if INDEX.exists():
                     self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
                 else:
                     self._send(500, b"console/index.html missing", "text/plain")
                 return
-            if self.path == "/api/snapshot":
+            if path == "/api/snapshot":
                 self._json(200, session.snapshot())
                 return
-            if self.path.startswith("/api/finding/"):
-                detail = session.finding_detail(self.path.rsplit("/", 1)[-1])
+            if path.startswith("/api/finding/"):
+                detail = session.finding_detail(path.rsplit("/", 1)[-1])
                 self._json(200, detail) if detail else self._json(404, {"error": "not found"})
                 return
-            if self.path.startswith("/api/brief/"):
-                brief = session.commanders_brief(self.path.rsplit("/", 1)[-1])
+            if path.startswith("/api/brief/"):
+                brief = session.commanders_brief(path.rsplit("/", 1)[-1])
                 self._json(200, brief) if brief else self._json(404, {"error": "not found"})
                 return
-            if self.path.startswith("/api/verify/"):
-                res = session.verify_bundle(self.path.rsplit("/", 1)[-1])
+            if path.startswith("/api/verify/"):
+                res = session.verify_bundle(path.rsplit("/", 1)[-1])
                 self._json(200, res) if res else self._json(404, {"error": "not found"})
                 return
             self._send(404, b"not found", "text/plain")
@@ -72,7 +81,7 @@ def make_handler(session):
 def serve(session, *, port: int = 8080, host: str = "127.0.0.1") -> int:
     httpd = ThreadingHTTPServer((host, port), make_handler(session))
     httpd.daemon_threads = True
-    print(f"RAKSHA console on http://{host}:{port}  (NETWORK INTERFACES: 0 · CLOUD CALLS: 0)")
+    print(f"RAKSHA console on http://{host}:{port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

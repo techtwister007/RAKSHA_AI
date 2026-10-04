@@ -18,6 +18,7 @@ Run as a test (see tests/test_airgap.py) so a regression fails CI, and runnable 
 
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from dataclasses import dataclass, field
@@ -40,23 +41,63 @@ _NET_MODULES = (
     "http.client", "ftplib", "smtplib", "telnetlib", "poplib", "imaplib", "nntplib",
     "xmlrpc.client", "webbrowser", "openai", "anthropic",
 )
-_NET_IMPORT = re.compile(
-    r"^\s*(?:import\s+(?:" + "|".join(re.escape(m) for m in _NET_MODULES) + r")"
-    r"|from\s+(?:" + "|".join(re.escape(m) for m in (*_NET_MODULES, "urllib")) + r")\s+import)",
-    re.MULTILINE,
-)
-
-#: Shelling out to a network tool is egress too, even without a net import. Matched only at a real
-#: call site (subprocess/os.system/Popen with a network tool in the command), never in prose.
-_SHELL_CALL = re.compile(r"(?:subprocess\.\w+|os\.system|os\.popen|check_output|Popen)\s*\(")
+_NET_SET = frozenset(_NET_MODULES)
+_SHELL_FUNCS = frozenset({"subprocess.run", "subprocess.call", "subprocess.check_call",
+                          "subprocess.check_output", "subprocess.Popen", "os.system", "os.popen",
+                          "run", "call", "check_call", "check_output", "Popen", "system", "popen"})
+#: Shelling out to a network tool is egress too, even without a net import.
 _SHELL_TOOL = re.compile(r"\b(?:curl|wget|ncat|netcat|scp|sftp|rsync|telnet)\b")
+
+
+def _is_net_module(name: str) -> bool:
+    """`socket` and `socket.x` are network modules; `socketserver` is not (exact path components)."""
+    parts = name.split(".")
+    return any(".".join(parts[:i]) in _NET_SET for i in range(1, len(parts) + 1))
+
+
+def _call_name(node) -> str:
+    f = node.func
+    if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name):
+        return f"{f.value.id}.{f.attr}"
+    if isinstance(f, ast.Name):
+        return f.id
+    return ""
+
+
+def _scan_source(text: str):
+    """Yield (line, kind, snippet) for every egress path in one Python file, found by parsing it:
+    imports in any form (aliases, comma lists, `from http import client`), dynamic imports of a
+    network module, and calls that shell out to a network tool — across lines, ignoring comments."""
+    tree = ast.parse(text)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if _is_net_module(alias.name):
+                    yield node.lineno, "network-import", f"import {alias.name}"
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            if _is_net_module(node.module):
+                yield node.lineno, "network-import", f"from {node.module} import ..."
+            else:
+                for alias in node.names:
+                    if _is_net_module(f"{node.module}.{alias.name}"):
+                        yield node.lineno, "network-import", f"from {node.module} import {alias.name}"
+        elif isinstance(node, ast.Call):
+            name = _call_name(node)
+            consts = [a.value for a in ast.walk(node) if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            if name in ("__import__", "importlib.import_module", "import_module"):
+                if any(_is_net_module(c) for c in consts[:1]):
+                    yield node.lineno, "network-import", f"{name}({consts[0]!r})"
+            elif name in _SHELL_FUNCS and any(_SHELL_TOOL.search(c) for c in consts):
+                yield node.lineno, "shell-egress", f"{name}(... network tool ...)"
+
 
 #: External resources in HTML: src/href http(s), protocol-relative //host, CSS @import url(),
 #: and a fetch/XHR to an absolute URL. Relative /api calls (the console's own) are not matched.
 _EXTERNAL_URL = re.compile(
-    r"""(?:(?:src|href)\s*=\s*["']\s*(?:https?:)?//"""          # src/href to http(s) or //host
-    r"""|@import\s+(?:url\()?["']?\s*(?:https?:)?//"""          # CSS @import
-    r"""|(?:fetch|XMLHttpRequest|open)\s*\(\s*["']\s*https?://)""",  # JS fetch/XHR to absolute URL
+    r"""(?:\b(?:src|href|action|poster|data|srcset)\s*=\s*["']?\s*(?:https?:)?//"""  # attributes, quoted or not
+    r"""|\burl\(\s*["']?\s*(?:https?:)?//"""                     # CSS url(), incl. @import url()
+    r"""|@import\s+["']\s*(?:https?:)?//"""                       # CSS @import "..."
+    r"""|\b(?:fetch|open|EventSource|WebSocket|sendBeacon)\s*\([^)]*["'`]\s*(?:https?|wss?):)""",  # JS calls
     re.IGNORECASE,
 )
 
@@ -102,11 +143,14 @@ def check_python(dirs: tuple[Path, ...] | Path = _SCAN_DIRS) -> list[Violation]:
             if py in _ALLOWLISTED or py in seen or "__pycache__" in py.parts:
                 continue
             seen.add(py)
-            for i, line in enumerate(py.read_text(errors="replace").splitlines(), 1):
-                if _NET_IMPORT.match(line):
-                    out.append(Violation(_rel(py), i, "network-import", line))
-                elif _SHELL_CALL.search(line) and _SHELL_TOOL.search(line):
-                    out.append(Violation(_rel(py), i, "shell-egress", line))
+            text = py.read_text(errors="replace")
+            try:
+                hits = list(_scan_source(text))
+            except SyntaxError as e:
+                # a file the guard cannot read is a file it cannot vouch for
+                out.append(Violation(_rel(py), e.lineno or 0, "unparseable", str(e)))
+                continue
+            out.extend(Violation(_rel(py), line, kind, snippet) for line, kind, snippet in hits)
     return out
 
 

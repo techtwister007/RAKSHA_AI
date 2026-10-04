@@ -46,8 +46,10 @@ def overfitting_patch(runner_src: str, reproducer: str) -> str:
 def reject_bad_patch() -> dict:
     target = python_target(PY)
     repro = b"status; rm -rf /tmp/x"
-    f = PySecSanOracle().parse(target.run(target.build(None), repro).text, target="py-cmdinject")[0]
-    f.attach_reproducer(Reproducer.from_bytes(repro, ["python3", "fuzz_cmd.py"], minimised=True))
+    hunt = target.build(None)
+    f = PySecSanOracle().parse(target.run(hunt, repro).text, target="py-cmdinject")[0]
+    target.discard(hunt)
+    f.attach_reproducer(Reproducer.from_bytes(repro, ["python3", "fuzz_cmd.py", "repro"], minimised=True))
     f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(), abort_signature=f.abort_signature, exit_code=77))
     f.confirm()
     f.mark_patched(overfitting_patch((PY / "app" / "runner.py").read_text(), repro.decode()), RepairLane.LLM)
@@ -103,19 +105,9 @@ def vaccine_sweep(verified: Finding) -> dict:
 
 
 def _vaccine_fleet() -> dict:
-    """A small bundled fleet of codebases that share the shell=True mistake, for the sweep demo."""
-    base = pathlib.Path("/tmp/claude-0/raksha-fleet")
-    base.mkdir(parents=True, exist_ok=True)
-    (base / "svc-a").mkdir(exist_ok=True)
-    (base / "svc-a" / "handler.py").write_text(
-        "import subprocess\ndef h(x):\n    subprocess.run('echo '+x, shell=True)\n")
-    (base / "svc-b").mkdir(exist_ok=True)
-    (base / "svc-b" / "worker.py").write_text(
-        "import subprocess\ndef w(cmd):\n    return subprocess.Popen(cmd, shell=True)\n")
-    (base / "svc-c").mkdir(exist_ok=True)
-    (base / "svc-c" / "safe.py").write_text(
-        "import subprocess\ndef s(a):\n    subprocess.run(['echo', a], shell=False)\n")  # already safe
-    return {"svc-a": base / "svc-a", "svc-b": base / "svc-b", "svc-c": base / "svc-c"}
+    """The sister codebases of the estate (demo-targets/fleet): the sweep reads them, never writes."""
+    base = ROOT / "demo-targets" / "fleet"
+    return {p.name: p for p in sorted(base.iterdir()) if p.is_dir()}
 
 
 # ---------------------------------------------------------------- runner

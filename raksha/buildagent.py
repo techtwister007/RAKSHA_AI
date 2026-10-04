@@ -145,7 +145,7 @@ class BuildAgent:
 
     def __init__(self, runner: Runner, *, max_attempts: int = 5) -> None:
         self.runner = runner
-        self.max_attempts = max_attempts
+        self.max_attempts = max(1, max_attempts)
 
     def build(self, root: str | Path) -> BuildOutcome:
         root = Path(root)
@@ -168,16 +168,20 @@ class BuildAgent:
                 # inference is wired in Phase 4 we degrade rather than guess.
                 logs.append("unknown build error → degrade (model remedy hook not yet active)")
                 break
-            applied.append(remedy.id)
+            if remedy.id not in applied:
+                applied.append(remedy.id)
             logs.append(f"remedy: {remedy.id} — {remedy.description}")
             extra = remedy.action(remedy.pattern.search(out), root)
             if extra:
+                if extra == cmd:
+                    logs.append(f"remedy {remedy.id} would repeat the failing command → degrade")
+                    break
                 code2, out2 = self.runner.run(extra, root)
                 logs.append(f"[remedy cmd] exit={code2}\n{out2[-300:]}")
-                if code2 == 0 and extra != cmd:
-                    cmd = extra                 # progress: a new build command to try
+                if code2 == 0:
+                    cmd = extra                 # progress: the remedy is the new build command
                     continue
-                logs.append(f"remedy {remedy.id} command made no progress → degrade")
+                logs.append(f"remedy {remedy.id} command failed → degrade")
                 break
             # A recognised error with nothing to change in this environment: retry once (the
             # fix may land between attempts, e.g. an offline-mirror warm-up), but if the same

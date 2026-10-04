@@ -38,6 +38,7 @@
   .badge{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:4px 9px;border-radius:3px;
          border:1px solid var(--line);background:var(--panel2);color:var(--dim);white-space:nowrap}
   .badge b{color:var(--green);font-weight:700}
+  .badge b.warn,.zerobadge.warn .n{color:var(--amber)} .zerobadge.warn{border-color:var(--amber)}
   nav.tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1.5px solid var(--line);background:var(--panel);
            overflow-x:auto}
   nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);
@@ -271,8 +272,11 @@ async function showBrief(id){
 function renderBadges(){
   const p = STATE.scorecard.precision.reports_with_reproducer_pct;
   $('#b-prec').textContent = (p==null?'—':p+'%');
-  $('#b-net').textContent = STATE.scorecard.posture.network_interfaces;
-  $('#b-cloud').textContent = STATE.scorecard.posture.cloud_calls;
+  const post = STATE.scorecard.posture;
+  for (const [id, v] of [['#b-net', post.network_interfaces], ['#b-cloud', post.cloud_calls]]) {
+    $(id).textContent = v;
+    $(id).classList.toggle('warn', v !== 0);   // a badge that is not zero must not look reassuring
+  }
 }
 
 function renderBoard(){
@@ -362,8 +366,16 @@ function renderDetail(p){
   }
 
   // the patch diff, coloured
-  if(p.status==='VERIFIED' || (p.repair && p.repair.lane)){
-    // detail block only carries diff when present; the finding list carries status
+  if(p.patch_diff){
+    d.appendChild(el('div','lab', p.status==='VERIFIED' ? 'proven patch' : 'candidate patch (not proven)'));
+    const pre=el('pre','diff');
+    // line by line, as text: the diff carries target code and must never be parsed as markup
+    p.patch_diff.split('\n').forEach(line=>{
+      const cls = line.startsWith('+') && !line.startsWith('+++') ? 'add'
+                : line.startsWith('-') && !line.startsWith('---') ? 'del' : '';
+      pre.appendChild(el('span', cls, line+'\n'));
+    });
+    d.appendChild(pre);
   }
 }
 
@@ -393,7 +405,7 @@ function renderScore(){
   body.appendChild(kpis);
 
   const zero = el('div','zero');
-  const z=(n,l)=>{const b=el('div','zerobadge'); b.appendChild(el('div','n',String(n))); b.appendChild(el('div','l',l)); zero.appendChild(b);};
+  const z=(n,l)=>{const b=el('div','zerobadge'+(n!==0?' warn':'')); b.appendChild(el('div','n',String(n))); b.appendChild(el('div','l',l)); zero.appendChild(b);};
   z(s.posture.network_interfaces,'network interfaces');
   z(s.posture.cloud_calls,'cloud calls');
   body.appendChild(zero);

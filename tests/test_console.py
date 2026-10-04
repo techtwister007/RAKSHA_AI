@@ -62,7 +62,9 @@ def test_snapshot_shape():
     s = demo_session(REPO)
     snap = s.snapshot()
     assert {"board", "findings", "scorecard", "risk", "pipeline"} <= set(snap)
-    assert snap["scorecard"]["posture"] == {"network_interfaces": 0, "cloud_calls": 0}
+    # a build-free session runs no target code, so no target code ever had a network interface
+    assert snap["scorecard"]["posture"]["network_interfaces"] == 0
+    assert snap["scorecard"]["posture"]["cloud_calls"] == 0
     assert all("id" in r and "severity" in r for r in snap["findings"])
 
 
