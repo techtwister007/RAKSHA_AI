@@ -15,6 +15,7 @@ This module produces candidates; it never decides truth. The gate does that.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
@@ -28,6 +29,10 @@ class Candidate:
     lane: RepairLane
     model_version: str | None = None
     prompt_version: str | None = None
+    #: A proposed regression test the candidate carries (model-written, or a deterministic template
+    #: one). It is NEVER trusted here: the gate verifies fail-before/pass-after and only a verified
+    #: test is shipped on the finding. Carried so the test rides with the diff that motivated it.
+    regression_test: str | None = None
 
 
 #: A template: given a finding, return a patch diff or None. Zero inference.
@@ -117,3 +122,30 @@ def _extract_diff(text: str) -> str | None:
     if "--- " in t and "+++ " in t:
         return t if t.endswith("\n") else t + "\n"
     return None
+
+
+#: The model may append a regression test after this marker. A cheap, unambiguous delimiter the
+#: prompt asks for, so the diff and the test are told apart without guessing.
+_TEST_MARKER = re.compile(r"^={2,}\s*REGRESSION[ _-]?TEST\s*={2,}\s*$", re.MULTILINE | re.IGNORECASE)
+
+
+def _strip_fences(text: str) -> str:
+    """Drop a single wrapping code fence (``` or ```lang) from a block, if present."""
+    t = text.strip()
+    if t.startswith("```"):
+        t = t.split("\n", 1)[1] if "\n" in t else ""
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()[:-3]
+    return t.strip()
+
+
+def split_diff_and_test(text: str) -> tuple[str | None, str | None]:
+    """Split a model completion into (unified diff, regression test). The test is whatever follows
+    the `=== REGRESSION TEST ===` marker; absent the marker there is no test. The test is never
+    trusted here — the gate decides it by fail-before/pass-after."""
+    m = _TEST_MARKER.search(text)
+    if not m:
+        return _extract_diff(text), None
+    diff = _extract_diff(text[: m.start()])
+    test = _strip_fences(text[m.end():])
+    return diff, (test or None)

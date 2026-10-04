@@ -12,6 +12,7 @@ when an endpoint is configured; these are the floor that always runs.
 
 from __future__ import annotations
 
+import base64
 import difflib
 import re
 from pathlib import Path
@@ -187,3 +188,73 @@ def generic_templates(finding: Finding, root: Path):
     if finding.language == "go" and cwe in ("CWE-125", "CWE-787", "CWE-129"):
         out.append(lambda: go_bound_slice(finding, root))
     return out
+
+
+# ---- deterministic regression tests (zero inference) -------------------------------------------
+# A regression test the TEMPLATE lane can offer, so "fail-before / pass-after" is available offline
+# with no model. The gate verifies it exactly like a model-written one (verify_regression_test), so
+# a generated test that does NOT exercise the bug is rejected and never shipped — the generator
+# earns nothing by itself. The test SOURCE is run by the target's `added_test_cmd`; for the
+# synthesized autofuzz targets that is `sh {test}` (C) or `python3 {test}` (Python).
+
+_C_REGRESSION_CLASSES = ("CWE-121", "CWE-122", "CWE-787", "CWE-125", "CWE-120")
+_PY_REGRESSION_CLASSES = ("CWE-78", "CWE-77")
+
+
+def _c_overflow_regression(reproducer: bytes) -> str:
+    """A shell test: feed the reproducer to the synthesized harness and assert NO sanitizer abort.
+
+    Fails on the vulnerable build (the harness aborts under ASan, non-zero exit); passes on the
+    patched build (the harness exits clean). Reproducer bytes travel base64-encoded so arbitrary
+    binary input survives the shell.
+    """
+    b64 = base64.b64encode(reproducer).decode("ascii")
+    return (
+        "#!/bin/sh\n"
+        "# RAKSHA generated regression test (C overflow): the reproducer must not abort.\n"
+        f"printf '%s' '{b64}' | base64 -d > .raksha_regress_in 2>/dev/null\n"
+        "./raksha_harness .raksha_regress_in > .raksha_regress_out 2>&1\n"
+        "rc=$?\n"
+        'if [ "$rc" -ne 0 ]; then echo "REGRESS-FAIL: harness aborted (rc=$rc)"; exit 1; fi\n'
+        "if grep -Eq 'AddressSanitizer|ERROR: |runtime error:|SUMMARY: ' .raksha_regress_out; then "
+        'echo "REGRESS-FAIL: sanitizer reported an abort"; exit 1; fi\n'
+        'echo "REGRESS-PASS: reproducer no longer aborts"; exit 0\n'
+    )
+
+
+def _py_injection_regression() -> str:
+    """A Python test: drive the harness with a shell-metacharacter payload and assert the injected
+    command never runs (no marker file appears) and the sink guard did not fire.
+
+    Fails on the vulnerable build (the metacharacter reaches `shell=True`, the guard aborts
+    non-zero); passes on the patched build (no-shell argv — the metacharacter is inert)."""
+    return (
+        "# RAKSHA generated regression test (Python shell injection): the sink must stay unreached.\n"
+        "import os, subprocess, sys\n"
+        "marker = '.raksha_injection_marker'\n"
+        "try:\n"
+        "    os.remove(marker)\n"
+        "except OSError:\n"
+        "    pass\n"
+        "payload = b'x; touch ' + marker.encode()\n"
+        "with open('.raksha_regress_in', 'wb') as fh:\n"
+        "    fh.write(payload)\n"
+        "proc = subprocess.run(['python3', 'raksha_harness.py', '.raksha_regress_in'],\n"
+        "                      capture_output=True)\n"
+        "fired = os.path.exists(marker) or b'PySecSan' in proc.stderr or proc.returncode != 0\n"
+        "try:\n"
+        "    os.remove(marker)\n"
+        "except OSError:\n"
+        "    pass\n"
+        "sys.exit(1 if fired else 0)\n"
+    )
+
+
+def template_regression_test(finding: Finding, reproducer: bytes | None) -> str | None:
+    """A deterministic regression test for the covered bug classes, or None. Zero inference."""
+    cwe = finding.bug_class
+    if finding.language == "c/c++" and cwe in _C_REGRESSION_CLASSES and reproducer is not None:
+        return _c_overflow_regression(reproducer)
+    if finding.language == "python" and cwe in _PY_REGRESSION_CLASSES:
+        return _py_injection_regression()
+    return None
