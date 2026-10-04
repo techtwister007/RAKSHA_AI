@@ -164,11 +164,19 @@ def _llm_candidates(finding: Finding, root: Path, client, n: int = 3,
             "Then, OPTIONALLY, on a line by itself write `=== REGRESSION TEST ===` and after it a",
             "The regression_test, when given, is a")}
         kwargs["extra"] = _guided.request_fields(gstyle)
-    try:
-        completions = client.complete(prompt, role=REPAIR, n=(1 if feedback else n), temperature=0.3,
-                                      **kwargs)
-    except InferenceError:
-        return []
+    want = 1 if feedback else n
+    completions: list[str] = []
+    # Not every server honours n>1 (llama.cpp returns one choice). Top up with further calls at
+    # rising temperature so the model lane really gets `want` distinct attempts per round.
+    for attempt in range(want):
+        try:
+            got = client.complete(prompt, role=REPAIR, n=want - len(completions),
+                                  temperature=0.3 + 0.2 * attempt, **kwargs)
+        except InferenceError:
+            break
+        completions += [c for c in got if c not in completions]
+        if len(completions) >= want:
+            break
     model = client.config.model_for(REPAIR)
     out = []
     for textc in completions:
@@ -181,6 +189,8 @@ def _llm_candidates(finding: Finding, root: Path, client, n: int = 3,
                 diff = normalise_diff(diff, rel, text) or diff  # re-anchor a malformed diff
         else:
             _d, test = _guided.parse(textc, gstyle)
+        if diff and not _changes_something(diff):
+            diff = None                                        # a "patch" that changes nothing
         if diff:
             out.append(Candidate(diff, RepairLane.LLM, model_version=model,
                                  prompt_version=PROMPT_VERSION, regression_test=test))
@@ -350,6 +360,12 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
     return RepairOutcome(finding.status, finding.repair_lane if finding.status is Status.VERIFIED else None,
                          finding.repair_rounds, tried, verdict, len(finding.rejected_candidates),
                          frontier_size=len(passers))
+
+
+def _changes_something(diff: str) -> bool:
+    """Whether a diff adds or removes at least one line (headers aside)."""
+    return any((ln.startswith("+") and not ln.startswith("+++")) or
+               (ln.startswith("-") and not ln.startswith("---")) for ln in diff.splitlines())
 
 
 def _supports_added_test(target: Target) -> bool:

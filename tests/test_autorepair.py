@@ -254,3 +254,34 @@ def test_model_edits_become_exact_diffs():
     # an anchor that is not in the file is refused, never guessed
     assert normalise_diff(bad.replace('os.system("echo " + v)', "nowhere()"), "conv.py", src) is None
     assert edits_to_diff("<<<<<<< SEARCH\nnot there\n=======\nx\n>>>>>>> REPLACE", "conv.py", src) is None
+
+
+def test_model_lane_tops_up_candidates_and_drops_no_op_patches(tmp_path):
+    """A server that returns one choice per call (llama.cpp) still yields n attempts; a reply whose
+    'diff' changes nothing is dropped before the gate."""
+    from raksha.autorepair import _llm_candidates
+    from raksha.finding import Finding, FixSite
+    (tmp_path / "c.py").write_text("import os\n\ndef f(v):\n    return os.system('x ' + v)\n")
+    f = Finding(oracle="pysecsan", bug_class="CWE-78", language="python", target="t", message="m")
+    f.add_fix_site(FixSite(uri="c.py", rank=0, start_line=4))
+    replies = iter([
+        "--- a/c.py\n+++ b/c.py\n@@ -1,2 +1,2 @@\n import os\n \n",                 # no change
+        "<<<<<<< SEARCH\n    return os.system('x ' + v)\n=======\n"
+        "    return subprocess.run(['x', v]).returncode\n>>>>>>> REPLACE",
+        "<<<<<<< SEARCH\nimport os\n=======\nimport os\nimport subprocess\n>>>>>>> REPLACE",
+    ])
+
+    class OneChoice:
+        class config:
+            guided = "off"
+            @staticmethod
+            def model_for(role):
+                return "m"
+        calls = 0
+        def complete(self, prompt, **kw):
+            self.calls += 1
+            return [next(replies)]
+    c = OneChoice()
+    cands = _llm_candidates(f, tmp_path, c, n=3)
+    assert c.calls == 3
+    assert len(cands) == 2 and all("+++ b/c.py" in x.diff for x in cands)
