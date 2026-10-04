@@ -34,11 +34,59 @@ if need apt-get; then
     need mvn  || sudo apt-get install -y -qq openjdk-17-jdk-headless maven >/dev/null 2>&1 || true
     need go   || sudo apt-get install -y -qq golang-go >/dev/null 2>&1 || true
 fi
-for t in python3 git gcc mvn java go; do
+
+# Python 3.11+. An older distro (Ubuntu 22.04 ships 3.10) may still carry a newer interpreter as
+# a separate package; use it for the venv if so, otherwise say exactly what to do.
+PY=python3
+pymm() { "$1" -c 'import sys; print("%d%02d" % sys.version_info[:2])' 2>/dev/null || echo 0; }
+if [ "$(pymm python3)" -lt 311 ]; then
+    for cand in python3.13 python3.12 python3.11; do
+        if need "$cand"; then PY="$cand"; break; fi
+    done
+    if [ "$(pymm "$PY")" -lt 311 ] && need apt-get; then
+        for cand in python3.12 python3.11; do
+            if sudo apt-get install -y -qq "$cand" "$cand-venv" >/dev/null 2>&1 && need "$cand"; then PY="$cand"; break; fi
+        done
+    fi
+    if [ "$(pymm "$PY")" -lt 311 ]; then
+        echo "Python 3.11+ is required and this distro only has $(python3 --version 2>&1)." >&2
+        echo "Easiest fix on Windows: install a current distro —  wsl --install -d Ubuntu-24.04  — and re-run." >&2
+        exit 1
+    fi
+fi
+"$PY" -c 'import venv' 2>/dev/null || { need apt-get && sudo apt-get install -y -qq "${PY}-venv" >/dev/null 2>&1 || true; }
+
+# Go 1.21+ for the Go lane (the repair template uses the builtin min). Ubuntu 22.04's apt Go is
+# 1.18: too old. Install the official toolchain to /usr/local/go in that case; the lane is optional,
+# so a failure here is reported, never fatal.
+gomm() { go version 2>/dev/null | sed -nE 's/.*go1\.([0-9]+).*/\1/p'; }
+install_go=0
+if need go; then
+    m=$(gomm); [ -n "$m" ] && [ "$m" -lt 21 ] && install_go=1      # present but too old
+elif need apt-get; then
+    install_go=1                                                      # absent and apt had none
+fi
+if [ "$install_go" = 1 ]; then
+    arch=$(uname -m); case "$arch" in x86_64) goarch=amd64;; aarch64|arm64) goarch=arm64;; *) goarch="";; esac
+    if [ -n "$goarch" ] && { need curl || need wget; }; then
+        say "installing Go 1.22 (official toolchain) for the Go lane"
+        url="https://go.dev/dl/go1.22.5.linux-$goarch.tar.gz"
+        if { need curl && curl -fsSL "$url" -o /tmp/go.tgz; } || wget -qO /tmp/go.tgz "$url"; then
+            sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf /tmp/go.tgz && rm -f /tmp/go.tgz
+            export PATH="/usr/local/go/bin:$PATH"
+            grep -q '/usr/local/go/bin' "$HOME/.profile" 2>/dev/null || echo 'export PATH="/usr/local/go/bin:$PATH"' >> "$HOME/.profile"
+        else
+            echo "  (could not download Go — the Go lane will be skipped; everything else is unaffected)"
+        fi
+    fi
+fi
+
+for t in git gcc mvn java go; do
     if need "$t"; then printf '  %-8s ok\n' "$t"; else printf '  %-8s absent (optional lane skipped)\n' "$t"; fi
 done
-pyver=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
-case "$pyver" in 3.1[1-9]|3.[2-9]*) ;; *) echo "Python $pyver found; 3.11+ required" >&2; exit 1;; esac
+printf '  %-8s ok (%s)\n' python "$("$PY" --version 2>&1)"
+if need go; then m=$(gomm); if [ -n "$m" ] && [ "$m" -lt 21 ]; then
+    echo "  note: $(go version | awk '{print $3}') < 1.21 — the Go lane's fix template will not compile; other lanes unaffected"; fi; fi
 
 # ---- 2. the code ---------------------------------------------------------------------------
 if [ -d "$TARGET/.git" ]; then
@@ -55,7 +103,7 @@ cd "$TARGET"
 
 # ---- 3. python environment -----------------------------------------------------------------
 say "creating the virtualenv and installing (runtime has no third-party deps; dev = pytest+jsonschema)"
-[ -d .venv ] || python3 -m venv .venv
+[ -d .venv ] || "$PY" -m venv .venv
 . .venv/bin/activate
 pip install -q --upgrade pip >/dev/null 2>&1 || true
 pip install -q -e '.[dev]'

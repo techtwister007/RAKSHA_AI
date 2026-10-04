@@ -18,6 +18,26 @@ Both install the toolchains they can, clone, create the venv, warm Maven, and ru
 verification (tests, air-gap guard, the no-harness find→fix→prove slice). Re-runnable. The manual
 steps below are what they do.
 
+### Windows: what to expect, honestly
+
+- **It runs under WSL2, not natively.** The gate's fork-server, gcc's AddressSanitizer and gcov
+  are POSIX. WSL2 is a real Linux kernel, so under it behaviour is identical to a Linux box —
+  this is the supported, reliable path; native Windows is not.
+- **Use Ubuntu 24.04** (`wsl --install -d Ubuntu-24.04`): its apt has Python 3.12 and Go 1.22.
+  An existing Ubuntu 22.04 (Python 3.10, Go 1.18) still works — the bootstrap installs a newer
+  Python package and the official Go 1.22 itself — but 24.04 has fewer moving parts.
+- **The checkout on D:/E: is fine; the heavy work is not there.** Every scratch build, fuzz
+  campaign and evidence bundle is written under `/tmp`, which lives on WSL's own ext4 disk, so
+  the gate runs at native Linux speed. Only reading the repository and running pytest touch
+  NTFS through WSL, which is slower: expect the ~20 s test suite to take 1–3 minutes. If that
+  bothers you, clone inside the WSL filesystem (`~/RAKSHA_AI`) instead.
+- **Disk:** WSL's virtual disk (where `/tmp`, `~/.m2` and the Go cache live) sits on C: by
+  default (`%LOCALAPPDATA%\Packages\...\ext4.vhdx`). The demos need well under 2 GB there. If
+  C: is tight, move the distro: `wsl --export Ubuntu-24.04 D:\wsl.tar`, then
+  `wsl --import Ubuntu-24.04 D:\wsl D:\wsl.tar`.
+- **Windows Defender** scanning NTFS files slows WSL file access further; excluding the
+  `RAKSHA_AI` folder from real-time scanning is optional and safe.
+
 ## 1. Toolchains
 
 | Needed for | Install | Required? |
