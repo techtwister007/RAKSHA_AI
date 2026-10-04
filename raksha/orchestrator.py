@@ -127,6 +127,34 @@ class Session:
                                           note=f"build failed, degraded to build-free ({outcome.summary})")
         return self.ingest_build_free(root, name=name, roe=roe)
 
+    def ingest_autofuzz(self, root: str | Path, *, name: str | None = None,
+                        repair_it: bool = True, corpus: list[bytes] | None = None,
+                        roe: RoeLevel = RoeLevel.R1) -> Target:
+        """Deep-ingest a target that ships no fuzz harness: synthesize one, find a bug, and (by
+        default) drive the repair ladder through the gate. This is the find→fix→prove loop on an
+        unknown target with no human writing a driver."""
+        from .autorepair import repair as _repair
+        from .harness import autofuzz
+        root = Path(root)
+        name = name or root.name
+        r = autofuzz(root)
+        if not r.found:
+            t = Target(name=name, build_status="amber", roe_level=roe,
+                       note=f"autofuzz found no crash: {r.note}")
+            self.targets.append(t)
+            return t
+        f = r.finding
+        if repair_it:
+            _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                    corpus=corpus or [b"ok", b"test", b"\x01\x02"])
+            if hasattr(r.target, "discard"):
+                try:
+                    r.target.discard(r.target.build(None))
+                except Exception:  # noqa: BLE001
+                    pass
+        return self.attach_target(name, [f], build_status="green",
+                                  languages=[f.language])
+
     def attach_target(self, name: str, findings: list[Finding], *, build_status: str = "green",
                       roe: RoeLevel = RoeLevel.R1, languages: list[str] | None = None) -> Target:
         """Attach a target whose findings came from the deep lanes (e.g. the Java slice)."""
@@ -299,6 +327,22 @@ def three_language_session(repo_root: Path | None = None, *, include_java: bool 
     codebases.update({p.name: p for p in (targets / "fleet").glob("*") if p.is_dir()})
     if codebases:
         s.run_vaccine_sweep(codebases)
+    return s
+
+
+def autofuzz_session(repo_root: Path | None = None) -> Session:
+    """Seed a session from targets that ship NO fuzz harness: RAKSHA synthesizes the harness, finds
+    the bug, and proves the fix — the Mission Board shows deep findings with no hand-written driver."""
+    repo_root = repo_root or Path(__file__).parents[1]
+    s = Session()
+    for name, corpus in [("c-nolibfuzzer", [b"\x01\x04abcd", b"\x02zz"]),
+                         ("py-noharness", [b"10 m to ft", b"warm"])]:
+        root = repo_root / "demo-targets" / name
+        if root.exists():
+            try:
+                s.ingest_autofuzz(root, corpus=corpus)
+            except Exception:  # noqa: BLE001 — a target whose toolchain is absent is simply skipped
+                pass
     return s
 
 

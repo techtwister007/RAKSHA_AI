@@ -25,7 +25,8 @@ real. Nothing unproven ever ships.
 ## Status
 
 **All phases built** (phase table and exit gates in `BUILD_PLAN.md`). The system finds,
-fixes and proves vulnerabilities across C, Java and Python through one gate, scans any
+fixes and proves vulnerabilities across C, Java, Python and Go through one gate — including
+on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
 The only thing a build container cannot do is the 36-hour dress rehearsal on finale GPU
 hardware — the harness and runbook for it are built (`raksha/rehearse.py`,
@@ -36,9 +37,12 @@ raksha/
   finding.py      the unified finding record — SARIF 2.1 + a proof block, invariants enforced
   metrics.py      the scorecard, every number derived from the records
   gate/           the five-check gate: target protocol, differential corpus, runner, cross-confirm
-  oracles/        the plugin interface + ASan (C/C++), Jazzer (Java), PySecSan (Python)
+  oracles/        the plugin interface + ASan (C/C++), Jazzer (Java), PySecSan (Python), Go panics
+  harness/        automatic harness generation — discover an entry point, synthesize a harness,
+                  fuzz it (fork-server), confirm; no hand-written driver needed
+  autorepair.py   repair ladder (templates → model → mitigation) driven through the gate
   lanes/          build-free: supply-chain (Maven/npm/PyPI/Go), secrets, service, dependency bump
-  adapters/       one per language — wires a real toolchain to the gate (c_asan, java, python_sink)
+  adapters/       one per language — a real toolchain to the gate (c_asan, java, python_sink, go_fuzz)
   buildagent.py   detect → build → escalate → degrade to build-free
   inference.py    the ONE interface any model call goes through (air-gap guard proves it)
   repair.py       the repair ladder: template → retrieval → model → mitigation floor
@@ -60,6 +64,8 @@ pytest                       # the full invariant, gate, lane and hardening suit
 
 python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
 python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)
+python -m raksha.slice_autofuzz # find→fix→prove on targets that ship NO fuzz harness (C, Python)
+python -m raksha.slice_go    # Go deep lane via native go test -fuzz, no hand-written harness
 python -m raksha.orchestrator # serve the offline operator console on :8080
 python -m raksha.airgap      # the no-egress guard (run before building the bundle)
 python -m raksha.rehearse 10 # a short self-test of the endurance harness

@@ -103,6 +103,16 @@ kill-switches are in the campaign plan, Part 2.
 | 8 | Screens 2/4/6; signed evidence bundle; Commander's Brief (JSSD); rollback; risk register | bundle builds, signs, verifies & tamper-detects; brief + risk + pipeline live in console | **done** (`raksha/bundle.py`, `brief.py`, `risk.py`, `rollback.py`) |
 | 9 | Our own numbers on ARVO / AutoPatchBench; self-score; licence register | Every number we will say traces to this run | |
 | 10 | Rehearsal harness + health watchdog + runbook (execution needs finale hardware) | harness loops & survives caps; watchdog restarts visibly; runbook ready | **scaffolding done** (`raksha/health.py`, `raksha/rehearse.py`, `docs/rehearsal-runbook.md`) · 36h execution awaits finale GPU/Docker |
+| 11 | Automatic harness generation — find→fix→prove on a target with NO hand-written harness | discover entry point → synthesize harness → fuzz → confirm → repair ladder through the gate; C, Python (own mutation fuzzer + fork server) and Go (native `go test -fuzz`) | **done** (`raksha/harness/`, `raksha/autorepair.py`, `raksha/adapters/go_fuzz.py`, `raksha/slice_autofuzz.py`, `raksha/slice_go.py`) |
+
+**The fix-score gap is closed.** The deep find→fix→prove loop no longer needs a human-written
+harness: `raksha/harness/` discovers the input-boundary function, synthesizes a driver, proves the
+driver with a two-check quality gate, and fuzzes it (our stdlib mutation engine behind a fork
+server for C/Python; native `go test -fuzz` for Go). `autorepair.py` then runs the repair ladder —
+generic templates (zero inference), the model lane through the one inference interface when
+`RAKSHA_INFERENCE_BASE_URL` is set, and a mitigation floor — gating each candidate. Rust remains the
+one deep language still on the build-free tier (cargo-fuzz adapter is the next addition behind the
+same oracle API).
 
 ## Standing constraints
 

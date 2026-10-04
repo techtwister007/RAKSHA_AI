@@ -205,6 +205,28 @@ def deep_cases() -> list[tuple[str, Callable[[], Finding]]]:
     return [("c-overflow", run_c), ("py-cmdinject", run_python), ("java-log4shell", run_java)]
 
 
+def autofuzz_cases() -> list[tuple[str, Callable[[], Finding]]]:
+    """Targets with NO hand-written harness — the find→fix→prove loop starting from zero."""
+    import pathlib
+
+    from .autorepair import repair
+    from .harness import autofuzz
+    repo = pathlib.Path(__file__).parents[1]
+
+    def _drive(name: str, corpus: list[bytes]):
+        def run() -> Finding:
+            r = autofuzz(repo / "demo-targets" / name, max_execs=60000)
+            if not r.found:
+                raise RuntimeError(r.note)
+            repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                   corpus=corpus)
+            return r.finding
+        return run
+
+    return [("autofuzz:c-nolibfuzzer", _drive("c-nolibfuzzer", [b"\x01\x04abcd", b"\x02zz"])),
+            ("autofuzz:py-noharness", _drive("py-noharness", [b"10 m to ft", b"warm"]))]
+
+
 #: The clean twin of the vulnerable estate: every file here must produce ZERO findings.
 NEGATIVE_CONTROLS: dict[str, str] = {
     "log4j/pom.xml": "<project><dependencies><dependency><groupId>org.apache.logging.log4j</groupId>"
@@ -271,7 +293,7 @@ def main() -> int:
     from datetime import datetime, timezone
     from .lanes import scan_target
     repo = pathlib.Path(__file__).parents[1]
-    report = run_cases(deep_cases())
+    report = run_cases(deep_cases() + autofuzz_cases())
     estate = repo / "demo-targets" / "mixed-estate"
     if estate.exists():
         t0 = time.monotonic()

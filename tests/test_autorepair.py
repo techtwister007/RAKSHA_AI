@@ -86,3 +86,14 @@ def test_repair_refuses_a_finding_that_is_not_confirmed():
     with pytest.raises(ValueError):
         repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
                corpus=[b"x"], use_model=False)                      # already terminal
+
+
+@pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
+def test_orchestrator_autofuzz_session_shows_verified_deep_targets():
+    from raksha.orchestrator import autofuzz_session
+    s = autofuzz_session()
+    board = {t["name"]: t for t in s.board()}
+    assert board["py-noharness"]["verified"] == 1          # python always available
+    assert board["py-noharness"]["build_status"] == "green"
+    card = s.scorecard()
+    assert card["performance"]["bugs_verified_fixed"] >= 1

@@ -12,31 +12,33 @@ Every number below is measured by running the actual pipeline over the target se
 
 | Target | Lang | Bug | Status | Fixed | Evidence | Lane | end-to-end (s) | confirm (s) | patch (s) |
 |--------|------|-----|--------|-------|----------|------|----------------|-------------|-----------|
-| c-overflow | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 0.93 | 0.001016 | 0.72304 |
-| py-cmdinject | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.4 | 0.001262 | 1.333365 |
-| java-log4shell | java | CWE-917 | VERIFIED | yes | exploit-replay | TEMPLATE | 45.14 | 0.00544 | 39.457861 |
-| estate:generic-password-assign@config/app.properties:2 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.003 | 6.2e-05 | — |
-| estate:aws-secret-access-key@config/app.properties:3 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.5e-05 | — |
-| estate:missing-authz@gateway-go/openapi.json:DELETE /users/{id} | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.003 | 2.8e-05 | — |
-| estate:missing-authz@gateway-go/openapi.json:POST /admin/flush | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.2e-05 | — |
-| estate:debug-endpoint@gateway-go/openapi.json:POST /admin/flush | api | CWE-489 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.7e-05 | — |
-| estate:version-match@gateway-go/go.mod:6 | go | CWE-444 | CONFIRMED | — | deterministic-match | — | 0.003 | 3.3e-05 | — |
-| estate:version-match@service-js/package-lock.json:lodash | javascript | CWE-94 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.6e-05 | — |
-| estate:version-match@service-js/package-lock.json:minimist | javascript | CWE-1321 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.4e-05 | — |
-| estate:version-match@tool-py/requirements.txt:2 | python | CWE-20 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.4e-05 | — |
-| estate:version-match@tool-py/requirements.txt:3 | python | CWE-200 | CONFIRMED | — | deterministic-match | — | 0.003 | 4.5e-05 | — |
+| c-overflow | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 0.96 | 0.001311 | 0.761274 |
+| py-cmdinject | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.52 | 0.001121 | 1.450596 |
+| java-log4shell | java | CWE-917 | VERIFIED | yes | exploit-replay | TEMPLATE | 47.6 | 0.005152 | 41.377815 |
+| autofuzz:c-nolibfuzzer | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.51 | 3.9e-05 | 0.47582 |
+| autofuzz:py-noharness | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 0.96 | 3.1e-05 | 0.706318 |
+| estate:generic-password-assign@config/app.properties:2 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.002 | 5.7e-05 | — |
+| estate:aws-secret-access-key@config/app.properties:3 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.4e-05 | — |
+| estate:missing-authz@gateway-go/openapi.json:DELETE /users/{id} | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.002 | 2.5e-05 | — |
+| estate:missing-authz@gateway-go/openapi.json:POST /admin/flush | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.1e-05 | — |
+| estate:debug-endpoint@gateway-go/openapi.json:POST /admin/flush | api | CWE-489 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.1e-05 | — |
+| estate:version-match@gateway-go/go.mod:6 | go | CWE-444 | CONFIRMED | — | deterministic-match | — | 0.002 | 4.6e-05 | — |
+| estate:version-match@service-js/package-lock.json:lodash | javascript | CWE-94 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.6e-05 | — |
+| estate:version-match@service-js/package-lock.json:minimist | javascript | CWE-1321 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.4e-05 | — |
+| estate:version-match@tool-py/requirements.txt:2 | python | CWE-20 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.8e-05 | — |
+| estate:version-match@tool-py/requirements.txt:3 | python | CWE-200 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.3e-05 | — |
 
 ## Aggregates (on this set)
 
-- Targets run: **13** of 13 (0 errors)
-- Proven findings reported: **13**
-- Verified fixes: **3**  ·  report-only: **0**
-- Fix rate on this set: **23.1%** (of reported findings; small-set baseline, not a security fix-rate)
+- Targets run: **15** of 15 (0 errors)
+- Proven findings reported: **15**
+- Verified fixes: **5**  ·  report-only: **0**
+- Fix rate on this set: **33.3%** (of reported findings; small-set baseline, not a security fix-rate)
 - Zero-inference fixes: **100.0%**
 - Languages covered: **5** (c/c++, go, java, javascript, python)
-- Evidence: 3 exploit-proven, 10 match-proven
-- Deep cases, median end-to-end (build → hunt → fix → five-check gate): **1.4s**
-- Build-free estate scan, all 10 match-proven findings: **0.003s**
+- Evidence: 5 exploit-proven, 10 match-proven
+- Deep cases, median end-to-end (build → hunt → fix → five-check gate): **1.51s**
+- Build-free estate scan, all 10 match-proven findings: **0.002s**
 
 ## Losses, shown beside the wins
 
@@ -61,4 +63,4 @@ Every number below is measured by running the actual pipeline over the target se
 
 ---
 
-_Generated by `python -m raksha.benchmark` at commit 2bd56ab on 2026-10-04 09:36 UTC. Re-run it to reproduce every number._
+_Generated by `python -m raksha.benchmark` at commit fcca8fc on 2026-10-04 10:26 UTC. Re-run it to reproduce every number._
