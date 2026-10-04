@@ -4,6 +4,20 @@ Everything is in this repository. The runtime has **no third-party Python depend
 only, by design — see `pyproject.toml`); every lane drives an ordinary toolchain as a subprocess.
 Linux or macOS natively; on Windows use WSL2 (the gate relies on `fork`, `sh`, `gcc`).
 
+## 0. The one-command way
+
+**Windows** (PowerShell; installs under WSL2 on whichever of D:/E: has more free space):
+```powershell
+irm https://raw.githubusercontent.com/techtwister007/RAKSHA_AI/refs/heads/claude/magical-mayer-gs2xno/deploy/laptop-bootstrap.ps1 | iex
+```
+**Linux / macOS / inside WSL:**
+```sh
+curl -fsSL https://raw.githubusercontent.com/techtwister007/RAKSHA_AI/refs/heads/claude/magical-mayer-gs2xno/deploy/laptop-bootstrap.sh | sh -s -- ~/RAKSHA_AI
+```
+Both install the toolchains they can, clone, create the venv, warm Maven, and run the full
+verification (tests, air-gap guard, the no-harness find→fix→prove slice). Re-runnable. The manual
+steps below are what they do.
+
 ## 1. Toolchains
 
 | Needed for | Install | Required? |
