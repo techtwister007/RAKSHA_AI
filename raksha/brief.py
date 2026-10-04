@@ -87,6 +87,17 @@ def jssd_brief(f: Finding, *, serial: int = 1, hindi: bool = False) -> str:
         lines += ["     3.1   The vulnerability is proven real; corrective action is in preparation."]
         reco = "Await the corrective patch and its proof before deployment."
 
+    # G5: the method, in one line — each claim above was tested as a hypothesis
+    try:
+        from .method import cycles
+        cs = cycles(f)
+    except Exception:  # noqa: BLE001
+        cs = []
+    if cs:
+        n = sum(1 for ln in lines if ln.startswith("     3.")) + 1
+        summary = "; ".join(f"{c['question'].rstrip('?')} — {c['conclusion'].split(':')[0].split(' (')[0]}"
+                            for c in cs[:6])
+        lines.append(f"     3.{n}   Method.  Each claim was tested as a hypothesis: {one_line(summary, 900)}.")
     lines += ["", f"4.   Recommendation.  {reco}", "",
               "5.   Attachments.  Signed evidence bundle (reproducer, before/after, gate results, "
               "diff, regression test, rollback).", ""]

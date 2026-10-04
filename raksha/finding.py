@@ -284,6 +284,15 @@ class Transition:
     mono: float | None = None
 
 
+def _method_cycles(f) -> list[dict]:
+    """G5: the hypothesis → experiment → observation → conclusion cycles the record supports."""
+    from .method import cycles
+    try:
+        return cycles(f)
+    except Exception:  # noqa: BLE001 — a narrative of the record must never break the record
+        return []
+
+
 # Legal status transitions. Everything absent here is forbidden.
 _ALLOWED: dict[Status, frozenset[Status]] = {
     Status.SUSPECTED: frozenset({Status.CONFIRMED}),
@@ -773,6 +782,7 @@ class Finding:
             "rollback_proof": self.rollback_proof,
             "reach_proof": self.reach_proof,
             "retrieved_from": self.retrieved_from,
+            "method": _method_cycles(self),
             "assurance": {
                 "structure": self.structure,
                 "evidence_score": self.evidence_score,
