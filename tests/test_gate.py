@@ -315,3 +315,52 @@ def test_cross_confirmation_requires_the_same_site():
 def test_run_gate_refuses_a_finding_that_is_not_patched():
     with pytest.raises(ValueError):
         run_gate(confirmed_finding(), FakeTarget(), reproducer=REPRO, corpus=corpus())
+
+
+# ------------------------------------------------------------------- perf delta
+
+
+class SlowFakeTarget(FakeTarget):
+    """The 'slow' patch behaves exactly like 'real' but takes 2 ms per run: a fix that disabled
+    something (a retry loop, a fallback parser) rather than bounding a copy."""
+
+    def _program(self, variant, data):
+        if variant == "slow":
+            import time
+            time.sleep(0.002)
+            return super()._program("real", data)
+        return super()._program(variant, data)
+
+
+def test_a_patch_that_makes_the_target_much_slower_fails_the_differential_check():
+    f = patched("slow")
+    big_corpus = corpus() * 4                       # enough runs for the baseline total to mean something
+    v = run_gate(f, SlowFakeTarget(), reproducer=REPRO, corpus=big_corpus, refuzz_seconds=1,
+                 perf_floor_seconds=0.0)
+    assert v.failed_check is GateCheck.DIFFERENTIAL_CORPUS
+    assert "perf" in v.detail and "perf" in f.gate[GateCheck.DIFFERENTIAL_CORPUS].detail
+    assert v.perf_delta is not None and v.perf_delta > 5.0
+    assert f.perf_delta == v.perf_delta             # the number is on the record, measured
+
+
+def test_perf_delta_is_measured_on_a_passing_patch_and_the_tolerance_is_loose():
+    f = patched("real")
+    v = run_gate(f, FakeTarget(), reproducer=REPRO, corpus=corpus() * 4, refuzz_seconds=1,
+                 perf_floor_seconds=0.0)
+    assert v.passed, v.detail
+    assert v.perf_delta is not None and f.perf_delta == v.perf_delta
+    assert "perf" in f.gate[GateCheck.DIFFERENTIAL_CORPUS].detail
+    # the same slow patch passes when the operator widens the tolerance: the check is a knob, not a guess
+    f2 = patched("slow")
+    v2 = run_gate(f2, SlowFakeTarget(), reproducer=REPRO, corpus=corpus(), refuzz_seconds=1,
+                  perf_floor_seconds=0.0, perf_tolerance=1e6)
+    assert v2.passed, v2.detail
+
+
+def test_perf_delta_is_none_below_the_timing_floor_and_never_fails():
+    f = patched("slow")
+    v = run_gate(f, SlowFakeTarget(), reproducer=REPRO, corpus=corpus(), refuzz_seconds=1,
+                 perf_floor_seconds=3600.0)         # a baseline this short is noise, not a measurement
+    assert v.passed, v.detail
+    assert v.perf_delta is None and f.perf_delta is None
+    assert "n/a" in f.gate[GateCheck.DIFFERENTIAL_CORPUS].detail

@@ -14,6 +14,7 @@ number we show.
 from __future__ import annotations
 
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -141,6 +142,56 @@ class Mismatch:
     after: bytes
 
 
+@dataclass
+class DifferentialResult:
+    """Mismatches plus the wall-time of each side over the stable corpus.
+
+    `perf_delta` is patched/baseline, or None when the baseline total is below `floor_seconds` —
+    a ratio over a few hundred microseconds is process start-up noise, not a measurement. Sanitizer
+    builds are noisy at the best of times, so the gate's tolerance on this number is deliberately
+    loose (see `run_gate(perf_tolerance=)`): it exists to catch a fix that disabled something (a
+    parser 5× slower did not get a bounds check, it got a retry loop), not to benchmark.
+    """
+
+    mismatches: list[Mismatch] = field(default_factory=list)
+    baseline_seconds: float = 0.0
+    patched_seconds: float = 0.0
+    perf_delta: float | None = None
+
+
+#: Below this much baseline wall-time the perf ratio is not reported at all.
+PERF_FLOOR_SECONDS = 0.001
+
+
+def differential_timed(
+    target: Target,
+    before: BuildResult,
+    after: BuildResult,
+    corpus: list[bytes],
+    stable: list[int],
+    *,
+    canon: Canonicaliser | None = None,
+    floor_seconds: float = PERF_FLOOR_SECONDS,
+) -> DifferentialResult:
+    """`differential()` plus measured wall-time of the baseline and patched runs."""
+    canon = canon or Canonicaliser()
+    out = DifferentialResult()
+    for i in stable:
+        t0 = time.perf_counter()
+        a = target.run(before, corpus[i])
+        t1 = time.perf_counter()
+        b = target.run(after, corpus[i])
+        t2 = time.perf_counter()
+        out.baseline_seconds += t1 - t0
+        out.patched_seconds += t2 - t1
+        ca, cb = canon.canon(a.stdout), canon.canon(b.stdout)
+        if ca != cb or a.exit_code != b.exit_code:
+            out.mismatches.append(Mismatch(i, ca, cb))
+    if out.baseline_seconds > 0 and out.baseline_seconds >= floor_seconds:
+        out.perf_delta = out.patched_seconds / out.baseline_seconds
+    return out
+
+
 def differential(
     target: Target,
     before: BuildResult,
@@ -151,12 +202,4 @@ def differential(
     canon: Canonicaliser | None = None,
 ) -> list[Mismatch]:
     """For every stable input, canonical output before must equal canonical output after."""
-    canon = canon or Canonicaliser()
-    mismatches: list[Mismatch] = []
-    for i in stable:
-        a = target.run(before, corpus[i])
-        b = target.run(after, corpus[i])
-        ca, cb = canon.canon(a.stdout), canon.canon(b.stdout)
-        if ca != cb or a.exit_code != b.exit_code:
-            mismatches.append(Mismatch(i, ca, cb))
-    return mismatches
+    return differential_timed(target, before, after, corpus, stable, canon=canon).mismatches

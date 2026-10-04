@@ -8,7 +8,9 @@ Order and cost:
 
     1 COMPILES              one build
     2 POV_DEAD              one run
-    3 DIFFERENTIAL_CORPUS   N inputs × 2 builds (+ pre-flight) and the project's own tests
+    3 DIFFERENTIAL_CORPUS   N inputs × 2 builds (+ pre-flight) and the project's own tests;
+                            the two sides are timed and a patch slower than `perf_tolerance`×
+                            fails (loose: sanitizer timing is noisy; 5× means something was disabled)
     4 COVERAGE_HELD         one coverage run over the corpus
     5 CLEAN_REFUZZ          the reproducer's own neighbourhood, then a bounded fresh campaign —
                             the expensive one, so it is last
@@ -27,7 +29,8 @@ from typing import Iterable
 
 from ..finding import Finding, FixSite, GateCheck, ReplayResult, Status, utcnow
 from ..oracles import KEYSTONE_ORACLES, Oracle
-from .differential import Canonicaliser, Mismatch, Quarantined, differential, preflight
+from .differential import (PERF_FLOOR_SECONDS, Canonicaliser, Mismatch, Quarantined, differential_timed,
+                           preflight)
 from .target import BuildResult, RunResult, Target, TestResult
 
 MAX_REPAIR_ROUNDS = 3
@@ -75,6 +78,12 @@ class GateVerdict:
     regression_test_verified: bool | None = None
     before: BuildResult | None = None
     after: BuildResult | None = None
+    #: patched/baseline wall-time over the stable corpus; None when the baseline was too short to mean anything
+    perf_delta: float | None = None
+    #: distinct (file, line) pairs the stable corpus + reproducer executed on the patched build
+    coverage_lines: int | None = None
+    #: deterministic reproducer variants replayed in CLEAN_REFUZZ
+    refuzz_variants: int = 0
 
 
 def _fail(finding: Finding, verdict: GateVerdict, check: GateCheck, detail: str, **kw) -> GateVerdict:
@@ -113,8 +122,16 @@ def run_gate(
     regression_test: str | None = None,
     preflight_runs: int = 3,
     pov_variants: int = POV_VARIANTS,
+    perf_tolerance: float = 5.0,
+    perf_floor_seconds: float = PERF_FLOOR_SECONDS,
 ) -> GateVerdict:
     """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict.
+
+    `perf_tolerance`: DIFFERENTIAL_CORPUS also fails when the patched build takes more than this
+    many times the baseline's wall-time over the stable corpus. Sanitizer-build timing is noisy and
+    the corpus runs are short, so the default is deliberately loose (5×): it is there to catch a
+    "fix" that disabled something, not to benchmark. The ratio is `None` (and never fails) when the
+    baseline total is under `perf_floor_seconds`.
 
     The two scratch builds the gate makes are discarded when it returns: an endurance run gates
     thousands of candidates, and leaving two full copies of the target per candidate fills the disk.
@@ -126,7 +143,8 @@ def run_gate(
         return _judge(finding, target, verdict, reproducer=reproducer, corpus=corpus,
                       refuzz_seconds=refuzz_seconds, oracles=tuple(oracles), canon=canon,
                       coverage_tolerance=coverage_tolerance, regression_test=regression_test,
-                      preflight_runs=preflight_runs, pov_variants=pov_variants)
+                      preflight_runs=preflight_runs, pov_variants=pov_variants,
+                      perf_tolerance=perf_tolerance, perf_floor_seconds=perf_floor_seconds)
     finally:
         discard = getattr(target, "discard", None)
         if discard is not None:
@@ -138,7 +156,7 @@ def run_gate(
 def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer: bytes,
            corpus: list[bytes], refuzz_seconds: float, oracles: tuple, canon: Canonicaliser | None,
            coverage_tolerance: int, regression_test: str | None, preflight_runs: int,
-           pov_variants: int) -> GateVerdict:
+           pov_variants: int, perf_tolerance: float, perf_floor_seconds: float) -> GateVerdict:
 
     # 1 ── COMPILES
     before = target.build(None)
@@ -167,25 +185,39 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
     pf = preflight(target, before, corpus, runs=preflight_runs, canon=canon,
                    is_abort=lambda text: oracle_fired(text, oracles))
     verdict.quarantined = pf.quarantined
-    mism = differential(target, before, after, corpus, pf.stable, canon=canon)
+    diff = differential_timed(target, before, after, corpus, pf.stable, canon=canon,
+                              floor_seconds=perf_floor_seconds)
+    mism = diff.mismatches
     verdict.mismatches = mism
+    verdict.perf_delta = diff.perf_delta
+    finding.perf_delta = diff.perf_delta
+    perf_note = (f"perf {diff.perf_delta:.2f}× baseline" if diff.perf_delta is not None
+                 else "perf n/a (baseline under the timing floor)")
     tests: TestResult = target.run_tests(after)
     verdict.tests_ran = tests.ran
     if mism:
         return _fail(finding, verdict, GateCheck.DIFFERENTIAL_CORPUS,
-                     f"{len(mism)} of {len(pf.stable)} corpus inputs changed output",
+                     f"{len(mism)} of {len(pf.stable)} corpus inputs changed output · {perf_note}",
                      quarantined_inputs=len(pf.quarantined))
     if not tests.passed:
         return _fail(finding, verdict, GateCheck.DIFFERENTIAL_CORPUS,
-                     f"{tests.failed} of {tests.ran} of the target's own tests fail on the patched build",
+                     f"{tests.failed} of {tests.ran} of the target's own tests fail on the patched build"
+                     f" · {perf_note}",
+                     quarantined_inputs=len(pf.quarantined))
+    if diff.perf_delta is not None and diff.perf_delta > perf_tolerance:
+        return _fail(finding, verdict, GateCheck.DIFFERENTIAL_CORPUS,
+                     f"perf regression: patched build {diff.perf_delta:.2f}× the baseline wall-time over "
+                     f"{len(pf.stable)} inputs (tolerance {perf_tolerance:g}×) — a fix this slow disabled something",
                      quarantined_inputs=len(pf.quarantined))
     finding.record_gate(GateCheck.DIFFERENTIAL_CORPUS, True,
                         detail=f"{len(pf.stable)} inputs identical · {tests.ran} own tests pass · "
-                               f"{len(pf.quarantined)} quarantined · {len(pf.crashing)} crash on baseline",
+                               f"{len(pf.quarantined)} quarantined · {len(pf.crashing)} crash on baseline · "
+                               f"{perf_note}",
                         quarantined_inputs=len(pf.quarantined))
 
     # 4 ── COVERAGE_HELD
     covered = target.covered_lines(after, [corpus[i] for i in pf.stable] + [reproducer])
+    verdict.coverage_lines = len(covered)
     if not _fix_site_covered(finding.fix_site_set, covered, coverage_tolerance):
         return _fail(finding, verdict, GateCheck.COVERAGE_HELD,
                      "no corpus input reaches the fix site on the patched build — fixed by deleting it?")
@@ -203,6 +235,7 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
                      "reported, not verified")
     # 5a — the reproducer's neighbourhood, deterministic, on the patched build
     variants = pov_neighbourhood(reproducer, pov_variants) if pov_variants else []
+    verdict.refuzz_variants = len(variants)
     still = 0
     for v in variants:
         r = target.run(after, v)

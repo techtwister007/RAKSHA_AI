@@ -1,0 +1,13 @@
+--- a/src/worker.c
++++ b/src/worker.c
+@@ -23,7 +23,9 @@
+     struct job *j = arg;
+     for (int rep = 0; rep < REPS; rep++) {
+         for (size_t i = j->from; i < j->to; i++) {
+-            g_total += j->data[i];                 /* BUG: unguarded write to shared state */
++            pthread_mutex_lock(&g_lock);
++            g_total += j->data[i];                 /* FIX: the shared update is guarded */
++            pthread_mutex_unlock(&g_lock);
+         }
+     }
+     return NULL;

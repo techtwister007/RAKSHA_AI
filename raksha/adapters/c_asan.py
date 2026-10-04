@@ -15,14 +15,31 @@ from pathlib import Path
 
 from ..gate.target import CommandTarget
 
-_BUILD = ("{cc} -g -fsanitize=address -fno-omit-frame-pointer "
-          "-o harness harness.c src/parser.c")
+#: Build flags per sanitizer. "thread" is the concurrency lane: gcc's libtsan reports a data race
+#: as `WARNING: ThreadSanitizer: data race`, which `oracles.tsan.TsanOracle` turns into a CWE-362
+#: record; -O1 is what TSan documents as its minimum, and the frame pointer keeps the stacks readable.
+_SANITIZER_FLAGS = {
+    "address": "-g -fsanitize=address -fno-omit-frame-pointer",
+    "thread": "-g -O1 -fsanitize=thread -fno-omit-frame-pointer",
+}
+_SANITIZER_LIBS = {"address": "", "thread": " -lpthread"}
+_BUILD = "{cc} {flags} -o harness {sources}{libs}"
+DEFAULT_SOURCES = "harness.c src/parser.c"
 
 
-def c_target(root: str | Path, *, cc: str = "gcc", timeout: float = 120.0) -> CommandTarget:
+def c_target(root: str | Path, *, cc: str = "gcc", timeout: float = 120.0,
+             sanitizer: str = "address", sources: str = DEFAULT_SOURCES) -> CommandTarget:
+    """A gate-ready CommandTarget for a single-harness C project.
+
+    `sanitizer` is "address" (the default: ASan, memory-safety bugs) or "thread" (TSan, data races —
+    pair it with `oracles=(TsanOracle(),)` on the gate). `sources` lists what the harness links.
+    """
+    if sanitizer not in _SANITIZER_FLAGS:
+        raise ValueError(f"unknown sanitizer {sanitizer!r}; one of {sorted(_SANITIZER_FLAGS)}")
     return CommandTarget(
         source_root=Path(root).resolve(),
-        build_cmd=_BUILD.format(cc=cc),
+        build_cmd=_BUILD.format(cc=cc, flags=_SANITIZER_FLAGS[sanitizer], sources=sources,
+                                libs=_SANITIZER_LIBS[sanitizer]),
         run_cmd="./harness {input}",
         test_cmd="sh run_tests.sh",
         # Coverage mode: the harness prints the fix-site line only if it actually reached parse.

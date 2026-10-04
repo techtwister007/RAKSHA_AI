@@ -160,3 +160,20 @@ def test_hygiene_scope_size_and_primitive_rules():
     assert hygiene.check(py, f2) is None
     bad = py.replace("+subprocess.run(shlex.split(cmd))", "+subprocess.run(shlex.split(cmd)); os.system(cmd)")
     assert "os.system" in hygiene.check(bad, f2)
+
+
+def test_single_template_targets_have_a_frontier_of_one_and_the_env_knob_restores_first_pass_wins(monkeypatch):
+    """The Python demo has one template, so the frontier is size one and behaviour is unchanged."""
+    r = autofuzz(PY_TARGET, max_execs=6000, use_model=False)
+    out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                 corpus=[b"10 m to ft", b"5 kg to lb"], use_model=False)
+    assert out.verified and out.frontier_size == 1
+    assert len(r.finding.frontier) == 1 and r.finding.frontier[0]["chosen"] is True
+    assert r.finding.frontier[0]["lane"] == "TEMPLATE" and r.finding.frontier[0]["hunks"] >= 1
+    assert len(r.finding.gate_history) == 5           # one candidate, one gate run, no re-run
+
+    monkeypatch.setenv("RAKSHA_PATCH_FRONTIER", "0")
+    r2 = autofuzz(PY_TARGET, max_execs=6000, use_model=False)
+    out2 = repair(r2.finding, r2.target, root=r2.target.source_root, reproducer=r2.crashing_input,
+                  corpus=[b"10 m to ft"], use_model=False)
+    assert out2.verified and out2.frontier_size == 1 and len(r2.finding.gate_history) == 5
