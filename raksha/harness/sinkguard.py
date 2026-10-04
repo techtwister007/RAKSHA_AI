@@ -38,6 +38,12 @@ def _report(detector: str, sink: str, cwe_hint: str) -> None:
         name = frame.f_code.co_filename
         if name.endswith("raksha_sinkguard.py") or name.endswith("raksha_harness.py"):
             continue
+        # relative to cwd (the target root), so the fix site and a repair diff share the path the
+        # gate applies against
+        try:
+            name = os.path.relpath(name)
+        except ValueError:
+            pass
         caller = f'  File "{name}", line {lineno}, in {frame.f_code.co_name}\n'
         break
     sys.stderr.write(f"=== BUG DETECTED: PySecSan: {detector} ===\n"
