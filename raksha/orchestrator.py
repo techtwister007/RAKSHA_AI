@@ -61,6 +61,8 @@ class Session:
     #: Fleet variants found per verified fix by the vaccine sweep. None until a sweep runs, so the
     #: scorecard shows the row as honestly-unmeasured rather than a faked zero.
     vaccine_variants: int | None = None
+    #: Where sealed evidence bundles are kept (one directory per finding); created on first use.
+    evidence_root: Path | None = None
 
     # -- ingest -------------------------------------------------------------------------------
     def add_finding(self, f: Finding) -> None:
@@ -183,17 +185,32 @@ class Session:
             return None
         return {"id": f.id, "plain": plain_summary(f), "jssd": jssd_brief(f)}
 
-    def verify_bundle(self, finding_id: str) -> dict | None:
-        """Build the finding's signed bundle in a temp dir and verify it — the live Vault check."""
-        import tempfile
-        from .bundle import build_bundle, verify_bundle as _verify
+    def bundle_dir(self, finding_id: str) -> Path | None:
+        """The finding's sealed evidence bundle — built once, then kept, so it can be re-verified."""
+        from .bundle import build_bundle
         f = self.findings.get(finding_id)
         if f is None or not f.is_reportable:
             return None
-        out = tempfile.mkdtemp(prefix="raksha-bundle-")
-        build_bundle(f, out)
+        if self.evidence_root is None:
+            import tempfile
+            self.evidence_root = Path(tempfile.mkdtemp(prefix="raksha-evidence-"))
+        out = self.evidence_root / f.id
+        if not (out / "bundle.json").exists():
+            build_bundle(f, out)
+        return out
+
+    def verify_bundle(self, finding_id: str) -> dict | None:
+        """Re-verify the SEALED bundle on disk — the live Vault check.
+
+        The bundle is sealed once (on first request) and every later verify recomputes its hashes and
+        signature from the files as they are now, so tampering with the stored bundle is detected.
+        """
+        from .bundle import verify_bundle as _verify
+        out = self.bundle_dir(finding_id)
+        if out is None:
+            return None
         res = _verify(out)
-        return {"id": f.id, "ok": res.ok, "summary": res.summary(), "path": out}
+        return {"id": finding_id, "ok": res.ok, "summary": res.summary(), "bundle": out.name}
 
     def pipeline_stages(self) -> list[dict]:
         """The status machine with a live count at or past each state — for the Live Pipeline.

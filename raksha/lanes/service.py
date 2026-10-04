@@ -81,7 +81,7 @@ def _finding(oracle: str, cwe: str, severity: str, spec_path: str, ep: Endpoint,
     f.add_fix_site(FixSite(uri=spec_path, rank=0, symbol=f"{ep.method.upper()} {ep.path}", rationale=remedy))
     repro = Reproducer.from_bytes(
         f"{oracle} {ep.method} {ep.path}".encode(),
-        ["raksha", "spec-check", oracle, ep.method, ep.path],
+        ["raksha", "spec-check", oracle, ep.method, ep.path, "--spec", spec_path],
         artifact_path=spec_path, minimised=True, kind=DETERMINISTIC_MATCH,
         detail=f"{message} (deterministic from the OpenAPI spec)",
     )

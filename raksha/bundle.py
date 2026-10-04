@@ -26,11 +26,24 @@ from pathlib import Path
 
 from .brief import jssd_brief, plain_summary
 from .finding import Finding, Status
+from .replay import REPRO_FILE, replay_script, ships_bytes
 from .rollback import rollback_script
 
 MANIFEST = "bundle.json"
 SIGNATURE = "signature.json"
 _DEMO_KEY = b"raksha-demo-verification-key-v1"   # production replaces this with a cosign keypair
+
+
+def signing_key() -> tuple[bytes, str]:
+    """(key, key_id). A deployment provisions its own key (RAKSHA_BUNDLE_KEY_FILE); without one the
+    published demo key is used and the bundle SAYS so — a demo-key signature only proves the bundle
+    was not altered by someone who lacks this repository, and is labelled exactly that."""
+    import os
+    path = os.environ.get("RAKSHA_BUNDLE_KEY_FILE")
+    if path and Path(path).is_file():
+        key = Path(path).read_bytes().strip()
+        return key, "deploy:" + hashlib.sha256(key).hexdigest()[:12]
+    return _DEMO_KEY, "demo"
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -42,20 +55,23 @@ def _sign(hashes: dict[str, str], key: bytes) -> str:
     return hmac.new(key, material, hashlib.sha256).hexdigest()
 
 
-def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes = _DEMO_KEY,
+def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes | None = None,
                  tool_version: str = "0.1.0") -> Path:
     """Write a signed evidence bundle for a VERIFIED (or REPORT_ONLY) finding."""
     if not finding.is_reportable:
         raise ValueError("refusing to bundle an unreportable (SUSPECTED) finding")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    key, key_id = (key, "caller") if key is not None else signing_key()
 
     artifacts: dict[str, bytes] = {
         "proof.json": json.dumps(finding.proof_block(), indent=2, sort_keys=True).encode(),
-        "replay.sh": _replay_script(finding).encode(),
+        "replay.sh": replay_script(finding).encode(),
         "report.md": (plain_summary(finding) + "\n").encode(),
         "commanders_brief.txt": jssd_brief(finding).encode(),
     }
+    if ships_bytes(finding):
+        artifacts[REPRO_FILE] = finding.reproducer.data  # the exploit itself, so replay.sh runs
     if finding.status is Status.VERIFIED and finding.patch_diff:
         artifacts["patch.diff"] = finding.patch_diff.encode()
         artifacts["rollback.sh"] = rollback_script(finding).encode()
@@ -78,7 +94,10 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes = _DEMO_KE
 
     signature = {
         "alg": "HMAC-SHA256",
-        "note": "demo verification key; production signs with cosign/in-toto (asymmetric, offline)",
+        "key_id": key_id,
+        "note": ("demo verification key: tamper-evident only against parties without the repository; "
+                 "a deployment provisions RAKSHA_BUNDLE_KEY_FILE, production signs with cosign/in-toto")
+                if key_id == "demo" else "deployment verification key",
         "manifest_sha256": _sha256_bytes(manifest_bytes),
         "signature": _sign({**hashes, MANIFEST: _sha256_bytes(manifest_bytes)}, key),
     }
@@ -90,48 +109,56 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes = _DEMO_KE
 class VerifyResult:
     ok: bool
     problems: list[str]
+    key_id: str = "demo"
 
     def summary(self) -> str:
-        return "signature valid; every artifact present and unchanged" if self.ok \
-            else "VERIFICATION FAILED:\n" + "\n".join("  " + p for p in self.problems)
+        if not self.ok:
+            return "VERIFICATION FAILED:\n" + "\n".join("  " + p for p in self.problems)
+        note = " (demo key: proves no tampering by anyone without this repository)" \
+            if self.key_id == "demo" else ""
+        return "signature valid; every artifact present and unchanged" + note
 
 
-def verify_bundle(bundle_dir: str | Path, *, key: bytes = _DEMO_KEY) -> VerifyResult:
-    """Recompute every hash and re-check the signature. A single changed byte fails this."""
+def verify_bundle(bundle_dir: str | Path, *, key: bytes | None = None) -> VerifyResult:
+    """Recompute every hash and re-check the signature. A single changed byte fails this, and so
+    does any file in the bundle that the signed manifest does not list."""
     out = Path(bundle_dir)
     problems: list[str] = []
     if not (out / MANIFEST).exists() or not (out / SIGNATURE).exists():
         return VerifyResult(False, ["missing manifest or signature"])
-
-    manifest_bytes = (out / MANIFEST).read_bytes()
-    manifest = json.loads(manifest_bytes)
-    signature = json.loads((out / SIGNATURE).read_text())
+    try:
+        manifest_bytes = (out / MANIFEST).read_bytes()
+        manifest = json.loads(manifest_bytes)
+        signature = json.loads((out / SIGNATURE).read_text())
+        if not isinstance(manifest, dict) or not isinstance(signature, dict) \
+                or not isinstance(manifest.get("artifacts", {}), dict):
+            raise ValueError("not a JSON object")
+    except (OSError, ValueError) as e:
+        return VerifyResult(False, [f"MALFORMED manifest or signature ({e})"])
+    if key is None:
+        key = _DEMO_KEY if signature.get("key_id", "demo") == "demo" else signing_key()[0]
 
     recomputed: dict[str, str] = {}
-    for name, recorded_hash in manifest.get("artifacts", {}).items():
+    listed = manifest.get("artifacts", {})
+    for name, recorded_hash in listed.items():
         p = out / name
-        if not p.exists():
+        if Path(name).name != name or not p.is_file():
             problems.append(f"MISSING {name}")
             continue
         actual = _sha256_bytes(p.read_bytes())
         recomputed[name] = actual
         if actual != recorded_hash:
             problems.append(f"CHANGED {name}")
+    for extra in sorted(p.name for p in out.iterdir()
+                        if p.name not in listed and p.name not in (MANIFEST, SIGNATURE)):
+        problems.append(f"UNEXPECTED {extra} (not in the signed manifest)")
 
     manifest_hash = _sha256_bytes(manifest_bytes)
     if manifest_hash != signature.get("manifest_sha256"):
         problems.append("CHANGED bundle.json (manifest hash mismatch)")
 
     expected_sig = _sign({**recomputed, MANIFEST: manifest_hash}, key)
-    if not hmac.compare_digest(expected_sig, signature.get("signature", "")):
+    if not hmac.compare_digest(expected_sig, str(signature.get("signature", ""))):
         problems.append("SIGNATURE INVALID")
 
-    return VerifyResult(not problems, problems)
-
-
-def _replay_script(finding: Finding) -> str:
-    repro = finding.reproducer
-    cmd = " ".join(repro.replay_cmd) if repro else "# no reproducer"
-    detail = (repro.detail or "") if repro else ""
-    return (f"#!/usr/bin/env sh\n# Replay for finding {finding.id} ({finding.bug_class})\n"
-            f"# Evidence: {repro.kind if repro else 'none'}\n# {detail}\n{cmd}\n")
+    return VerifyResult(not problems, problems, key_id=str(signature.get("key_id", "demo")))

@@ -9,6 +9,7 @@ state. This is deliberately boring: a rollback that is clever is a rollback nobo
 from __future__ import annotations
 
 from .finding import Finding
+from .replay import one_line
 
 
 def rollback_script(finding: Finding, *, test_cmd: str | None = None) -> str:
@@ -17,11 +18,13 @@ def rollback_script(finding: Finding, *, test_cmd: str | None = None) -> str:
         return "#!/usr/bin/env sh\n# no patch was applied for this finding; nothing to roll back\n"
     lines = [
         "#!/usr/bin/env sh",
-        f"# Rollback for finding {finding.id} ({finding.bug_class})",
-        "# Reverses the RAKSHA patch and confirms the target is back to its prior state.",
+        f"# Rollback for finding {one_line(finding.id)} ({one_line(finding.bug_class)})",
+        "# Reverses the RAKSHA patch. Run from the target's root; the patch defaults to the",
+        "# patch.diff shipped beside this script.",
         "set -eu",
         "",
-        'PATCH="${1:-patch.diff}"',
+        'HERE="$(cd "$(dirname "$0")" && pwd)"',
+        'PATCH="${1:-$HERE/patch.diff}"',
         'echo "reverting $PATCH ..."',
         'if command -v git >/dev/null 2>&1; then',
         '    git apply -R --whitespace=nowarn "$PATCH"',

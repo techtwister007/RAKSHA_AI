@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 
-from .finding import Finding, RepairLane, RoeLevel
+from .finding import Finding, RepairLane, RoeLevel, Status
 
 
 class Level(IntEnum):
@@ -94,6 +94,9 @@ class RoeDecision:
     effective: Level
     step_downs: list[str] = field(default_factory=list)
     two_person: bool = False
+    #: Whether the finding's fix actually cleared the gate. Authority is never authority to ship an
+    #: unproven patch: may_deploy refuses anything that is not VERIFIED, whatever the level.
+    verified: bool = False
 
     @property
     def requires_human(self) -> bool:
@@ -159,7 +162,8 @@ def effective_roe(asset: Asset, finding: Finding, *, advisor_disagrees: bool = F
     if advisor_disagrees:
         step_to(Level.R1, "security advisor disagrees with the coding model")
 
-    return RoeDecision(asset.name, asset.tier, cap, level, reasons, two_person=asset.tier.two_person)
+    return RoeDecision(asset.name, asset.tier, cap, level, reasons, two_person=asset.tier.two_person,
+                       verified=finding.status is Status.VERIFIED)
 
 
 @dataclass
@@ -169,8 +173,13 @@ class Signature:
 
 
 def may_deploy(decision: RoeDecision, signatures: list[Signature]) -> tuple[bool, str]:
-    """Whether a verified fix may actually be deployed, given the authority and any signatures."""
-    distinct = {s.key_id for s in signatures}
+    """Whether a verified fix may actually be deployed, given the authority and any signatures.
+
+    The two-person rule counts distinct OFFICERS: one officer holding two keys is still one person.
+    """
+    if not decision.verified:
+        return False, "the fix has not cleared the five-check gate — nothing unproven is ever deployed"
+    distinct = {s.officer.strip().lower() for s in signatures if s.officer.strip()}
     if decision.effective <= Level.R1:
         return False, f"{decision.effective.name}: recommend only — a human applies this, the system does not"
     if decision.two_person:

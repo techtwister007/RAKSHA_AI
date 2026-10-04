@@ -8,8 +8,11 @@ record rather than guessed:
   reachability   — a finding with a replaying reproducer is reachable (1.0); a static-only SUSPECTED
                    finding is only possibly reachable (0.4)
   exploitability — an exploit that replays (1.0) outranks a deterministic match such as a dependency
-                   CVE (0.7) or a spec-only exposure (0.6); this is why the register ranks
-                   exploit-proven findings above match-proven ones
+                   CVE or a secret (0.7), which outranks a spec-only API exposure (0.6)
+
+The factors multiply, so evidence ranks findings WITHIN a severity band: a medium exploit-proven
+crash outranks a medium dependency CVE, but a critical CVE (e.g. Log4Shell) still outranks a medium
+crash — severity dominates, as an operator would expect.
 
 Verified fixes sort to the top within a score band (they are actionable now), and REPORT_ONLY
 findings are flagged for human remediation. The score is a priority signal, never a precision claim.
@@ -35,6 +38,8 @@ def _exploitability(f: Finding) -> float:
         return 0.5
     if f.reproducer.kind == EXPLOIT_REPLAY:
         return 1.0
+    if f.oracle.startswith("service:"):
+        return 0.6  # exposure read from the API spec, not observed on a live service
     if f.reproducer.kind == DETERMINISTIC_MATCH:
         return 0.7
     return 0.6

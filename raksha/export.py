@@ -8,7 +8,7 @@ is the actual deliverable. For every reportable finding this writes a self-conta
       findings.sarif               the full SARIF 2.1 log with the proof block
       <finding-id>/
         finding.json               the finding's proof block
-        reproducer.bin             the reproducer artifact (if any)
+        repro                      the exploit input (exploit-replay findings)
         replay.sh                  how to replay it
         patch.diff                 the validated patch (VERIFIED findings only)
         report.md                  plain-English report (the Commander's Brief seed)
@@ -23,6 +23,7 @@ import json
 from pathlib import Path
 
 from .finding import Finding, Status, reportable, to_sarif_log
+from .replay import REPRO_FILE, one_line, replay_script, ships_bytes
 
 
 def export(findings: list[Finding], out_dir: str | Path, *, tool_version: str = "0.1.0") -> Path:
@@ -39,12 +40,11 @@ def export(findings: list[Finding], out_dir: str | Path, *, tool_version: str = 
         proof = f.proof_block()
         (fdir / "finding.json").write_text(json.dumps(proof, indent=2))
 
-        if f.reproducer and f.reproducer.artifact_path:
-            # The reproducer bytes are the target's own file/input; we record the pointer and the
-            # replay command rather than copying target code into the submission.
-            (fdir / "replay.sh").write_text(_replay_script(f))
-        elif f.reproducer:
-            (fdir / "replay.sh").write_text(_replay_script(f))
+        if f.reproducer:
+            (fdir / "replay.sh").write_text(replay_script(f))
+        if ships_bytes(f):
+            # The exploit input itself (a crafted input, not target code), so replay.sh can run.
+            (fdir / REPRO_FILE).write_bytes(f.reproducer.data)
 
         if f.status is Status.VERIFIED and f.patch_diff:
             (fdir / "patch.diff").write_text(f.patch_diff)
@@ -84,34 +84,25 @@ def _counts(reports: list[Finding]) -> dict:
     return c
 
 
-def _replay_script(f: Finding) -> str:
-    cmd = " ".join(f.reproducer.replay_cmd) if f.reproducer else "# no reproducer"
-    detail = (f.reproducer.detail or "") if f.reproducer else ""
-    return (f"#!/usr/bin/env sh\n"
-            f"# Replay for finding {f.id} ({f.bug_class})\n"
-            f"# Evidence: {f.reproducer.kind if f.reproducer else 'none'}\n"
-            f"# {detail}\n"
-            f"{cmd}\n")
-
-
 def _report_md(f: Finding) -> str:
     repro = f.reproducer
     lines = [
         f"# {f.bug_class} — {f.severity.upper()}",
         "",
         f"- **Status:** {f.status.value}",
-        f"- **Target:** {f.target}",
+        f"- **Target:** {one_line(f.target)}",
         f"- **Language:** {f.language}",
         f"- **Detected by:** {f.oracle}",
         f"- **Evidence:** {repro.kind if repro else 'none'}"
-        + (f" — {repro.detail}" if repro and repro.detail else ""),
+        + (f" — {one_line(repro.detail)}" if repro and repro.detail else ""),
     ]
     if f.fix_site_set:
         s = f.fix_site_set[0]
-        lines.append(f"- **Fix site:** {s.uri}" + (f":{s.start_line}" if s.start_line else ""))
+        lines.append(f"- **Fix site:** `{one_line(s.uri)}`" + (f":{s.start_line}" if s.start_line else ""))
         if s.rationale:
-            lines.append(f"- **Recommended fix:** {s.rationale}")
-    lines += ["", "## What was found", "", f.message, ""]
+            lines.append(f"- **Recommended fix:** {one_line(s.rationale)}")
+    # The finding text comes from the scanned target: one line, in a code span, never live markup.
+    lines += ["", "## What was found", "", "`" + one_line(f.message, 1000).replace("`", "'") + "`", ""]
     if f.status is Status.VERIFIED:
         lines += ["## Proof the fix holds", "",
                   "All five gate checks passed and the original attack no longer triggers on the "
