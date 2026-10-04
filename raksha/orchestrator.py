@@ -102,6 +102,9 @@ class Session:
     intake_desk: object | None = field(default=None, repr=False)
     #: Guards merges from worker threads (intake, demo beats) against the console's snapshot reads.
     _lock: object = field(default_factory=threading.RLock, repr=False)
+    #: K1/K2: where each target's tree lives, so its project report can be written; and the store.
+    roots: dict = field(default_factory=dict, repr=False)
+    project_store: object | None = field(default=None, repr=False)
 
     def open_journal(self, path: str | Path) -> None:
         """Begin (or continue) journalling pipeline events to `path`."""
@@ -201,6 +204,7 @@ class Session:
         """Ingest a target directory through the build-free lanes and add it to the board."""
         root = Path(root)
         name = name or root.name
+        self.roots[name] = root
         try:
             result = scan_target(root)
         except Exception as e:  # noqa: BLE001 — a target we cannot read is red, not a crash
@@ -381,6 +385,7 @@ class Session:
         from .autorepair import repair as _repair
         root = Path(root)
         name = name or root.name
+        self.roots[name] = root
         self.emit("autofuzz_started", target=name)
         r = _dispatch_autofuzz(root)
         ep = getattr(r, "entrypoint", None)
@@ -768,6 +773,43 @@ class Session:
         return {"ok": ok, "advisory": out.name, "path": str(out), "problems": problems,
                 "text": (out / _adv.TEXT).read_text()}
 
+    def store(self):
+        """K1: the on-box project store (RAKSHA_HOME)."""
+        if self.project_store is None:
+            from .projects import Store
+            self.project_store = Store()
+        return self.project_store
+
+    def record_project_run(self, target_name: str, *, root: str | Path | None = None,
+                           project_name: str | None = None) -> dict:
+        """K2: write the next signed report version for the project behind `target_name`."""
+        from . import reports
+        from .airgap import egress_counter
+        from .learning import Learning
+        root = Path(root) if root is not None else self.roots.get(target_name)
+        if root is None or not Path(root).is_dir():
+            return {"ok": False, "error": f"no source tree known for {target_name!r}"}
+        st = self.store()
+        project = st.identify(root, name=project_name or target_name.split(":")[0].split("#")[0],
+                              registry=self.registry)
+        t = next((t for t in self.targets if t.name == target_name), None)
+        fs = [self.findings[i] for i in (t.finding_ids if t else []) if i in self.findings]
+        head = None
+        if self.journal is not None:
+            recs = _journal.read(self.journal.path)
+            head = recs[-1]["hash"] if recs else None
+        files = len(project.structure)
+        lessons = Learning(st)
+        body = reports.record_run(st, project, fs, root,
+                                  run={"files_scanned": files, "egress": egress_counter(),
+                                       "journal_head": head, "target": target_name},
+                                  extra_privileged=lessons.active_calls(project.id))
+        lessons.observe_report(body)
+        self.emit("project_report", target=target_name, project=project.id, version=body["version"],
+                  fixed=len(body["diff"]["fixed"]), new=len(body["diff"]["new"]),
+                  needs_human=len(body["needs_human"]), score=body["score"]["score"])
+        return {"ok": True, "project": project.id, "version": body["version"]}
+
     def save_memory(self, path=None):
         """E5: persist the fix memory so a learned fix survives a reboot."""
         from .retrieval import default_memory
@@ -979,6 +1021,11 @@ def finale_session(targets_dir: Path, out_dir: Path | None = None) -> Session:
             s.ingest(root, runner, name=root.name)
     finally:
         runner.cleanup()
+    for t in list(s.targets):                  # K2: every target gets its next report version
+        try:
+            s.record_project_run(t.name)
+        except Exception:  # noqa: BLE001 — reporting never takes the run down
+            pass
     if out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
         export(list(s.findings.values()), out_dir / "submission")

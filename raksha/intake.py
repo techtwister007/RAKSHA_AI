@@ -141,6 +141,7 @@ class IntakeJob:
     findings: int = 0
     stage: dict | None = None
     error: str | None = None
+    project: str | None = None
 
     def as_dict(self) -> dict:
         d = {k: v for k, v in self.__dict__.items() if k != "started_mono"}
@@ -229,6 +230,11 @@ class Intake:
                 if m and job.first_finding_s is None:
                     job.first_finding_s = round(time.monotonic() - job.started_mono, 3)
                     sess.emit("intake_first_finding", target=job.name, seconds=job.first_finding_s)
+            try:                                   # K2: the media becomes a project with a report
+                live = sess.record_project_run(job.name, root=staged, project_name=Path(job.path).name)
+                job.project = live.get("project")
+            except Exception:  # noqa: BLE001 — a report failure never fails the intake
+                pass
             job.state = "done"
         except Exception as e:  # noqa: BLE001 — a bad medium is a red row, never a dead console
             job.state, job.error = "failed", f"{type(e).__name__}: {e}"[:300]
