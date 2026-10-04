@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAKSHA AI — Submission Deck v2</title>
+<style>
+  :root{--bg:#0b0e14;--panel:#121722;--panel2:#171d2b;--line:#263142;--fg:#e8edf6;
+    --dim:#93a0b4;--green:#49d18b;--amber:#f2b340;--red:#ff6b6b;--blue:#5aa2ff;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans)}
+  .deck{max-width:1040px;margin:0 auto;padding:24px 16px 80px}
+  .slide{background:var(--panel);border:1.5px solid var(--line);border-radius:10px;
+    padding:34px 40px;margin:0 0 22px;min-height:460px;display:flex;flex-direction:column;
+    page-break-after:always;position:relative}
+  .slide .no{position:absolute;top:16px;right:22px;font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .kick{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin:0 0 10px}
+  h1{font-size:40px;line-height:1.1;margin:0 0 14px}
+  h2{font-size:26px;line-height:1.15;margin:0 0 18px}
+  h3{font-size:15px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:18px 0 8px}
+  p{font-size:17px;line-height:1.5;color:var(--fg);margin:0 0 12px}
+  .dim{color:var(--dim)}
+  .big{font-size:22px;line-height:1.4}
+  ul{margin:0 0 10px;padding-left:22px}li{font-size:16px;line-height:1.5;margin:0 0 7px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:14px 16px}
+  .card h4{margin:0 0 6px;font-size:15px;color:var(--fg)}
+  .card p{font-size:14px;margin:0;color:var(--dim);line-height:1.45}
+  .mono{font-family:var(--mono)}
+  .flow{font-family:var(--mono);font-size:14px;color:var(--fg);background:var(--panel2);
+    border:1px solid var(--line);border-radius:7px;padding:14px 16px;line-height:1.8;overflow:auto}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:4px;
+    border:1px solid var(--line);color:var(--dim);margin:0 6px 6px 0}
+  .ok{color:var(--green);border-color:var(--green)}
+  .soon{color:var(--amber);border-color:var(--amber)}
+  .road{color:var(--blue);border-color:var(--blue)}
+  .spacer{flex:1}
+  .foot{font-size:12px;color:var(--dim);font-family:var(--mono);border-top:1px solid var(--line);padding-top:10px;margin-top:14px}
+  .quote{font-size:24px;line-height:1.35;color:var(--fg);border-left:3px solid var(--amber);padding-left:18px;margin:8px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  td,th{border:1px solid var(--line);padding:7px 10px;text-align:left}th{color:var(--dim);font-weight:600;font-family:var(--mono);font-size:12px}
+  @media print{body{background:#fff;color:#000}.deck{max-width:none;padding:0}
+    .slide{border:none;border-radius:0;min-height:96vh;padding:7vh 8vw}}
+  @media (max-width:640px){.grid2,.grid3{grid-template-columns:1fr}h1{font-size:30px}.slide{padding:24px 20px}}
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <section class="slide">
+    <span class="no">01</span>
+    <p class="kick">AI Kavach Grand Finale · EME School, Vadodara · Indian Army</p>
+    <div class="spacer"></div>
+    <h1>RAKSHA&nbsp;AI</h1>
+    <p class="big">Reasoning-based Autonomous Knowledge &amp; Security Hardening Agent</p>
+    <p class="quote">Runs where classified code lives, and refuses to speak without proof.</p>
+    <div class="spacer"></div>
+    <p class="foot">An offline cyber-reasoning system that finds a vulnerability, fixes it, and proves the fix holds — autonomously, on an air-gapped network. Submission deck v2.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">02</span>
+    <p class="kick">The gap we address</p>
+    <h2>Every cyber-reasoning system today assumes a cloud LLM. A classified network has none.</h2>
+    <div class="grid2">
+      <div class="card"><h4>The deployment wall</h4><p>Armed-Forces code lives on air-gapped networks. A tool that phones a foreign cloud API is structurally undeployable there — the attack surface is the controlled transfer, not the internet.</p></div>
+      <div class="card"><h4>The noise wall</h4><p>AI scanners flood reviewers with findings that carry no proof. The curl project shut its bug-bounty after AI submissions overwhelmed its maintainers. On a military network, wasted review time is scarce cleared manpower.</p></div>
+    </div>
+    <h3>Our answer</h3>
+    <p>A single sealed node. No network interfaces. A local model proposes; a deterministic verifier decides. Nothing unproven ever reaches a live system.</p>
+    <div class="spacer"></div>
+    <p class="foot">Judged on: accuracy / precision · speed · least resources · functionality · scalability.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">03</span>
+    <p class="kick">The central bet</p>
+    <div class="spacer"></div>
+    <p class="quote">The LLM is not the brain. The verifier is.</p>
+    <p class="big">The best frontier agents score ~34% on patching and ~18% on proof-of-concept generation. The documented failures are scaffold problems, not model-size problems. So we compete on the scaffold.</p>
+    <h3>Two invariants, enforced in code — not promised in a slide</h3>
+    <ul>
+      <li><b>No reproducer, no report.</b> A finding without a reproducer that actually replays can never be reported. "100% precision on reports" is therefore structural, not tuned.</li>
+      <li><b>Nothing unproven ships.</b> A patch is VERIFIED only when all five mechanical checks pass on the patched build. Else it is a proven report for a human — never a guess.</li>
+    </ul>
+    <div class="spacer"></div>
+    <p class="foot">Both raise <span class="mono">InvariantViolation</span> in <span class="mono">raksha/finding.py</span>. The model cannot overrule them.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">04</span>
+    <p class="kick">How it works — one pipeline, three acts</p>
+    <h2>Find → Fix → Prove</h2>
+    <div class="flow">
+FIND&nbsp;&nbsp;&nbsp;build + instrument → install sink oracles → fuzz / static / taint / structural<br>
+FIX&nbsp;&nbsp;&nbsp;&nbsp;dedup &amp; localise (the sanitizer gives the line) → repair ladder, cheapest first<br>
+PROVE&nbsp;&nbsp;five-check gate → signed evidence bundle → learn (vaccine, memory)
+    </div>
+    <h3>The five-check gate — a patch earns all five, every round</h3>
+    <div class="grid3">
+      <div class="card"><p><b>1 COMPILES</b> · the patched build builds</p></div>
+      <div class="card"><p><b>2 POV&nbsp;DEAD</b> · the exploit no longer fires</p></div>
+      <div class="card"><p><b>3 DIFFERENTIAL</b> · corpus output + own tests unchanged (+ perf)</p></div>
+      <div class="card"><p><b>4 COVERAGE&nbsp;HELD</b> · the fix site is still reached (no delete-to-fix)</p></div>
+      <div class="card"><p><b>5 CLEAN&nbsp;REFUZZ</b> · the reproducer's whole neighbourhood stays dead</p></div>
+      <div class="card"><p><b>+ RED TEAM</b> · an independent attacker re-tries to break it</p></div>
+    </div>
+    <div class="spacer"></div>
+    <p class="foot">Check 5 opens with 24 deterministic variants of the reproducer: the shallow fix that silences one input dies here.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">05</span>
+    <p class="kick">The key novelty</p>
+    <h2>Model what the system must never do — then make the machine try to do it.</h2>
+    <p class="big">Non-crashing vulnerabilities — command injection, auth bypass, weak crypto — get a runtime invariant injected at the sink, so they abort exactly like a memory bug.</p>
+    <div class="flow">
+untrusted input → … → command execution&nbsp;&nbsp;❌ aborts at the sink → reproducer → patch → re-prove
+    </div>
+    <p>One verification architecture covers every bug class, instead of a fuzzer for memory bugs and a separate AI scanner for everything else.</p>
+    <div class="spacer"></div>
+    <p class="foot">Shipped as sink oracles: AddressSanitizer (C/C++), Jazzer (Java), a Python sink guard, Go panics, a ThreadSanitizer race oracle, a Node sink guard.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">06</span>
+    <p class="kick">Coverage — one gate, many languages</p>
+    <h2>Deep find→fix→prove, and a build-free floor on everything.</h2>
+    <table>
+      <tr><th>Language</th><th>Deep (synthesized harness → gate)</th><th>Build-free lanes</th></tr>
+      <tr><td>C / C++</td><td class="mono">gcc + ASan / TSan</td><td>crypto, secrets, structural</td></tr>
+      <tr><td>Python</td><td class="mono">sink guard</td><td>deps, secrets, crypto, structural</td></tr>
+      <tr><td>Go</td><td class="mono">native go test -fuzz</td><td>deps, secrets, structural</td></tr>
+      <tr><td>Java</td><td class="mono">Jazzer / Maven</td><td>deps, secrets</td></tr>
+      <tr><td>Rust</td><td class="mono">cargo panic</td><td>secrets, crypto</td></tr>
+      <tr><td>JavaScript / TS</td><td class="mono">Node sink guard</td><td>deps, secrets, OpenAPI</td></tr>
+      <tr><td>any other</td><td class="dim">—</td><td>secrets, crypto, OpenAPI</td></tr>
+    </table>
+    <p>No hand-written harness is needed: RAKSHA discovers the input boundary, synthesizes a driver, proves the driver, and fuzzes it.</p>
+    <div class="spacer"></div>
+    <p class="foot">Build-free lanes deliver proven findings in seconds on a target that will not build — the opening move when speed is scored.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">07</span>
+    <p class="kick">The threat horizon — built for 2026→2030</p>
+    <h2>Not one big model. An ecosystem the verifier governs.</h2>
+    <div class="grid2">
+      <div class="card"><h4>Heterogeneous intelligence</h4><p>A fast decision funnel ranks where to spend budget; a model parliament turns disagreement into an investigation signal; an evidence-fusion kernel caps model influence below the proven line.</p></div>
+      <div class="card"><h4>Post-quantum readiness</h4><p>A weak-crypto lane plus an inventory of every RSA/ECC/DH use, each tagged with its NIST ML-KEM / ML-DSA / SLH-DSA migration and a blast-radius.</p></div>
+      <div class="card"><h4>Attack-chain reasoning</h4><p>Individually-moderate findings compose into chains scored by attack economics — the cheapest viable path to a mission-critical function.</p></div>
+      <div class="card"><h4>Agent self-defence</h4><p>The model has no tools; patch hygiene refuses a diff that adds an execution or network primitive; target source is fenced as untrusted data. Prompt injection has no exit.</p></div>
+    </div>
+    <div class="spacer"></div>
+    <p>
+      <span class="tag ok">built: PQC · parliament · fusion · attack graph · red team · TSan · CPG · Rust · JS</span>
+      <span class="tag road">roadmap: GNN · schedule fuzzing · attestation · CHERI · federated</span>
+    </p>
+    <p class="foot">Full map, each marked built / wired / roadmap: <span class="mono">docs/future-technologies.md</span>.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">08</span>
+    <p class="kick">Honesty is the product</p>
+    <h2>It never says "secure". It says what it proved, and what it did not analyse.</h2>
+    <div class="grid2">
+      <div class="card"><h4>Assurance boundary</h4><p>Every run reports languages exercised by exploit vs build-free only, targets that would not build, suspected-but-unproven findings, and dependencies the code never imports. Presence, never absence.</p></div>
+      <div class="card"><h4>Evidence a judge can run</h4><p>A shell-safe <span class="mono">replay.sh</span>, the reproducer bytes, and an HMAC-signed bundle that names the environment the proof was made in and detects a single changed byte.</p></div>
+    </div>
+    <h3>Fail-closed by design</h3>
+    <p>If no patch survives all five gates, no patch is issued — only a verified vulnerability report, flagged for a cleared human under the Rules of Engagement in force for that asset.</p>
+    <div class="spacer"></div>
+    <p class="foot">A dependency CVE in a library the code never imports is ranked down, not dressed up as an exploit.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">09</span>
+    <p class="kick">Why we win the scoresheet</p>
+    <h2>Every criterion emits a measured number, live.</h2>
+    <table>
+      <tr><th>Criterion</th><th>What the Scorecard shows, measured per run</th></tr>
+      <tr><td>Precision</td><td>100% of reports carry a replaying reproducer; false positives measured on negative controls (0 of 11)</td></tr>
+      <tr><td>Speed</td><td>time to first proven finding; medians to PoV and validated patch</td></tr>
+      <tr><td>Resources</td><td>zero-inference fix share; tokens per validated patch; VRAM (null off-GPU, never a faked 0)</td></tr>
+      <tr><td>Functionality</td><td>full loop with zero human input; ROE authority per action; attack chains</td></tr>
+      <tr><td>Scalability</td><td>languages covered; verified per language; vaccine fleet sweep</td></tr>
+    </table>
+    <p class="quote" style="font-size:19px">A criterion you cannot measure is a criterion you cannot score.</p>
+    <div class="spacer"></div>
+    <p class="foot">No component is "done" until it emits the metric that proves it. Every number traces to a record the pipeline wrote while it ran.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">10</span>
+    <p class="kick">What we hand over · the ask</p>
+    <h2>A sealed node, a signed bundle, and a one-command install.</h2>
+    <div class="grid2">
+      <div class="card"><h4>Deliverables</h4><p>The offline operator console (six screens, keyboard-only demo), the signed evidence bundle per finding, the Commander's Brief in service-writing style with a Hindi headline, and the rollback script.</p></div>
+      <div class="card"><h4>Footprint</h4><p>Single node, 32&nbsp;GB VRAM, zero network interfaces, degrades to a CPU-only, model-free profile rather than failing.</p></div>
+    </div>
+    <div class="spacer"></div>
+    <p class="quote">Don't scan for vulnerabilities. Model what the system must never do — then make the machine try to do it, and refuse to speak without proof.</p>
+    <p class="foot">RAKSHA AI · an autonomous software-assurance system for the networks where it matters most.</p>
+  </section>
+
+</div>
+</body>
+</html>

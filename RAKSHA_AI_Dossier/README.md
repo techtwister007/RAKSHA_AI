@@ -5,6 +5,12 @@ AI Kavach Grand Finale entry · EME School, Vadodara · Indian Army
 
 ---
 
+> **Deck v2 (2026-10-04):** `../docs/deck-v2.html` is the current submission deck — a self-contained,
+> print-to-PDF slide deck reflecting the full built system (the two-model split, ROE, the vaccine,
+> automatic harness generation, and the breadth pass: crypto/PQC, the structural lane, the attack
+> graph, the model parliament, evidence fusion, the independent red team, and the Rust/JS deep lanes).
+> It supersedes `RAKSHA_submission_deck_v1.pptx/.pdf`, which predate all of the above.
+
 ## What this folder is
 
 This is the complete, self-contained brief for RAKSHA AI. It exists so that anyone
