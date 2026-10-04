@@ -1,7 +1,7 @@
 # RAKSHA AI — Plan V2: close every gap, add every feature
 
-**Status:** Waves 0, 1 and 2 built (2026-10-04); Waves 3–4 not started. Per-item status, with
-the evidence and the honest caveats, is in the *Wave 1 — status* and *Wave 2 — status* blocks.
+**Status:** Waves 0, 1, 2 and 3 built (2026-10-04); Wave 4 not started. Per-item status, with the
+evidence and the honest caveats, is in the *Wave 1 / 2 / 3 — status* blocks.
 **Scope rule:** every item from the two review passes is included — nothing dropped for cost.
 Breadth first; optimisation after. This document is the contract we execute from and tick off.
 
@@ -229,6 +229,31 @@ Built after the gate is trustworthy, because each only proposes or ranks.
 ---
 
 ## Wave 3 — UI / UX and the operator
+
+### Wave 3 — status (built; each line names its proof)
+
+The console is served offline by `console/server.py` (stdlib http.server), one self-contained
+`index.html` + `app.js`, no external asset; verified end to end in a headless browser (every screen
+renders, no page errors) and by `tests/test_console_wave3.py` + `tests/test_console.py`.
+
+- **F1** ✔ live event log: the Session keeps a bounded event stream and emits story events through the pipeline; `console_api.narrate` turns each into a line with a level; the Event Log screen reads top to bottom.
+- **F2** ✔ attack graph drawn as inline SVG, cheapest path lit, each edge hovering its rule (marked heuristic).
+- **F3** ✔ side-by-side vulnerable-fires / patched-dead panes on the detail screen (engineer voice).
+- **F4** ✔ the five-check gate as tick/cross tiles with each check's one-line reason, plus the deployment-twin and the solver (reachability / bound) proofs as extra tiles.
+- **F5** ✔ the assurance boundary as stacked bars (exploit vs build-free languages, built vs degraded targets, reported vs suspected), with the boundary statement verbatim below.
+- **F6** ✔ post-quantum screen: the crypto inventory summary and the per-file / per-primitive / replacement migration table, from the live PQC report.
+- **F7** ✔ operator actions — approve, reject (demotes the fix shape), mark false positive (records a dispute, never changes status), re-run the red team, export the bundle — each recorded on the finding, in the hash-chained journal and the event stream; POST routes guarded by a per-process token.
+- **F8** ✔ search, and filter/sort by language, status, severity and lane, over the finding list.
+- **F9** ✔ estate map grouped by asset tier against status, with the top three risks pinned.
+- **F10** ✔ full bilingual Commander's Brief from a Hindi glossary (facts verbatim, prose translated); EN/HI toggle swaps the whole brief and the console labels.
+- **F11** ✔ a high-contrast projector theme toggle; every screen stays legible.
+- **F12** ✔ CSV / xlsx (valid Open XML, stdlib zip+XML) / PDF (hand-built, single font) exports and a keyboard-shortcut help overlay listing the real shortcuts.
+- **F13** ✔ a staff-officer and an engineer rendering of the same finding, both from the record and agreeing on the facts.
+- **F14** ✔ each finding shows its lane's measured record on this estate (findings / proven / disputed), accumulating live.
+
+Caveat: the PDF export is Latin-only (a Devanagari font blob is deliberately not carried), so the
+Hindi brief is offered as on-screen text, not PDF.
+
 
 The console stops being a read-only board and becomes the thing a human runs.
 

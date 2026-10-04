@@ -23,7 +23,7 @@ regenerated from the repository as the last step.
 
 Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24):
 
-- **826 tests pass**, 0 fail, 2 skipped, with every slow lane (Go/Rust/JS), the deep and Java slices
+- **840 tests pass**, 0 fail, 2 skipped, with every slow lane (Go/Rust/JS), the deep and Java slices
   and the z3 proofs enabled; still unrun here: the multi-language benchmark and one slow
   mutation-factory test. Air-gap guard and pyflakes clean.
 - **Plan V2 Wave 0 + Wave 1 built** (`PLAN_V2.md` carries per-item status, proof and caveats): multi-bug
@@ -32,6 +32,14 @@ Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24)
   demotion, per-run anti-analysis names, **binary lane** (real log4j jar matched), **LD_PRELOAD sink
   interposition** and a **behavioural baseline** for defects no crash oracle sees, supply-chain v2,
   signed journal, PQ/in-toto bundles, signed self-update, crash-resume, budgets, persistent learning.
+- **Plan V2 Wave 3 built** (the console is now the thing an operator runs, offline, no external
+  asset): a live narrated event log, the attack graph as inline SVG with the cheapest path lit,
+  side-by-side vulnerable/patched proof panes, the gate strip with twin + solver proofs, assurance
+  boundary as bars, a post-quantum migration screen, operator actions (approve / reject / mark
+  false-positive / re-run red team / export, each journalled, POST token-guarded), search & filter,
+  an estate map by asset tier, a full bilingual (EN/HI) Commander's Brief, a high-contrast projector
+  theme, CSV/xlsx/PDF exports, two voices per finding and live lane-trust. Verified in a headless
+  browser (every screen renders, no page errors).
 - **Plan V2 Wave 2 built** (intelligence, each a proposer/annotator — the gate still decides): SMT
   reachability evidence on fixes (before: reachable with the solver's witness; after: unreachable),
   guided-decoding repair output with strict parsing, cross-language retrieval of a proven fix's idea
