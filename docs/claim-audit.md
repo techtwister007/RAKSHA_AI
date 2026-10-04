@@ -77,6 +77,15 @@ unit-tested here, but the full execution needs the finale hardware (named in the
 | Readiness certificate, compliance pack | BUILT | issued only when the record supports it; the pack verifies on the standalone verifier |
 | Attacker-path explainer (K21), ask-about-my-project (K24), process drill (K30) | NOT BUILT | to be built by the team; not claimed |
 
+## Tools wired in
+
+| claim | status | behind it |
+|-------|--------|-----------|
+| Industry scanners add independent evidence | BUILT (optional) | OSV-Scanner, Gitleaks, Checkov, Semgrep take lanes; `tests/test_tool_integrations.py` |
+| Evidence can be verified without the power to forge | BUILT (optional) | cosign public-key seal, `raksha/cosign.py` |
+| Rules of engagement are enforced twice | BUILT (optional) | OPA policy `raksha/data/roe.rego` must agree with `raksha/roe.py` |
+| Each deployment has its own signing key | BUILT | `raksha/keys.py`, run by `deploy/install.sh` |
+
 ## Standing honest gaps (unchanged from the threat model)
 
 - The 36-hour endurance run, vLLM serving, and the long sandboxed container run require the finale

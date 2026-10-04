@@ -449,6 +449,20 @@ and reporting stays on the box; every number is measured or null; colour is neve
   `raksha/views.py` for K21/K24, the project store for K30).
 - Tests: `tests/test_wave5.py` (17).
 
+### Open-source tools wired in (2026-10-04)
+
+- **OSV-Scanner, Gitleaks, Checkov, Semgrep** as optional take lanes (`RAKSHA_TAKE_ALL=1`): the
+  first three confirm by deterministic re-match; Semgrep runs a bundled offline ruleset and its
+  leads count only when RAKSHA's own lanes confirm the same site and CWE. Measured on the demo
+  estate with the real binaries: 90 extra findings in about 15 s, offline.
+- **cosign:** optional public-key seal on every evidence bundle (`RAKSHA_COSIGN_KEY`).
+- **Open Policy Agent:** the deploy rule as policy code (`RAKSHA_OPA=1`); both must allow.
+- **Deployment signing key** generated on the box by `install.sh` (`raksha/keys.py`).
+- Not wired, with reasons: vLLM/Qwen/Foundation-sec (finale GPU), gVisor (host runtime), external
+  fuzzing engines (engine seam exists; team task with the toolchain image), Joern (heavy; built-in
+  structure lane suffices today), Syft/Trivy/Grype (CycloneDX and OSV-Scanner already cover them).
+- Tests: `tests/test_tool_integrations.py`.
+
 ### Suggested order
 
 Tier 1 (K1–K6) first — it is what users see and it builds directly on the journal, bundles and
