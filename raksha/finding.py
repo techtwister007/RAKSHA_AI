@@ -141,6 +141,15 @@ class Frame:
 EXPLOIT_REPLAY = "exploit-replay"          # a crafted input replays and an oracle aborts
 DETERMINISTIC_MATCH = "deterministic-match"  # a detector deterministically re-matches (dep CVE, secret)
 
+#: Frames from language runtimes and fuzzing harnesses: never the bug's own code, so never its identity.
+_RUNTIME_FRAME_PREFIXES = (
+    "java.", "javax.", "jdk.", "sun.", "com.sun.", "com.code_intelligence.jazzer", "kotlin.",
+    "__libc_", "__interceptor_", "__asan_", "__sanitizer", "LLVMFuzzer", "fuzzer::",
+)
+
+#: Reproducers up to this size are carried in the record and shipped in the evidence bundle.
+MAX_REPRO_BYTES = 1_000_000
+
 
 @dataclass(frozen=True)
 class Reproducer:
@@ -160,6 +169,9 @@ class Reproducer:
     size_bytes: int | None = None
     kind: str = EXPLOIT_REPLAY
     detail: str | None = None  # e.g. "pkg@1.2.3 vulnerable per OSV GHSA-xxxx (fixed in 1.2.4)"
+    #: The reproducer bytes themselves, kept (up to MAX_REPRO_BYTES) so the evidence bundle can ship
+    #: them and a replay can actually run. Never part of equality or the printed record.
+    data: bytes | None = field(default=None, repr=False, compare=False)
 
     @classmethod
     def from_bytes(
@@ -180,6 +192,7 @@ class Reproducer:
             size_bytes=len(data),
             kind=kind,
             detail=detail,
+            data=bytes(data) if len(data) <= MAX_REPRO_BYTES else None,
         )
 
 
@@ -522,14 +535,28 @@ class Finding:
         return self.repair_lane is not None and self.repair_lane not in INFERENCE_LANES
 
     def dedup_key(self, depth: int = 3) -> str:
-        """Stack hash for the Normalise stage — 800 raw crashes collapse to ~6 bugs.
+        """The identity used by the Normalise stage to collapse duplicate records.
 
-        Keyed on bug class plus the top `depth` frames by symbol and file basename, so
-        the same bug reached by different inputs collapses to one record while two
-        different bugs in the same function do not.
+        Two kinds of finding, two notions of "the same bug":
+
+        - A deterministic match (a dependency CVE, a secret, a spec exposure) IS its location: the
+          same advisory in two services, or two passwords in one file, are separate findings. Keyed
+          on oracle, class, advisory/rule, full path, line and symbol.
+        - A crash is keyed on its stack, so 800 inputs reaching one bug collapse to one record. The
+          top frame carries its line (one function can hold two distinct overflows) and runtime /
+          fuzzer frames are skipped (two command injections both pass through
+          ProcessBuilder.start, but are different bugs in different callers).
         """
-        top = [f.normalised() for f in self.frames[:depth]]
-        material = "|".join([self.bug_class, *top])
+        if self.reproducer is not None and self.reproducer.kind == DETERMINISTIC_MATCH:
+            loc = self.frames[0] if self.frames else Frame(symbol="")
+            material = "|".join(str(x) for x in (
+                self.oracle, self.bug_class, self.abort_signature or "", loc.uri or self.target,
+                loc.line or "", loc.symbol))
+        else:
+            own = [f for f in self.frames if not f.symbol.startswith(_RUNTIME_FRAME_PREFIXES)] or self.frames
+            top = [own[0].normalised() + f":{own[0].line or ''}"] if own else []
+            top += [f.normalised() for f in own[1:depth]]
+            material = "|".join([self.bug_class, *top])
         return hashlib.sha256(material.encode()).hexdigest()[:16]
 
     def _transition_at(self, status: Status) -> datetime | None:

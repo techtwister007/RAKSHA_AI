@@ -18,7 +18,6 @@ from dataclasses import dataclass
 
 from ..finding import DETERMINISTIC_MATCH, Finding, Frame, Reproducer, ReplayResult, utcnow
 from . import vulndb
-from .version import in_range
 
 _SEVERITY = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}
 
@@ -35,74 +34,109 @@ class Dependency:
 # ---------------------------------------------------------------- manifest parsers
 
 def parse_maven(text: str, path: str) -> list[Dependency]:
+    """Every <dependency> block with a groupId, artifactId and version, in any tag order.
+
+    A version inherited from a parent POM / BOM / dependencyManagement is not in the block and so
+    cannot be matched deterministically from this file alone; such dependencies are skipped rather
+    than guessed.
+    """
     props = dict(re.findall(r"<([\w.\-]+)>([^<]+)</\1>", text))
     deps: list[Dependency] = []
-    for m in re.finditer(
-        r"<dependency>\s*<groupId>([^<]+)</groupId>\s*<artifactId>([^<]+)</artifactId>\s*"
-        r"<version>([^<]+)</version>", text, re.S):
-        gid, aid, ver = (x.strip() for x in m.groups())
+    for m in re.finditer(r"<dependency>(.*?)</dependency>", text, re.S):
+        block = m.group(1)
+        tags = {t: v.strip() for t, v in re.findall(r"<(groupId|artifactId|version)>([^<]+)</\1>", block)}
+        if not {"groupId", "artifactId", "version"} <= tags.keys():
+            continue
+        ver = tags["version"]
         if ver.startswith("${") and ver.endswith("}"):
             ver = props.get(ver[2:-1], ver)
+        if ver.startswith("${"):
+            continue                                  # unresolved property: unknown version
         line = text[: m.start()].count("\n") + 1
-        deps.append(Dependency("Maven", f"{gid}:{aid}", ver, path, line))
+        deps.append(Dependency("Maven", f"{tags['groupId']}:{tags['artifactId']}", ver, path, line))
     return deps
 
 
 def _norm_pypi(name: str) -> str:
-    return name.lower().replace("_", "-")
+    return vulndb.normalise_package("PyPI", name)
 
 
-def _base_version(spec: str) -> str | None:
-    """The concrete version a range spec is anchored on, for deterministic matching.
+#: An exact version pin with no range operator ("4.17.20", "=4.17.20", "v1.2.3", "1.0.0-rc.1").
+_EXACT = re.compile(r"^\s*(?:={1,3}\s*)?v?(\d+(?:\.\d+)*(?:[-+.][0-9A-Za-z.\-+]*)?)\s*$")
 
-    A manifest range like "^4.17.20" or ">=2.25.1" has a concrete lower bound; if that bound is
-    in a vulnerable range, the declared dependency is vulnerable. We match that bound and say so.
-    Returns None when no numeric version can be read (e.g. "*", a git URL, "latest").
+
+def exact_pin(spec: str | None) -> str | None:
+    """The version if `spec` pins exactly one version, else None.
+
+    Only an exact pin is evidence of what is installed. A range ("^4.17.20", ">=2.25.1") says what
+    is *allowed*; a resolver may well install a fixed version, so matching its lower bound would
+    report a CONFIRMED finding on a dependency that is not vulnerable. Ranges are left to the
+    lockfile, which records what was actually resolved.
     """
-    m = re.search(r"(\d+(?:\.\d+)*(?:[.\-+][0-9A-Za-z.\-]+)?)", spec or "")
+    if not isinstance(spec, str):
+        return None
+    m = _EXACT.match(spec)
     return m.group(1) if m else None
 
 
 def parse_requirements(text: str, path: str) -> list[Dependency]:
     deps = []
     for i, raw in enumerate(text.splitlines(), 1):
-        line = raw.split("#", 1)[0].strip()
-        # name, optional [extras], then an == pin (the only form a concrete version can be read from)
-        m = re.match(r"^([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*==\s*([A-Za-z0-9_.\-+]+)", line)
+        line = raw.split("#", 1)[0].split(";", 1)[0].strip()
+        # name, optional [extras], then an exact == / === pin (the only form a version can be read from)
+        m = re.match(r"^([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*===?\s*([A-Za-z0-9_.\-+!]+)\s*$", line)
         if m:
             deps.append(Dependency("PyPI", _norm_pypi(m.group(1)), m.group(2), path, i))
     return deps
 
 
-def parse_pyproject(text: str, path: str) -> list[Dependency]:
-    """PEP-621 (`dependencies = ["name==x"]`) and Poetry (`name = "^x"`) dependency tables.
-
-    Regex-parsed to keep the lane dependency-free and consistent across Python versions. Only
-    dependencies carrying a readable version are emitted; the base version is matched.
-    """
-    deps: list[Dependency] = []
-    # PEP-621 / PEP-508 strings inside any `dependencies = [ ... ]` array.
-    for m in re.finditer(r"""["']([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*(==|>=|~=|>)\s*([0-9][\w.\-+]*)""", text):
-        deps.append(Dependency("PyPI", _norm_pypi(m.group(1)), m.group(3), path))
-    # Poetry table: `name = "^1.2.3"` under [tool.poetry.dependencies] / group dev deps.
-    in_poetry = False
+def _toml_sections(text: str):
+    """Yield (section header, line number, line) for every line of a TOML file."""
+    section = ""
     for i, raw in enumerate(text.splitlines(), 1):
         s = raw.strip()
-        if s.startswith("["):
-            in_poetry = "poetry" in s and "dependencies" in s
-            continue
-        if not in_poetry:
-            continue
-        pm = re.match(r"""^([A-Za-z0-9_.\-]+)\s*=\s*["']([^"']+)["']""", s)
-        if pm and pm.group(1).lower() != "python":
-            base = _base_version(pm.group(2))
-            if base:
-                deps.append(Dependency("PyPI", _norm_pypi(pm.group(1)), base, path, i))
-    return _dedup_deps(deps)
+        if s.startswith("[") and not s.startswith("[["):
+            section = s.strip("[]").strip()
+        yield section, i, raw
+
+
+def parse_pyproject(text: str, path: str) -> list[Dependency]:
+    """Exact pins from the runtime dependency tables of a pyproject.toml.
+
+    PEP 621: the `dependencies = [...]` array of [project] only — not [build-system] requires, not
+    optional extras (not installed by default). Poetry: [tool.poetry.dependencies], where a bare
+    version string is an exact pin. Regex-parsed to stay dependency-free.
+    """
+    deps: list[Dependency] = []
+    in_array = False
+    for section, i, raw in _toml_sections(text):
+        s = raw.split("#", 1)[0]
+        if section == "project":
+            opening = re.match(r"^\s*dependencies\s*=\s*\[", s)
+            if opening:
+                in_array = True
+            if in_array:
+                for name, ver in re.findall(
+                        r"""["']\s*([A-Za-z0-9_.\-]+)\s*(?:\[[^\]]*\])?\s*===?\s*([0-9][\w.\-+!]*)\s*(?:;[^"']*)?["']""", s):
+                    deps.append(Dependency("PyPI", _norm_pypi(name), ver, path, i))
+                # the array closes at a "]" outside any quoted string (extras like pkg[x] are quoted)
+                unquoted = re.sub(r"\"[^\"]*\"|'[^']*'", "", s)
+                body = unquoted[opening.end():] if opening else unquoted
+                if "]" in body:
+                    in_array = False
+        else:
+            in_array = False
+        if section == "tool.poetry.dependencies":
+            pm = re.match(r"""^\s*([A-Za-z0-9_.\-]+)\s*=\s*["']([^"']+)["']""", s)
+            if pm and pm.group(1).lower() != "python":
+                ver = exact_pin(pm.group(2))
+                if ver:
+                    deps.append(Dependency("PyPI", _norm_pypi(pm.group(1)), ver, path, i))
+    return deps
 
 
 def parse_package_json(text: str, path: str) -> list[Dependency]:
-    """npm manifest. Versions are ranges, so match the range's concrete lower bound."""
+    """Exact pins from an npm manifest. Ranges are resolved by the lockfile, not guessed here."""
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
@@ -110,17 +144,10 @@ def parse_package_json(text: str, path: str) -> list[Dependency]:
     deps: list[Dependency] = []
     for section in ("dependencies", "devDependencies", "optionalDependencies"):
         for name, spec in (data.get(section) or {}).items():
-            base = _base_version(spec if isinstance(spec, str) else "")
-            if base:
-                deps.append(Dependency("npm", name, base, path))
-    return _dedup_deps(deps)
-
-
-def _dedup_deps(deps: list[Dependency]) -> list[Dependency]:
-    seen: dict[tuple[str, str, str], Dependency] = {}
-    for d in deps:
-        seen.setdefault((d.ecosystem, d.package, d.version), d)
-    return list(seen.values())
+            ver = exact_pin(spec)
+            if ver:
+                deps.append(Dependency("npm", name, ver, path))
+    return deps
 
 
 def parse_package_lock(text: str, path: str) -> list[Dependency]:
@@ -128,28 +155,98 @@ def parse_package_lock(text: str, path: str) -> list[Dependency]:
         data = json.loads(text)
     except json.JSONDecodeError:
         return []
+    seen: set[tuple[str, str]] = set()
     deps: list[Dependency] = []
     # npm lockfile v2/v3: "packages": {"node_modules/x": {"version": ...}}
     for key, meta in (data.get("packages") or {}).items():
         if key.startswith("node_modules/") and isinstance(meta, dict) and "version" in meta:
-            deps.append(Dependency("npm", key.split("node_modules/")[-1], meta["version"], path))
-    # lockfile v1: "dependencies": {"x": {"version": ...}}
+            name = key.split("node_modules/")[-1]
+            if (name, meta["version"]) not in seen:
+                seen.add((name, meta["version"]))
+                deps.append(Dependency("npm", name, meta["version"], path))
+    # lockfile v1: "dependencies": {"x": {"version": ...}} (v2 carries both; do not double-count)
     for name, meta in (data.get("dependencies") or {}).items():
-        if isinstance(meta, dict) and "version" in meta:
+        if isinstance(meta, dict) and "version" in meta and (name, meta["version"]) not in seen:
+            seen.add((name, meta["version"]))
             deps.append(Dependency("npm", name, meta["version"], path))
     return deps
 
 
 def parse_go_mod(text: str, path: str) -> list[Dependency]:
-    deps = []
+    """require directives (single-line and block), with `replace` directives applied.
+
+    A module replaced by another versioned module is reported at the replacement; one replaced by a
+    local path has no published version and is skipped. `exclude` blocks are not dependencies.
+    """
+    required: list[tuple[str, str, int]] = []
+    replaced: dict[str, tuple[str, str] | None] = {}
+    block = None
     for i, raw in enumerate(text.splitlines(), 1):
-        # Strip a leading `require` so both the single-line form (`require mod vX`) and the
-        # block form (indented `mod vX` inside `require ( ... )`) are parsed.
-        line = re.sub(r"^\s*require\s+", "", raw)
-        m = re.match(r"^\s*([\w./\-]+)\s+v([0-9][\w.\-+]*)", line)
-        if m and m.group(1) not in ("go", "module", "require", "replace", "exclude"):
-            deps.append(Dependency("Go", m.group(1), m.group(2), path, i))
+        line = raw.split("//", 1)[0].strip()
+        if not line:
+            continue
+        if block:
+            if line == ")":
+                block = None
+                continue
+            directive, body = block, line
+        else:
+            m = re.match(r"^(require|replace|exclude|retract)\s*(\(?)\s*(.*)$", line)
+            if not m:
+                continue
+            if m.group(2) == "(":
+                block = m.group(1)
+                continue
+            directive, body = m.group(1), m.group(3)
+        if directive == "require":
+            r = re.match(r"^([\w./\-~]+)\s+v([0-9][\w.\-+]*)", body)
+            if r:
+                required.append((r.group(1), r.group(2), i))
+        elif directive == "replace":
+            r = re.match(r"^([\w./\-~]+)(?:\s+v[\w.\-+]+)?\s*=>\s*([^\s]+)(?:\s+v([0-9][\w.\-+]*))?", body)
+            if r:
+                replaced[r.group(1)] = (r.group(2), r.group(3)) if r.group(3) else None
+    deps = []
+    for mod, ver, line in required:
+        if mod in replaced:
+            target = replaced[mod]
+            if target is None:
+                continue                              # replaced by a local path: no version to match
+            mod, ver = target
+        deps.append(Dependency("Go", mod, ver, path, line))
     return deps
+
+
+#: When several manifests in one directory name the same dependency, the most authoritative wins:
+#: a lockfile records what was resolved; a manifest only what was asked for.
+_MANIFEST_RANK = {"package-lock.json": 0, "go.mod": 0, "pom.xml": 0, "requirements.txt": 1,
+                  "pyproject.toml": 2, "package.json": 3}
+
+
+def prefer_authoritative(deps: list[Dependency]) -> list[Dependency]:
+    """Per (ecosystem, package, directory), keep only the most authoritative manifest's entries.
+
+    package.json pinning 4.17.20 beside a lockfile that resolved 4.17.21 must not yield a finding —
+    the lockfile is what is installed. A lockfile can legitimately hold several versions of one
+    package (nested installs); all of them are kept.
+    """
+    def key(d: Dependency) -> tuple[str, str, str]:
+        directory = d.manifest.rsplit("/", 1)[0] if "/" in d.manifest else ""
+        return d.ecosystem, d.package, directory
+
+    def rank(d: Dependency) -> int:
+        return _MANIFEST_RANK.get(d.manifest.rsplit("/", 1)[-1], 9)
+
+    best: dict[tuple[str, str, str], int] = {}
+    for d in deps:
+        best[key(d)] = min(best.get(key(d), 99), rank(d))
+    out, seen = [], set()
+    for d in deps:
+        ident = (*key(d), d.version, d.manifest)
+        if rank(d) == best[key(d)] and ident not in seen:
+            seen.add(ident)
+            out.append(d)
+    return out
 
 
 _PARSERS = {
@@ -173,16 +270,17 @@ def scan_dependencies(deps: list[Dependency], db: vulndb.VulnDB | None = None) -
     """Match each dependency against the vuln DB; return CONFIRMED findings for every hit."""
     db = db or vulndb.load()
     findings: list[Finding] = []
-    for dep in deps:
+    for dep in prefer_authoritative(deps):
         for adv in db.for_package(dep.ecosystem, dep.package):
-            if not in_range(dep.version, adv["introduced"], adv.get("fixed")):
+            hit = vulndb.affected_range(adv, dep.version)
+            if hit is None:
                 continue
-            findings.append(_finding(dep, adv))
+            findings.append(_finding(dep, adv, hit.get("fixed")))
     return findings
 
 
-def _finding(dep: Dependency, adv: dict) -> Finding:
-    fixed = adv.get("fixed")
+def _finding(dep: Dependency, adv: dict, fixed: str | None) -> Finding:
+    """`fixed` is the fix on the dependency's own release line (the range that matched)."""
     detail = (f"{dep.package}@{dep.version} vulnerable per {adv['id']}"
               + (f"/{adv['aka']}" if adv.get('aka') else "")
               + (f"; fixed in {fixed}" if fixed else "; no fixed version"))
@@ -201,7 +299,8 @@ def _finding(dep: Dependency, adv: dict) -> Finding:
     # Deterministic-match evidence: the version is, verifiably, in the vulnerable range.
     repro = Reproducer.from_bytes(
         f"{dep.ecosystem} {dep.package} {dep.version} :: {adv['id']}".encode(),
-        ["raksha", "match", dep.ecosystem, dep.package, dep.version, "--advisory", adv["id"]],
+        ["raksha", "match", dep.ecosystem, dep.package, dep.version, "--advisory", adv["id"],
+         "--manifest", dep.manifest],
         artifact_path=dep.manifest, minimised=True, kind=DETERMINISTIC_MATCH, detail=detail,
     )
     f.attach_reproducer(repro)

@@ -55,31 +55,88 @@ def test_parse_requirements_and_go_and_npm():
     assert npm[0].package == "lodash" and npm[0].version == "4.17.20"
 
 
-def test_parse_package_json_reads_range_floors():
+def test_package_json_reports_exact_pins_only():
+    # a range says what is allowed, not what is installed — matching its floor would be a false positive
     deps = {d.package: d.version for d in
-            supply.parse_package_json('{"dependencies":{"lodash":"^4.17.20"},'
-                                      '"devDependencies":{"minimist":"~1.2.5"}}', "package.json")}
-    assert deps == {"lodash": "4.17.20", "minimist": "1.2.5"}   # range floor, so no-lockfile still finds
+            supply.parse_package_json('{"dependencies":{"lodash":"^4.17.20","minimist":"1.2.5",'
+                                      '"a":"link:../foo2","b":"https://x/pkg-2.0.0.tgz","c":"<1.0.0",'
+                                      '"d":"github:u/r#v1.2.3","e":"workspace:*"}}', "package.json")}
+    assert deps == {"minimist": "1.2.5"}
 
 
-def test_parse_pyproject_pep621_and_poetry():
-    text = ('[project]\ndependencies = ["requests==2.25.1", "flask>=2.0"]\n'
-            '[tool.poetry.dependencies]\npython = "^3.11"\npyyaml = "^5.3.1"\n')
+def test_lockfile_overrides_its_manifest(tmp_path):
+    # package.json pins a vulnerable lodash but the lockfile resolved the fixed one: no finding
+    (tmp_path / "package.json").write_text('{"dependencies":{"lodash":"4.17.20"}}')
+    (tmp_path / "package-lock.json").write_text(
+        '{"packages":{"node_modules/lodash":{"version":"4.17.21"}},"dependencies":{"lodash":{"version":"4.17.21"}}}')
+    assert scan_target(tmp_path).findings == []
+
+
+def test_one_dependency_one_finding_across_manifest_and_lockfile(tmp_path):
+    (tmp_path / "package.json").write_text('{"dependencies":{"minimist":"1.2.5"}}')
+    (tmp_path / "package-lock.json").write_text(
+        '{"packages":{"node_modules/minimist":{"version":"1.2.5"}},"dependencies":{"minimist":{"version":"1.2.5"}}}')
+    found = [f for f in scan_target(tmp_path).findings if "minimist" in f.message]
+    assert len(found) == 1 and found[0].target == "package-lock.json"
+
+
+def test_parse_pyproject_runtime_pins_only():
+    text = ('[build-system]\nrequires = ["setuptools>=61", "pyyaml==5.3.1"]\n'
+            '[project]\nname = "x"\ndependencies = [\n  "requests>=2.25.1",\n'
+            '  "pyyaml[extra]==5.3.1 ; python_version>\'3\'",\n]\n'
+            '[project.optional-dependencies]\ndev = ["flask==1.0"]\n'
+            '[tool.poetry.dependencies]\npython = "^3.11"\nclick = "8.0.1"\nrich = "^13.0"\n')
     deps = {d.package: d.version for d in supply.parse_pyproject(text, "pyproject.toml")}
-    assert deps["requests"] == "2.25.1" and deps["pyyaml"] == "5.3.1" and "python" not in deps
+    assert deps == {"pyyaml": "5.3.1", "click": "8.0.1"}
 
 
-def test_parse_go_mod_handles_single_line_require():
-    deps = supply.parse_go_mod("module x\nrequire github.com/gin-gonic/gin v1.6.3\n", "go.mod")
-    assert deps and deps[0].package == "github.com/gin-gonic/gin" and deps[0].version == "1.6.3"
+def test_parse_go_mod_single_line_exclude_and_replace():
+    text = ("module x\nrequire github.com/gin-gonic/gin v1.6.3\nrequire github.com/a/b v1.0.0\n"
+            "exclude (\n\tgithub.com/c/d v0.1.0\n)\n"
+            "replace github.com/a/b => github.com/a/b v1.9.1\n")
+    deps = {d.package: d.version for d in supply.parse_go_mod(text, "go.mod")}
+    assert deps == {"github.com/gin-gonic/gin": "1.6.3", "github.com/a/b": "1.9.1"}
 
 
-def test_new_ecosystem_manifests_produce_findings():
-    # package.json / pyproject carrying a DB-known vulnerable version must yield findings
-    pj = supply.scan_dependencies(supply.parse_package_json('{"dependencies":{"lodash":"^4.17.20"}}', "package.json"))
-    assert pj and pj[0].language == "javascript"
-    pp = supply.scan_dependencies(supply.parse_pyproject('[project]\ndependencies=["pyyaml==5.3.1"]\n', "pyproject.toml"))
-    assert pp and pp[0].language == "python"
+def test_maven_tag_order_does_not_matter():
+    pom = ("<dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind"
+           "</artifactId><scope>compile</scope><version>2.9.8</version></dependency>")
+    (dep,) = supply.parse_maven(pom, "pom.xml")
+    assert dep.version == "2.9.8"
+
+
+@pytest.mark.parametrize("version,expected", [
+    ("2.0", 3), ("2.0-beta9", 3), ("2.14.1", 3),   # all three Log4j CVEs
+    ("2.15.0", 2), ("2.16.0", 1),                   # Log4Shell fixed; the later CVEs are not
+    ("2.17.1", 0), ("2.12.4", 0), ("2.3.2", 0),     # fixed, including the backport lines
+])
+def test_log4j_ranges_match_osv(version, expected):
+    deps = [supply.Dependency("Maven", "org.apache.logging.log4j:log4j-core", version, "pom.xml")]
+    assert len(supply.scan_dependencies(deps)) == expected
+
+
+@pytest.mark.parametrize("pkg,eco,version,vulnerable", [
+    ("com.fasterxml.jackson.core:jackson-databind", "Maven", "2.12.6.1", False),
+    ("com.fasterxml.jackson.core:jackson-databind", "Maven", "2.13.1", True),
+    ("minimist", "npm", "0.2.4", False), ("minimist", "npm", "1.2.5", True),
+    ("github.com/gin-gonic/gin", "Go", "1.7.6", True), ("github.com/gin-gonic/gin", "Go", "1.7.7", False),
+    ("requests", "PyPI", "2.31", False), ("PyYAML", "PyPI", "5.3.1", True),
+])
+def test_backport_lines_and_boundaries(pkg, eco, version, vulnerable):
+    assert bool(supply.scan_dependencies([supply.Dependency(eco, pkg, version, "m")])) is vulnerable
+
+
+def test_dedup_keeps_distinct_build_free_findings(tmp_path):
+    # two passwords in one file and the same CVE in two services are four findings, not two
+    for svc in ("svc_a", "svc_b"):
+        (tmp_path / svc).mkdir()
+        (tmp_path / svc / "package-lock.json").write_text(
+            '{"packages":{"node_modules/minimist":{"version":"1.2.5"}}}')
+    (tmp_path / "svc_a" / "settings.py").write_text(
+        'DB_PASSWORD = "Xk9mQ2vL7pZw"\nADMIN_PASSWORD = "Qw8eRt5yUi2o"\n')
+    found = scan_target(tmp_path).findings
+    assert len([f for f in found if "minimist" in f.message]) == 2
+    assert len([f for f in found if f.oracle == "secrets:generic-password-assign"]) == 2
 
 
 # ---------------------------------------------------------------- the supply lane
@@ -157,7 +214,7 @@ def test_secrets_scanned_in_c_rust_and_key_files(tmp_path):
     from raksha.lanes.buildfree import _SECRET_EXT, _SECRET_NAMES
     assert ".c" in _SECRET_EXT and ".rs" in _SECRET_EXT and ".pem" in _SECRET_EXT
     assert "id_rsa" in _SECRET_NAMES
-    (tmp_path / "creds.c").write_text('const char* k = "AKIAIOSFODNN7EXAMPLE";\n')
+    (tmp_path / "creds.c").write_text('const char* k = "AKIA2QX7RB5NLM3PZK4W";\n')
     res = scan_target(tmp_path)
     assert any(f.oracle == "secrets:aws-access-key-id" for f in res.findings)
 
@@ -191,3 +248,44 @@ def test_build_free_scan_is_fast_and_language_agnostic():
     langs = {f.language for f in res.findings}
     assert len(langs) >= 4                                # js, python, go, 'any' (secrets)
     assert all(f.is_reportable for f in res.findings)     # nothing unproven in the output
+
+
+# ---------------------------------------------------------------- secrets precision
+
+@pytest.mark.parametrize("line", [
+    'password = os.environ["DB_PASS"]', 'password = config.get("database", "password")',
+    'password = request.form["password"]', 'password = hashlib.sha256(raw).hexdigest()',
+    'pwd = os.getcwd()', 'token = generate_csrf_token_for_user(user)', 'password=getpass()',
+    'self.token = refresh_access_token_from_cache()', 'const authToken: AuthTokenProviderType',
+    'SECRET = loadSecretFromKeystore();', 'secret_key = settings.SECRET_KEY', 'token: str',
+    'bypass = "aB3dE5fG7hJ9kL"', 'password = "changeme"',
+])
+def test_expressions_in_code_are_not_secrets(line):
+    assert secrets.scan_text(line, "app/service.py") == []
+
+
+@pytest.mark.parametrize("line", [
+    "DB_PASSWORD=${DB_PASSWORD}", "spring.datasource.password=${SPRING_DATASOURCE_PASSWORD}",
+    "secret: SECRET_KEY_FROM_VAULT_REF", "password: !vault |",
+])
+def test_config_references_are_not_secrets(line):
+    assert secrets.scan_text(line, "config/application.yml") == []
+
+
+@pytest.mark.parametrize("line", [
+    '"password": "Xk9mQ2vL7pZ",', 'DB_PASS = "Xk9#mQ2vL7"', 'client_secret = "8Q~4nX.yZ2-wq9Lp3Rr8tT"',
+    'GH = "ghp_' + "Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0Uv1Wx2" + '"',
+    'x = "xoxb-123456789012-abcdefABCDEF"', 'url = "mongodb://admin:S3cr3tP4ss@db.internal:27017"',
+    'STRIPE = "sk_live_' + "4eC39HqLyjWDarjtT1zdp7dc" + '"', "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+])
+def test_real_secrets_are_found(line):
+    assert secrets.scan_text(line, "app/settings.py")
+
+
+def test_aws_documentation_example_key_is_not_reported():
+    assert secrets.scan_text('k = "AKIAIOSFODNN7EXAMPLE"', "app/x.py") == []
+
+
+def test_secrets_in_test_fixtures_rank_low():
+    (f,) = secrets.scan_text('password = "Xk9mQ2vL7pZ"', "tests/fixtures/x.py")
+    assert f.severity == "low" and f.is_reportable
