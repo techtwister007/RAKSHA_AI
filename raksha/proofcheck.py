@@ -246,3 +246,42 @@ def prove_bound(claim: BoundClaim, *, timeout_ms: int = 5000) -> ProofResult:
             cex,
         )
     return ProofResult("unknown", f"solver returned {verdict} (timeout or incomplete)", None)
+
+
+# ---------------------------------------------------------------- the claim, read from the patch
+
+import re as _re
+
+_U64 = (0, 2**64 - 1)
+_CAP = (1, 2**63)            # a real buffer has at least one byte (premise, recorded in the detail)
+_C_TERNARY = _re.compile(r"\(\s*(?P<n>[^()]+?)\s*\)\s*<\s*sizeof\((?P<d>\w+)\)\s*\?\s*\(\s*(?P<n2>[^()]+?)\s*\)\s*:\s*sizeof\((?P<d2>\w+)\)")
+_C_STRNCPY = _re.compile(r"strncpy\(\s*(?P<d>\w+)\s*,[^,]+,\s*sizeof\((?P<d2>\w+)\)\s*-\s*1\s*\)")
+_GO_SLICE = _re.compile(r"\[[^\[\]:]*:min\((?P<hi>[^()]+?),\s*len\((?P<a>\w+)\)\)\]")
+_RS_MIN = _re.compile(r"usize::min\((?P<hi>[^()]+?),\s*(?P<a>\w+)\.len\(\)\)")
+
+
+def claim_from_diff(diff: str) -> tuple[BoundClaim, str] | None:
+    """The bound claim the patch ACTUALLY makes, read from its added lines, with a description of
+    what was read. None when no added line is a clamp shape this module models — the caller then
+    records "not-modelled" instead of claiming a proof it did not attempt."""
+    for line in diff.splitlines():
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+        m = _C_TERNARY.search(line)
+        if m and m.group("n").strip() == m.group("n2").strip() and m.group("d") == m.group("d2"):
+            return (BoundClaim("cap", "min(n, cap)", {"n": _U64, "cap": _CAP}),
+                    f"C copy length `({m.group('n').strip()}) < sizeof({m.group('d')}) ? ... ` "
+                    f"read as min(n, cap), n: size_t, cap = sizeof({m.group('d')}) >= 1")
+        m = _C_STRNCPY.search(line)
+        if m and m.group("d") == m.group("d2"):
+            return (BoundClaim("cap", "cap - 1", {"cap": _CAP}),
+                    f"C strncpy length sizeof({m.group('d')}) - 1, cap >= 1")
+        m = _GO_SLICE.search(line)
+        if m:
+            return (BoundClaim("len_a", f"min(hi, len_a)", {"hi": (-(2**63), 2**63 - 1), "len_a": (0, 2**63 - 1)}),
+                    f"Go slice high bound min({m.group('hi').strip()}, len({m.group('a')})), hi: int")
+        m = _RS_MIN.search(line)
+        if m:
+            return (BoundClaim("len_a", "min(hi, len_a)", {"hi": _U64, "len_a": _U64}),
+                    f"Rust usize::min({m.group('hi').strip()}, {m.group('a')}.len()), hi: usize")
+    return None

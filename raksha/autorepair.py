@@ -271,19 +271,29 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
                             f"{len(finding.rejected_candidates)} refused by patch hygiene)")
     if finding.status is Status.VERIFIED and finding.repair_lane in (RepairLane.TEMPLATE, RepairLane.RETRIEVAL):
         try:
-            from .proofcheck import prove_bound, z3_available, BoundClaim
-            if z3_available():
-                # a conservative obligation for a size_t-ranged clamp into the fix-site buffer; the
-                # exact buffer size is the gate's concern, so we model it symbolically as the cap.
-                claim = BoundClaim(dst_size_expr="cap", clamped_len_expr="min(n, cap)",
-                                   var_ranges={"n": (0, 2**64 - 1), "cap": (0, 2**63)})
-                res = prove_bound(claim)
-                finding.bound_proof = {"status": res.status, "detail": res.detail}
+            from .proofcheck import bound_obligation, claim_from_diff, prove_bound, z3_available
+            read = claim_from_diff(finding.patch_diff or "")
+            if read is None:
+                finding.bound_proof = {"status": "not-modelled",
+                                       "detail": "the patch's bound is not a clamp shape the prover models"}
             else:
-                finding.bound_proof = {"status": "unavailable",
-                                       "detail": "no SMT solver bundled on this node; proof deferred"}
+                claim, what = read
+                if z3_available():
+                    res = prove_bound(claim)
+                    finding.bound_proof = {"status": res.status, "detail": res.detail, "claim": what,
+                                           "obligation": bound_obligation(claim)}
+                else:
+                    finding.bound_proof = {"status": "unavailable", "claim": what,
+                                           "obligation": bound_obligation(claim),
+                                           "detail": "no SMT solver bundled on this node; proof deferred"}
         except Exception:  # noqa: BLE001 — the proof is additive evidence, never fatal
             finding.bound_proof = None
+    if finding.status is Status.VERIFIED and finding.patch_diff:
+        try:   # A5: prove the shipped patch rolls back to a byte-identical tree
+            from .rollback import prove_rollback
+            finding.rollback_proof = prove_rollback(root, finding.patch_diff)
+        except Exception:  # noqa: BLE001 — additive evidence, never fatal
+            finding.rollback_proof = None
     finding.cpu_seconds = round(_cpu() - _cpu0, 3)
     try:
         finding.peak_rss_kb = _res.getrusage(_res.RUSAGE_SELF).ru_maxrss  # process peak (KB on Linux)

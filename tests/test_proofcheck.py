@@ -108,3 +108,14 @@ def test_unparseable_claim_is_unknown_not_a_crash():
     res = prove_bound(claim)
     assert res.status == "unknown"
     assert res.proved is False
+
+
+def test_claim_is_read_from_the_patch_not_assumed():
+    from raksha.proofcheck import claim_from_diff
+    c = claim_from_diff("+  memcpy(buf, src, (len) < sizeof(buf) ? (len) : sizeof(buf));\n")
+    assert c and c[0].clamped_len_expr == "min(n, cap)" and "sizeof(buf)" in c[1]
+    # mismatched operands are NOT a clamp: never read as one
+    assert claim_from_diff("+  memcpy(buf, src, (len) < sizeof(buf) ? (other) : sizeof(buf));\n") is None
+    assert claim_from_diff("+  if (i < n) x = 1;\n") is None
+    go = claim_from_diff("+\tout := data[2:min(n, len(data))]\n")
+    assert go and go[0].var_ranges["hi"][0] < 0          # a signed int high bound is modelled as signed

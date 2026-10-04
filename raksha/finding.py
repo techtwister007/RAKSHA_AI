@@ -390,6 +390,8 @@ class Finding:
     #: A10: the machine-checked bound-proof result for a bound-clamp fix, or None. Status is
     #: "proved"/"refuted"/"unknown"/"unavailable" (the last when no solver is bundled).
     bound_proof: dict | None = None
+    #: A5: proof that the patch rolls back to a byte-identical tree (tree hashes), or None.
+    rollback_proof: dict | None = None
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
@@ -762,6 +764,7 @@ class Finding:
             "reachability": self.reachability,
             "resource": {"cpu_seconds": self.cpu_seconds, "peak_rss_kb": self.peak_rss_kb},
             "bound_proof": self.bound_proof,
+            "rollback_proof": self.rollback_proof,
             "assurance": {
                 "structure": self.structure,
                 "evidence_score": self.evidence_score,
