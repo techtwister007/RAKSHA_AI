@@ -311,6 +311,14 @@ def scorecard(
         "mission_tiers": _count(f.mission_impact for f in findings if f.mission_impact),
         # concurrency: races found and proven (the TSan oracle)
         "race_findings": len([f for f in findings if f.oracle.startswith("tsan") or f.bug_class == "CWE-362"]),
+        # C6: dependency findings known to be actively exploited (KEV), and the max EPSS seen.
+        "known_exploited_findings": len([f for f in reported if getattr(f, "kev", False)]),
+        "max_epss": max([getattr(f, "epss", None) or 0.0 for f in findings] or [0.0]) or None,
+        # C1: dependency findings reached only transitively.
+        "transitive_dependency_findings": len([f for f in reported if getattr(f, "transitive", False)]),
+        # C8/C3: config/IaC and git-history findings now in the build-free floor.
+        "iac_findings": len([f for f in reported if f.oracle.startswith("iac:")]),
+        "git_history_findings": len([f for f in reported if f.oracle.startswith("githistory:")]),
     }
 
     return Scorecard(

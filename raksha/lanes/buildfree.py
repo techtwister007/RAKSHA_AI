@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..finding import Finding, dedup
-from . import crypto, secrets, service, supply, vulndb
+from . import crypto, githistory, iac, kev, secrets, service, supply, transitive, vulndb
 
 #: Files worth reading for secrets. Covers every language with source here (C/C++, Rust, C#,
 #: Kotlin, Scala, Swift included, not only the three with deep adapters), config, and the files
@@ -90,8 +90,28 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
             findings.extend(service.scan_openapi(text, rel))
 
     dep_findings = supply.scan_dependencies(deps, db)
+    # Transitive hits (C1): the full tree, where a lockfile or an offline tree tool is available.
+    # Deduped against the direct deps by the shared DETERMINISTIC_MATCH location key.
+    try:
+        dep_findings.extend(transitive.scan_transitive(root, db=db))
+    except Exception:  # noqa: BLE001 — a tree we cannot resolve is not a crash
+        pass
     supply.annotate_reachability(dep_findings, imports)   # present is not reached; say which
+    try:
+        kev.annotate_exploit_intel(dep_findings, db=db)   # C6: known-exploited + EPSS metadata
+    except Exception:  # noqa: BLE001
+        pass
     findings.extend(dep_findings)
+    # Config / IaC hardening (C8) and secrets in git history (C3) — each returns [] with no error
+    # when its prerequisite (a Dockerfile/manifest, a git repo) is absent.
+    try:
+        findings.extend(iac.scan_iac(root))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        findings.extend(githistory.scan_git_history(root))
+    except Exception:  # noqa: BLE001
+        pass
     findings = dedup(findings)
     return BuildFreeResult(findings=findings, files_scanned=files, manifests_found=manifests,
                            seconds=round(time.monotonic() - started, 3), crypto_uses=crypto_uses)

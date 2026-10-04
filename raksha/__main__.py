@@ -97,6 +97,26 @@ def _crypto(a: argparse.Namespace) -> int:
     return REPRODUCED if hit else NOT_REPRODUCED
 
 
+def _iac(a: argparse.Namespace) -> int:
+    from .lanes import iac
+    try:
+        hit = iac.replay(a.rule, a.path, a.line)
+    except (FileNotFoundError, ValueError) as e:
+        print(e); return ERROR
+    print(("REPRODUCED" if hit else "NOT REPRODUCED") + f": {a.rule} at {a.path}:{a.line}")
+    return REPRODUCED if hit else NOT_REPRODUCED
+
+
+def _githistory(a: argparse.Namespace) -> int:
+    from .lanes import githistory
+    try:
+        hit = githistory.replay(a.rule, a.commit, a.path)
+    except (FileNotFoundError, ValueError) as e:
+        print(e); return ERROR
+    print(("REPRODUCED" if hit else "NOT REPRODUCED") + f": {a.rule} in {a.commit}:{a.path}")
+    return REPRODUCED if hit else NOT_REPRODUCED
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m raksha", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -114,6 +134,12 @@ def main(argv: list[str] | None = None) -> int:
     cm = sub.add_parser("crypto-match", help="re-check a weak-crypto finding at a file:line")
     cm.add_argument("rule"); cm.add_argument("path"); cm.add_argument("line", type=int)
     cm.set_defaults(fn=_crypto)
+    im = sub.add_parser("iac-match", help="re-check an IaC/config misconfiguration at a file:line")
+    im.add_argument("rule"); im.add_argument("path"); im.add_argument("line", type=int)
+    im.set_defaults(fn=_iac)
+    gm = sub.add_parser("git-secret-match", help="re-check a secret in a past commit")
+    gm.add_argument("rule"); gm.add_argument("commit"); gm.add_argument("path"); gm.add_argument("line", type=int)
+    gm.set_defaults(fn=_githistory)
     args = ap.parse_args(argv)
     return args.fn(args)
 

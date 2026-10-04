@@ -242,7 +242,10 @@ NEGATIVE_CONTROLS: dict[str, str] = {
     "py/requirements.txt": "pyyaml==5.4\nrequests==2.31.0\nflask>=2.0\n",
     "py/pyproject.toml": '[build-system]\nrequires = ["setuptools>=61"]\n[project]\nname = "x"\n'
                          'dependencies = ["requests>=2.25.1"]\n',
-    "go/go.mod": "module x\nrequire github.com/gin-gonic/gin v1.7.7\n",
+    # A truly clean Go control pulls nothing external: the transitive lane (C1) resolves the whole
+    # module graph, and almost any real require drags in an old golang.org/x/text that the DB flags
+    # (a true transitive positive). A manifest with no requires is the unambiguous negative control.
+    "go/go.mod": "module x\n\ngo 1.21\n",
     "py/settings.py": 'import os\nDB_PASSWORD = os.environ["DB_PASSWORD"]\n'
                       'token = make_token(user)\nsecret_key = settings.SECRET_KEY\npwd = os.getcwd()\n'
                       'AWS_KEY = "AKIAIOSFODNN7EXAMPLE"\n',
