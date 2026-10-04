@@ -58,6 +58,9 @@ class Target:
 class Session:
     targets: list[Target] = field(default_factory=list)
     findings: dict[str, Finding] = field(default_factory=dict)
+    #: Fleet variants found per verified fix by the vaccine sweep. None until a sweep runs, so the
+    #: scorecard shows the row as honestly-unmeasured rather than a faked zero.
+    vaccine_variants: int | None = None
 
     # -- ingest -------------------------------------------------------------------------------
     def add_finding(self, f: Finding) -> None:
@@ -99,7 +102,25 @@ class Session:
         return [t.card(self.findings) for t in self.targets]
 
     def scorecard(self) -> dict:
-        return scorecard(self.findings.values()).as_dict()
+        return scorecard(self.findings.values(), vaccine_variants=self.vaccine_variants).as_dict()
+
+    def run_vaccine_sweep(self, codebases: dict[str, Path]) -> int:
+        """Mine a vaccine rule from every VERIFIED fix, sweep the codebases, record the count.
+
+        This is the scalability beat made into a live metric: one verified fix, how many fleet
+        variants of the same mistake it finds. Read-only (R0-safe); hits are only SUSPECTED.
+        """
+        from .vaccine import extract_rule, sweep
+        total = 0
+        for f in list(self.findings.values()):
+            if f.status is not Status.VERIFIED:
+                continue
+            rule = extract_rule(f)
+            if rule is None:
+                continue
+            total += len(sweep(rule, codebases))
+        self.vaccine_variants = total
+        return total
 
     def finding_rows(self) -> list[dict]:
         """Compact rows for the finding list, newest-looking order: severity then language."""
@@ -148,18 +169,27 @@ class Session:
         return {"id": f.id, "ok": res.ok, "summary": res.summary(), "path": out}
 
     def pipeline_stages(self) -> list[dict]:
-        """The nine stages with a live count of findings at or past each — for the Live Pipeline."""
+        """The status machine with a live count at or past each state — for the Live Pipeline.
+
+        REPORT_ONLY is shown as its own row (a proven finding with no validated fix), not folded
+        into CONFIRMED, so the board never discards findings it is actually holding.
+        """
         from .finding import Status
-        order = [Status.SUSPECTED, Status.CONFIRMED, Status.PATCHED, Status.VERIFIED]
-        rank = {s: i for i, s in enumerate(order)}
+        order = [Status.SUSPECTED, Status.CONFIRMED, Status.PATCHED, Status.VERIFIED,
+                 Status.REPORT_ONLY]
+        rank = {Status.SUSPECTED: 0, Status.CONFIRMED: 1, Status.PATCHED: 2, Status.VERIFIED: 3}
         rank[Status.REPORT_ONLY] = rank[Status.CONFIRMED]  # proven, no validated fix
         counts = {s.value: 0 for s in order}
-        counts["REPORT_ONLY"] = 0
         for f in self.findings.values():
             counts[f.status.value] = counts.get(f.status.value, 0) + 1
-        return [{"status": s.value, "count": counts.get(s.value, 0),
-                 "at_or_past": sum(1 for f in self.findings.values()
-                                   if rank.get(f.status, 0) >= rank[s])} for s in order]
+        rows = []
+        for s in order:
+            if s is Status.REPORT_ONLY:
+                at_or_past = counts["REPORT_ONLY"]           # a terminal state, counted on its own
+            else:
+                at_or_past = sum(1 for f in self.findings.values() if rank.get(f.status, 0) >= rank[s])
+            rows.append({"status": s.value, "count": counts.get(s.value, 0), "at_or_past": at_or_past})
+        return rows
 
     def snapshot(self) -> dict:
         return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
@@ -198,6 +228,11 @@ def three_language_session(repo_root: Path | None = None, *, include_java: bool 
     estate = repo_root / "demo-targets" / "mixed-estate"
     if estate.exists():
         s.ingest_build_free(estate, name="mixed-estate")
+    # One verified fix, fleet-wide: sweep the demo targets for the same mistake and record the
+    # variant count, so the scalability row on the Scorecard is a live number, not a claim.
+    codebases = {p.name: p for p in (repo_root / "demo-targets").glob("*") if p.is_dir()}
+    if codebases:
+        s.run_vaccine_sweep(codebases)
     return s
 
 

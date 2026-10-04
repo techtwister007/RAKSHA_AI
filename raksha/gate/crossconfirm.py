@@ -20,9 +20,12 @@ from ..finding import Finding, FixSite, Status
 def _same_site(a: FixSite, b: FixSite, tol: int) -> bool:
     if a.uri.rsplit("/", 1)[-1] != b.uri.rsplit("/", 1)[-1]:
         return False
-    if a.start_line is None or b.start_line is None:
-        return True
-    return abs(a.start_line - b.start_line) <= tol
+    if a.start_line is not None and b.start_line is not None:
+        return abs(a.start_line - b.start_line) <= tol
+    # A missing line must not collapse "same site" to "same file": two distinct same-CWE bugs
+    # in one file would wrongly merge. Fall back to the symbol, and refuse the match when even
+    # that is unknown — over-merging understates the finding count and attaches a wrong reproducer.
+    return a.symbol is not None and a.symbol == b.symbol
 
 
 def cross_confirm(findings: list[Finding], *, line_tolerance: int = 3) -> list[Finding]:

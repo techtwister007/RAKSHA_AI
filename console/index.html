@@ -152,7 +152,7 @@
   <main>
     <section id="board"><h2>Targets</h2><div class="board" id="board-grid"></div></section>
     <section id="pipeline" hidden>
-      <h2>Findings flowing through the nine stages</h2>
+      <h2>Findings flowing through the status machine</h2>
       <div class="pipe" id="pipe-flow"></div>
       <h2 style="margin-top:22px">Ranked risk register — fix these first</h2>
       <div class="flist" id="risk-list"></div>
@@ -379,6 +379,16 @@ function renderScore(){
   add((s.resource.zero_inference_fix_pct==null?'—':s.resource.zero_inference_fix_pct+'%'), 'fixes at zero inference','vi');
   add(s.functionality.zero_human_input_verified, 'fixes with zero human input');
   add((s.speed.median_time_to_pov_seconds==null?'—':s.speed.median_time_to_pov_seconds+'s'), 'median time to proof');
+  add((s.speed.time_to_first_proven_finding_seconds==null?'—':s.speed.time_to_first_proven_finding_seconds+'s'),
+      'time to first proven finding','hl');
+  add((s.speed.median_time_to_validated_patch_seconds==null?'—':s.speed.median_time_to_validated_patch_seconds+'s'),
+      'median time to validated patch');
+  add((s.precision.patches_surviving_differential_pct==null?'—':s.precision.patches_surviving_differential_pct+'%'),
+      'candidate patches surviving the gate');
+  add(s.precision.static_findings_promoted, 'static findings cross-confirmed');
+  add((s.resource.tokens_per_validated_patch==null?'—':s.resource.tokens_per_validated_patch), 'tokens per validated patch','vi');
+  add((s.resource.vram==null?'— no GPU':s.resource.vram.used_mb+' MB'), 'live VRAM in use','vi');
+  add((s.scalability.vaccine_variants_found==null?'—':s.scalability.vaccine_variants_found), 'vaccine variants found','vi');
   add(s.precision.unproven_findings_suppressed, 'unproven findings suppressed');
   body.appendChild(kpis);
 

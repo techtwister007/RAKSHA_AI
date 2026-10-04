@@ -173,3 +173,24 @@ def test_speed_emits_time_to_first_finding_and_first_window():
     card = scorecard([f], gpu_probe=lambda: None).as_dict()
     assert card["speed"]["time_to_first_proven_finding_seconds"] is not None
     assert card["speed"]["findings_in_first_10min"] == 1
+
+
+# ---------------------------------------------------------------- orchestrator wiring (C5/M3)
+
+def test_pipeline_shows_report_only_as_its_own_row():
+    from raksha.orchestrator import Session
+    rows = Session().pipeline_stages()
+    assert [r["status"] for r in rows] == [
+        "SUSPECTED", "CONFIRMED", "PATCHED", "VERIFIED", "REPORT_ONLY"]
+
+
+def test_vaccine_sweep_populates_the_scalability_metric(tmp_path):
+    from raksha.orchestrator import Session
+    (tmp_path / "svc.py").write_text("import subprocess\nsubprocess.run(cmd, shell=True)\n")
+    f = _verified_with_lane(RepairLane.TEMPLATE)
+    f.bug_class = "CWE-78"                      # shell-injection rule exists for this class
+    f.language = "python"                       # so the sweep scans .py files
+    s = Session()
+    s.add_finding(f)
+    n = s.run_vaccine_sweep({"svc": tmp_path})
+    assert n >= 1 and s.scorecard()["scalability"]["vaccine_variants_found"] == n
