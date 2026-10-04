@@ -339,6 +339,26 @@ class Session:
         return self.attach_target(name, [f], build_status="green",
                                   languages=[f.language])
 
+    def ingest_behaviour(self, root: str | Path, argv: list[str], corpus: list[bytes], *,
+                         name: str | None = None, language: str = "c/c++",
+                         candidates: list[bytes] | None = None, roe: RoeLevel = RoeLevel.R1) -> Target:
+        """B12: run `argv` (in `root`) under the observe shim on a benign corpus, then attach any
+        input whose files / sockets / processes leave that baseline — defects no crash oracle sees."""
+        from . import behaviour
+        root = Path(root)
+        name = name or root.name
+        shim = behaviour.build_shim()
+        if shim is None:
+            t = Target(name=name, build_status="amber", roe_level=roe,
+                       note="behavioural lane skipped: no C compiler for the observe shim")
+            self.targets.append(t)
+            return t
+        res = behaviour.scan(behaviour.Observer(argv, root, shim), corpus, candidates=candidates,
+                             target=name, language=language)
+        t = self.attach_target(name, res.findings, build_status="green", roe=roe, languages=[language])
+        t.note = f"behavioural baseline: {res.note}"
+        return t
+
     def attach_target(self, name: str, findings: list[Finding], *, build_status: str = "green",
                       roe: RoeLevel = RoeLevel.R1, languages: list[str] | None = None) -> Target:
         """Attach a target whose findings came from the deep lanes (e.g. the Java slice)."""
