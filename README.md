@@ -24,30 +24,44 @@ real. Nothing unproven ever ships.
 
 ## Status
 
-**Phase 0 — the keystone.** Three oracles → one record → one gate, proven on
-trivial targets before anything clever is built (`RAKSHA_AI_Dossier/14_open_questions.md`
-item 1).
+**All phases built** (phase table and exit gates in `BUILD_PLAN.md`). The system finds,
+fixes and proves vulnerabilities across C, Java and Python through one gate, scans any
+language build-free, serves the offline operator console, and signs an evidence bundle.
+The only thing a build container cannot do is the 36-hour dress rehearsal on finale GPU
+hardware — the harness and runbook for it are built (`raksha/rehearse.py`,
+`docs/rehearsal-runbook.md`).
 
 ```
 raksha/
-  finding.py    the unified finding record — SARIF 2.1 + a proof block
-  metrics.py    the scorecard, derived from the records
-  cwe.py        each oracle's vocabulary → CWE
-  oracles/
-    base.py     the oracle plugin interface
-    asan.py     C/C++      — ASan / UBSan / MSan
-    jazzer.py   Java       — Jazzer's built-in security detectors
-    pysecsan.py Python     — PySecSan sink aborts, Atheris fallback
+  finding.py      the unified finding record — SARIF 2.1 + a proof block, invariants enforced
+  metrics.py      the scorecard, every number derived from the records
+  gate/           the five-check gate: target protocol, differential corpus, runner, cross-confirm
+  oracles/        the plugin interface + ASan (C/C++), Jazzer (Java), PySecSan (Python)
+  lanes/          build-free: supply-chain (Maven/npm/PyPI/Go), secrets, service, dependency bump
+  adapters/       one per language — wires a real toolchain to the gate (c_asan, java, python_sink)
+  buildagent.py   detect → build → escalate → degrade to build-free
+  inference.py    the ONE interface any model call goes through (air-gap guard proves it)
+  repair.py       the repair ladder: template → retrieval → model → mitigation floor
+  roe.py          Rules of Engagement — asset tiers, step-downs, two-person rule
+  vaccine.py      one verified fix → a proven detection rule → a fleet sweep
+  bundle.py brief.py risk.py rollback.py   signed evidence, Commander's Brief, risk register
+  airgap.py sandbox.py                     the no-egress guard and the isolation wrapper
+  orchestrator.py console (../console/)    the live session the six-screen console renders
+  health.py rehearse.py                    endurance watchdog and dress-rehearsal harness
+  benchmark.py                             our own measured numbers (ARVO-style cases)
 ```
-
-The gate itself (Phase 1) and the Java vertical slice (Phase 2) are next.
 
 ## Run it
 
 ```sh
 pip install -e '.[dev]'
-pytest                  # 62 tests
-python -m raksha.demo    # a C, a Java and a Python finding through one pipeline
+pytest                       # the full invariant, gate, lane and hardening suite
+
+python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
+python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)
+python -m raksha.orchestrator # serve the offline operator console on :8080
+python -m raksha.airgap      # the no-egress guard (run before building the bundle)
+python -m raksha.rehearse 10 # a short self-test of the endurance harness
 ```
 
 The demo writes `raksha-findings.sarif`, which validates against the OASIS SARIF 2.1.0

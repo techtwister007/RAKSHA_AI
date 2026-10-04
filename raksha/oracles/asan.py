@@ -65,14 +65,16 @@ class AsanOracle(Oracle):
         kind = match.group("kind")
         tool = match.group("tool")
         frames = self._frames(raw)
-        bug_class = cwe_for_sanitizer(kind)
-        severity = "high" if kind in _HIGH_SEVERITY else "medium"
 
-        # The SUMMARY line is more specific than the banner for some kinds.
+        # The SUMMARY line is more specific than the banner for some kinds, so resolve the kind
+        # FIRST, then derive bug class and severity from the resolved kind — otherwise a banner
+        # that reads generic/medium but summarises to a high-severity write/lifetime kind would
+        # keep the wrong severity and emit SARIF level="warning" for a dangerous bug.
         summary = _SUMMARY.search(raw)
         if summary and summary.group("kind") != kind:
             kind = summary.group("kind")
-            bug_class = cwe_for_sanitizer(kind)
+        bug_class = cwe_for_sanitizer(kind)
+        severity = "high" if kind in _HIGH_SEVERITY else "medium"
 
         finding = Finding(
             oracle=f"{self.name}:{tool}",

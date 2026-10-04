@@ -184,6 +184,37 @@ def test_pipeline_shows_report_only_as_its_own_row():
         "SUSPECTED", "CONFIRMED", "PATCHED", "VERIFIED", "REPORT_ONLY"]
 
 
+def test_airgap_guard_catches_wider_egress(tmp_path):
+    from raksha import airgap
+    (tmp_path / "a.py").write_text("import http.client\n")           # egress client, not a server
+    (tmp_path / "b.py").write_text("import subprocess; subprocess.run('curl http://x', shell=True)\n")
+    kinds = {v.kind for v in airgap.check_python(tmp_path)}
+    assert "network-import" in kinds and "shell-egress" in kinds
+
+
+def test_airgap_allows_local_server_imports(tmp_path):
+    from raksha import airgap
+    (tmp_path / "srv.py").write_text("from http.server import ThreadingHTTPServer\n")
+    assert airgap.check_python(tmp_path) == []                       # binding a local port is not egress
+
+
+def test_airgap_html_catches_protocol_relative_and_fetch(tmp_path):
+    from raksha import airgap
+    (tmp_path / "p.html").write_text('<script src="//cdn.example.com/x.js"></script>\n'
+                                     '<script>fetch("https://api.example.com/d")</script>\n')
+    assert len(airgap.check_shipped_html([tmp_path])) >= 2
+
+
+def test_asan_severity_follows_the_summary_kind():
+    from raksha.oracles import AsanOracle
+    # banner says a generic/medium kind; SUMMARY resolves to a high-severity write
+    raw = ("==1==ERROR: AddressSanitizer: unknown-crash on address 0x1\n"
+           "    #0 0x1 in f /src/a.c:10:3\n"
+           "SUMMARY: AddressSanitizer: heap-buffer-overflow /src/a.c:10:3 in f\n")
+    (finding,) = AsanOracle().parse(raw, target="t")
+    assert finding.severity == "high"            # recomputed from the resolved kind, not the banner
+
+
 def test_vaccine_sweep_populates_the_scalability_metric(tmp_path):
     from raksha.orchestrator import Session
     (tmp_path / "svc.py").write_text("import subprocess\nsubprocess.run(cmd, shell=True)\n")
