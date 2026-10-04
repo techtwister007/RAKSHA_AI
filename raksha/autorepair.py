@@ -101,8 +101,26 @@ def _frontier_entry(cand: Candidate, verdict: GateVerdict, rank: int) -> dict:
             "refuzz_variants": verdict.refuzz_variants, "rank": rank, "chosen": False}
 
 
-def _llm_candidates(finding: Finding, root: Path, client, n: int = 3) -> list[Candidate]:
-    """Model-proposed patches, with the fix-site source in the prompt. [] when no endpoint."""
+def _verdict_feedback(verdict) -> str:
+    """One line a model can act on: the failed check, its reason, and a sample mismatching input."""
+    if verdict is None:
+        return ""
+    chk = verdict.failed_check.value if getattr(verdict, "failed_check", None) else "a gate check"
+    detail = (verdict.detail or "").strip()
+    sample = ""
+    if getattr(verdict, "mismatches", None):
+        m = verdict.mismatches[0]
+        sample = f" Example input that changed behaviour: index {getattr(m, 'index', '?')}."
+    return f"It failed {chk}: {detail}.{sample}"
+
+
+def _llm_candidates(finding: Finding, root: Path, client, n: int = 3,
+                    feedback: str | None = None) -> list[Candidate]:
+    """Model-proposed patches, with the fix-site source in the prompt. [] when no endpoint.
+
+    `feedback` (A6): when a previous candidate failed the gate, its check, the one-line reason and a
+    sample mismatching input are handed back so the next proposal is a correction, not a blind retry
+    — repair becomes a conversation with the verifier, bounded by MAX_REPAIR_ROUNDS."""
     if client is None:
         return []
     got = _read_fix_site(finding, root)
@@ -125,10 +143,12 @@ def _llm_candidates(finding: Finding, root: Path, client, n: int = 3) -> list[Ca
          f"Bug class: {finding.bug_class}\nLanguage: {finding.language}\nFile: {rel}\n"
          f"Vulnerable site: {rel}:{line}\nFinding: {one_line(finding.message, 400)}\n\n"
          f"<<<UNTRUSTED SOURCE {rel} (line-numbered)\n{numbered}\n>>>END UNTRUSTED SOURCE\n\n"
-         f"Produce the minimal unified diff for {rel}, then optionally the regression test."},
+         f"Produce the minimal unified diff for {rel}, then optionally the regression test."
+         + (f"\n\nYour previous attempt was REJECTED by the verifier. {feedback}\nFix that and "
+            "try again — do not repeat the rejected approach." if feedback else "")},
     ]
     try:
-        completions = client.complete(prompt, role=REPAIR, n=n, temperature=0.3)
+        completions = client.complete(prompt, role=REPAIR, n=(1 if feedback else n), temperature=0.3)
     except InferenceError:
         return []
     model = client.config.model_for(REPAIR)
@@ -224,6 +244,22 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
         finding.frontier = [e for _c, _v, e in passers]
     elif passers:
         finding.frontier = [dict(passers[0][2], chosen=finding.status is Status.VERIFIED)]
+
+    if (finding.status is Status.CONFIRMED and client is not None
+            and finding.repair_rounds < MAX_REPAIR_ROUNDS and verdict is not None
+            and any(l is RepairLane.LLM for l in finding.lane_history)):
+        # A6: hand the verifier's rejection back to the model and let it correct once more.
+        for cand in _llm_candidates(finding, root, client, feedback=_verdict_feedback(verdict)):
+            if finding.status is not Status.CONFIRMED or not _admit(cand, finding):
+                continue
+            finding.mark_patched(cand.diff, cand.lane, model_version=cand.model_version,
+                                 prompt_version=cand.prompt_version)
+            tried += 1
+            verdict = _gate(cand)
+            decide(finding, verdict)
+            if finding.status is Status.VERIFIED:
+                finding.frontier = [_frontier_entry(cand, verdict, rank=0) | {"chosen": True}]
+                break
 
     if finding.status is Status.CONFIRMED:
         finding.report_only(f"no repair candidate cleared the gate ({tried} gated, "

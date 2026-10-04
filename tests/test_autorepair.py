@@ -178,3 +178,33 @@ def test_single_template_targets_have_a_frontier_of_one_and_the_env_knob_restore
     out2 = repair(r2.finding, r2.target, root=r2.target.source_root, reproducer=r2.crashing_input,
                   corpus=[b"10 m to ft"], use_model=False)
     assert out2.verified and out2.frontier_size == 1 and len(r2.finding.gate_history) == 5
+
+
+@pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
+def test_a6_model_gets_the_verdicts_feedback_on_the_next_round(monkeypatch):
+    """A6: when a model patch fails the gate, the next model prompt carries the failed check and
+    reason, so repair is a conversation with the verifier. The second attempt (a correct diff)
+    verifies, and the mock records that round two's prompt named round one's failure."""
+    from raksha.repair_templates import c_bound_copy
+    r = autofuzz(C_TARGET, max_execs=60000, use_model=False)
+    good = c_bound_copy(r.finding, Path(r.target.source_root))
+    bad = ("--- a/src/tlv.c\n+++ b/src/tlv.c\n@@ -9,2 +9,3 @@\n"
+           "     if (len < 2) return -1;\n"
+           "+    /* no real fix */\n"
+           "     uint8_t tag = data[0];\n")
+    monkeypatch.setattr(autorepair, "generic_templates", lambda finding, root: [])
+
+    class FeedbackClient:
+        def __init__(self): self.calls = []
+        config = SimpleNamespace(model_for=lambda role: "mock-repair-model")
+        def complete(self, messages, *, role="repair", n=1, temperature=0.0, max_tokens=1024):
+            self.calls.append(messages)
+            # first call: the (bad) initial batch; later call (with feedback): the good fix
+            user = messages[-1]["content"]
+            return [good] if "REJECTED by the verifier" in user else [bad]
+    client = FeedbackClient()
+    out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                 corpus=[b"\x01\x04abcd", b"\x02zz"], client=client, frontier=False)
+    assert out.verified and r.finding.status is Status.VERIFIED
+    assert len(client.calls) >= 2                      # it came back for a second, informed attempt
+    assert "REJECTED by the verifier" in client.calls[-1][-1]["content"]
