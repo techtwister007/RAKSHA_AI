@@ -104,7 +104,7 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes | None = N
         "commanders_brief.txt": jssd_brief(finding).encode(),
     }
     if ships_bytes(finding):
-        artifacts[REPRO_FILE] = finding.reproducer.data  # the exploit itself, so replay.sh runs
+        artifacts[REPRO_FILE] = finding.reproducer.raw_bytes()  # the exploit itself (decompressed), so replay.sh runs
     if finding.status is Status.VERIFIED and finding.patch_diff:
         artifacts["patch.diff"] = finding.patch_diff.encode()
         artifacts["rollback.sh"] = rollback_script(finding).encode()

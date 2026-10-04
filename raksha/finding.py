@@ -150,6 +150,9 @@ RUNTIME_FRAME_PREFIXES = (
 
 #: Reproducers up to this size are carried in the record and shipped in the evidence bundle.
 MAX_REPRO_BYTES = 1_000_000
+#: A reproducer larger than MAX_REPRO_BYTES is kept zlib-compressed up to this compressed size, so a
+#: large proof input still ships and replays (D3) rather than being silently dropped.
+MAX_REPRO_COMPRESSED_BYTES = 4_000_000
 
 
 @dataclass(frozen=True)
@@ -173,6 +176,20 @@ class Reproducer:
     #: The reproducer bytes themselves, kept (up to MAX_REPRO_BYTES) so the evidence bundle can ship
     #: them and a replay can actually run. Never part of equality or the printed record.
     data: bytes | None = field(default=None, repr=False, compare=False)
+    #: D3: `data` holds zlib-compressed bytes (a large reproducer kept shippable). `raw_bytes()`
+    #: transparently decompresses. D6: `purged` records that the bytes were deliberately removed
+    #: from this node by policy, the content hash and replay command kept so the record stays valid.
+    compressed: bool = field(default=False, compare=False)
+    purged: bool = field(default=False, compare=False)
+
+    def raw_bytes(self) -> bytes | None:
+        """The real reproducer bytes, decompressing if stored compressed. None when absent/purged."""
+        if self.data is None:
+            return None
+        if self.compressed:
+            import zlib
+            return zlib.decompress(self.data)
+        return self.data
 
     @classmethod
     def from_bytes(
@@ -185,6 +202,11 @@ class Reproducer:
         kind: str = EXPLOIT_REPLAY,
         detail: str | None = None,
     ) -> "Reproducer":
+        kept, compressed = bytes(data), False
+        if len(data) > MAX_REPRO_BYTES:
+            import zlib
+            packed = zlib.compress(bytes(data), 9)
+            kept, compressed = (packed, True) if len(packed) <= MAX_REPRO_COMPRESSED_BYTES else (None, False)
         return cls(
             artifact_sha256=hashlib.sha256(data).hexdigest(),
             replay_cmd=list(replay_cmd),
@@ -193,7 +215,8 @@ class Reproducer:
             size_bytes=len(data),
             kind=kind,
             detail=detail,
-            data=bytes(data) if len(data) <= MAX_REPRO_BYTES else None,
+            data=kept,
+            compressed=compressed,
         )
 
 
@@ -431,6 +454,16 @@ class Finding:
         self._status = to
 
     # ------------------------------------------------------------- evidence
+
+    def purge_reproducer(self) -> bool:
+        """D6: remove the stored reproducer BYTES from this node (they are exploit material at
+        rest), keeping the content hash, size and replay command so the signed record stays valid
+        and a judge can still see what the proof was. Returns True when bytes were present to purge."""
+        import dataclasses as _dc
+        if self.reproducer is None or self.reproducer.data is None:
+            return False
+        self.reproducer = _dc.replace(self.reproducer, data=None, purged=True)
+        return True
 
     def attach_reproducer(self, reproducer: Reproducer) -> None:
         self.reproducer = reproducer

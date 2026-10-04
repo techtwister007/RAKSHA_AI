@@ -137,3 +137,35 @@ def test_evidence_score_is_the_documented_dict_shape():
     assert isinstance(s, EvidenceScore)
     assert set(s.as_dict()) == {"confidence", "channels", "independent_channels",
                                 "dominated_by", "proven", "capped", "rationale"}
+
+
+def test_d3_a_large_reproducer_is_compressed_and_still_ships_and_verifies(tmp_path):
+    """D3: a reproducer over the inline cap is kept zlib-compressed and still ships as real bytes,
+    never silently dropped."""
+    from raksha.finding import (Finding, Reproducer, ReplayResult, FixSite, GateCheck, RepairLane,
+                                Status, utcnow, MAX_REPRO_BYTES)
+    big = b"\x41" * (MAX_REPRO_BYTES + 5000)
+    f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m")
+    f.attach_reproducer(Reproducer.from_bytes(big, ["./raksha_harness", "repro"]))
+    f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow()))
+    f.add_fix_site(FixSite(uri="s.c", rank=0, start_line=1)); f.confirm()
+    f.mark_patched("--- a/s.c\n+++ b/s.c\n@@\n-a\n+b\n", RepairLane.TEMPLATE)
+    for c in list(GateCheck): f.record_gate(c, True, detail="ok")
+    f.record_replay_after(ReplayResult(oracle_fired=False, at=utcnow())); f.verify()
+    from raksha.bundle import build_bundle, verify_bundle
+    out = build_bundle(f, tmp_path / "b")
+    assert (out / "repro").read_bytes() == big and verify_bundle(out).ok
+
+
+def test_d6_purging_a_reproducer_keeps_the_record_valid():
+    """D6: purging the exploit bytes keeps the content hash and replay command, so the record is
+    still a valid, reportable finding — the bytes are simply no longer on the node."""
+    from raksha.finding import Finding, Reproducer, ReplayResult, utcnow, EXPLOIT_REPLAY
+    f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m")
+    f.attach_reproducer(Reproducer.from_bytes(b"A" * 48, ["./r", "repro"]))
+    f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow())); f.confirm()
+    sha = f.reproducer.artifact_sha256
+    assert f.purge_reproducer() is True
+    assert f.reproducer.data is None and f.reproducer.purged and f.reproducer.artifact_sha256 == sha
+    assert f.is_reportable                    # still a valid finding with its proof identity
+    assert f.purge_reproducer() is False      # idempotent: nothing left to purge

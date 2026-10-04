@@ -468,6 +468,21 @@ class Session:
             rows.append({"status": s.value, "count": counts.get(s.value, 0), "at_or_past": at_or_past})
         return rows
 
+    def purge_reproducers(self, *, exploit_only: bool = True) -> int:
+        """D6: remove stored reproducer bytes from the node by policy, keeping each signed record
+        valid (hash + replay command retained). Returns how many were purged. By default only
+        exploit-replay bytes (the sensitive ones) are purged; deterministic-match inputs are
+        benign identifiers and left in place."""
+        from .finding import EXPLOIT_REPLAY
+        n = 0
+        for f in self.findings.values():
+            if exploit_only and (f.reproducer is None or f.reproducer.kind != EXPLOIT_REPLAY):
+                continue
+            if f.purge_reproducer():
+                n += 1
+                self.emit("reproducer_purged", finding=f.id)
+        return n
+
     def _annotate_evidence(self) -> None:
         """Fuse independent evidence on every finding, and record the model parliament's read
         (offline: a single-source verdict and the deterministic epistemic-conflict signal). Neither
