@@ -159,22 +159,26 @@ class Session:
             t = Target(name=name, build_status="red", note=f"could not ingest: {e}")
             self.targets.append(t)
             return t
+        t = self._merge_build_free(root, name, result, roe=roe, note=note)
+        self.checkpoint()
+        return t
+
+    def _merge_build_free(self, root, name, result, *, roe: RoeLevel = RoeLevel.R1,
+                          note: str | None = None) -> Target:
+        """Merge an already-computed BuildFreeResult into the board (main thread only). Shared by
+        the serial ingest and the parallel ingest_build_free_many, so both behave identically."""
+        root = Path(root)
         self.crypto_uses.extend(result.crypto_uses)
         self.unpinned_deps.extend(getattr(result, "unpinned", []))
         found = list(result.findings)
-        # Structural (CPG) hypotheses: SUSPECTED source->sink paths that exist to be cross-confirmed
-        # by a lane that lands a reproducer on the same site+CWE, and otherwise to feed triage. They
-        # never become reports on their own — "no reproducer, no report" holds.
         try:
             sres = _structure.scan_structure(root)
             self.structure_summaries[name] = sres.graph_summary
             extra = list(_structure.to_findings(sres))
-            # "Take" lanes (Semgrep/Gitleaks/OSV-Scanner) only when a binary is present AND its flag
-            # is set — on a bare box this is a no-op; when enabled, their findings cross-confirm ours.
             from .lanes.take import run_take_lanes
             extra += run_take_lanes(str(root))
             found = cross_confirm([*found, *extra])
-        except Exception:  # noqa: BLE001 — a tree we cannot parse structurally is not a crash
+        except Exception:  # noqa: BLE001
             pass
         _assets.annotate(found, self.registry, target=name)
         langs = sorted({f.language for f in found if f.language not in ("any", "api")})
@@ -185,7 +189,6 @@ class Session:
             t.finding_ids.append(f.id)
         self.targets.append(t)
         self._annotate_evidence()
-        self.checkpoint()
         return t
 
     def ingest(self, root: str | Path, runner=None, *, name: str | None = None,
@@ -385,6 +388,7 @@ class Session:
         for f in self.findings.values():
             rows.append({
                 "id": f.id,
+                "dedup_key": f.dedup_key(),   # stable across runs — the key E4 diffs on
                 "bug_class": f.bug_class,
                 "severity": f.severity,
                 "language": f.language,
@@ -504,6 +508,45 @@ class Session:
                 if ec is not None:
                     f.parliament = {**(f.parliament or {}), "epistemic_conflict": ec}
         evidence.fuse_all(self.findings.values())
+
+    def ingest_build_free_many(self, roots, *, workers: int | None = None) -> list[Target]:
+        """E2: ingest several targets concurrently, each scanned in its own thread, then merged into
+        the board in a deterministic (name-sorted) order so the result is identical to serial. The
+        heavy per-target work (file walks, subprocess lanes) overlaps; the shared board is only
+        touched on the main thread, so there is no race."""
+        from concurrent.futures import ThreadPoolExecutor
+        roots = [Path(r) for r in roots]
+        n = workers if workers is not None else _profile.current().parallel_workers
+        from .lanes import scan_target as _scan
+        def _work(r):
+            try:
+                return r, _scan(r), None
+            except Exception as e:  # noqa: BLE001
+                return r, None, e
+        with ThreadPoolExecutor(max_workers=max(1, n)) as ex:
+            done = list(ex.map(_work, roots))
+        out: list[Target] = []
+        for r, res, err in sorted(done, key=lambda t: t[0].name):
+            if err is not None or res is None:
+                t = Target(name=r.name, build_status="red", note=f"could not ingest: {err}")
+                self.targets.append(t); out.append(t); continue
+            out.append(self._merge_build_free(r, r.name, res))   # the serial merge path, main thread
+        self.checkpoint()
+        return out
+
+    def changes_since(self, previous: dict) -> dict:
+        """E4: what changed versus a previous run's snapshot. Keys findings by their dedup identity:
+        `new` (defects not seen before), `fixed` (seen before, gone now — or now VERIFIED), and
+        `carried` (still present). The seed of continuous assurance: re-run and report the delta."""
+        def keyset(rows):
+            return {r.get("dedup_key") or r.get("id"): r for r in rows}
+        prev = keyset(previous.get("findings", []))
+        cur = keyset(self.finding_rows())
+        new = [cur[k] for k in cur if k not in prev]
+        gone = [prev[k] for k in prev if k not in cur]
+        carried = [cur[k] for k in cur if k in prev]
+        return {"new": new, "fixed_or_gone": gone, "carried": carried,
+                "summary": {"new": len(new), "fixed_or_gone": len(gone), "carried": len(carried)}}
 
     def fleet_rollup(self) -> list[dict]:
         """C5: defects that span two or more targets, folded into one row each."""

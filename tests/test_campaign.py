@@ -79,3 +79,25 @@ def test_campaign_on_the_single_bug_c_demo_verifies_one_then_stops():
     t = s.ingest_campaign(C_TARGET, name="c-demo", corpus=[b"\x01\x04abcd", b"\x02zz", b"\x01\x02ab"])
     verified = [s.findings[i] for i in t.finding_ids if s.findings[i].status is Status.VERIFIED]
     assert len(verified) >= 1 and verified[0].reproducer.minimised
+
+
+def test_e2_parallel_ingest_matches_serial():
+    """E2: ingesting several targets concurrently gives the same findings as serial."""
+    from raksha.orchestrator import Session
+    roots = [C_TARGET.parent / "mixed-estate", C_TARGET.parent / "java-log4shell"]
+    roots = [r for r in roots if r.exists()]
+    a = Session()
+    for r in roots:
+        a.ingest_build_free(r)
+    b = Session(); b.ingest_build_free_many(roots)
+    assert sorted(f.dedup_key() for f in a.findings.values()) == sorted(f.dedup_key() for f in b.findings.values())
+
+
+def test_e4_change_report_is_stable_across_an_unchanged_rescan():
+    """E4: continuous mode — re-scanning an unchanged estate reports nothing new or gone."""
+    from raksha.orchestrator import Session
+    est = C_TARGET.parent / "mixed-estate"
+    a = Session(); a.ingest_build_free(est); prev = a.snapshot()
+    b = Session(); b.ingest_build_free(est)
+    d = b.changes_since(prev)
+    assert d["summary"]["new"] == 0 and d["summary"]["fixed_or_gone"] == 0 and d["summary"]["carried"] > 0
