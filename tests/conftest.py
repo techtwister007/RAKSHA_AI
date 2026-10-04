@@ -33,3 +33,10 @@ def _fresh_fix_memory(monkeypatch):
     become a retrieval (or cross-language) candidate in another and change what that test measures."""
     from raksha import retrieval
     monkeypatch.setattr(retrieval, "_DEFAULT_MEMORY", retrieval.FixMemory())
+
+
+@pytest.fixture(autouse=True)
+def _isolated_project_store(monkeypatch, tmp_path):
+    """Wave 5: project reports and learning state go to a per-test RAKSHA_HOME, never the real one."""
+    if not __import__("os").environ.get("RAKSHA_HOME_KEEP"):
+        monkeypatch.setenv("RAKSHA_HOME", str(tmp_path / "raksha-home"))
