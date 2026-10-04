@@ -2,6 +2,7 @@
 
 from .asan import AsanOracle
 from .base import Oracle
+from .go_panic import GoOracle
 from .jazzer import JazzerOracle
 from .pysecsan import PySecSanOracle
 
@@ -19,5 +20,6 @@ __all__ = [
     "AsanOracle",
     "JazzerOracle",
     "PySecSanOracle",
+    "GoOracle",
     "KEYSTONE_ORACLES",
 ]

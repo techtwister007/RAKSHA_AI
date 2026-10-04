@@ -101,8 +101,30 @@ def _py_entrypoints(text: str, path: str) -> list[Entrypoint]:
     return out
 
 
+# ---------------------------------------------------------------- Go
+
+# A top-level func (no receiver) taking one []byte or string argument — the Go native-fuzzing shape.
+_GO_FUNC = re.compile(r"^func\s+(?P<name>[A-Za-z_]\w*)\s*\(\s*\w+\s+(?P<type>\[\]byte|string)\s*\)", re.MULTILINE)
+_GO_PKG = re.compile(r"^package\s+(\w+)", re.MULTILINE)
+
+
+def _go_entrypoints(text: str, path: str) -> list[Entrypoint]:
+    if path.endswith("_test.go"):
+        return []
+    out: list[Entrypoint] = []
+    for m in _GO_FUNC.finditer(text):
+        name = m.group("name")
+        line = text[: m.start()].count("\n") + 1
+        kind = "go_bytes" if m.group("type") == "[]byte" else "go_string"
+        # exported functions (capitalised) are the reachable API surface — a small bonus
+        score = 3.0 + _name_bonus(name) + (0.5 if name[:1].isupper() else 0.0)
+        out.append(Entrypoint("go", path, name, line, kind, score,
+                              signature=f"func {name}({m.group('type')})"))
+    return out
+
+
 _SCANNERS = {".c": _c_entrypoints, ".cc": _c_entrypoints, ".cpp": _c_entrypoints,
-             ".cxx": _c_entrypoints, ".py": _py_entrypoints}
+             ".cxx": _c_entrypoints, ".py": _py_entrypoints, ".go": _go_entrypoints}
 _MAX_FILE_BYTES = 1_000_000
 
 

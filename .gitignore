@@ -27,3 +27,8 @@ demo-targets/c-overflow/harness
 demo-targets/**/__pycache__/
 demo-targets/**/.raksha*
 raksha-*.sarif
+
+# Go lane build artifacts (generated during fuzzing / coverage)
+raksha.cov
+demo-targets/**/testdata/fuzz/
+raksha_fuzz_test.go

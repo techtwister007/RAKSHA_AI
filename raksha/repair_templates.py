@@ -120,6 +120,39 @@ def py_shell_safe(finding: Finding, root: Path) -> str | None:
     return _diff(text, body, rel)
 
 
+# ---- Go: bound a slice / index to the backing length --------------------------------------------
+
+_GO_SLICE = re.compile(r"(?P<arr>[A-Za-z_]\w*)\[\s*(?P<lo>[^\]:]*?):\s*(?P<hi>[^\]]+?)\s*\]")
+
+
+def go_bound_slice(finding: Finding, root: Path) -> str | None:
+    """Clamp a slice high bound to the backing array's length: `a[lo:hi]` -> `a[lo:min(hi, len(a))]`.
+
+    Go 1.21+ has a builtin `min`. A slice-bounds panic is an unchecked high index; clamping it to
+    len removes the panic while preserving behaviour for in-range inputs — the gate confirms that.
+    """
+    got = _read_fix_site(finding, root)
+    if got is None:
+        return None
+    rel, text = got
+    lines = text.splitlines(keepends=True)
+    idx = (finding.fix_site_set[0].start_line or 1) - 1
+    after = list(lines)
+    changed = False
+    for i in range(max(0, idx - 2), min(len(lines), idx + 3)):
+        m = _GO_SLICE.search(lines[i])
+        if not m:
+            continue
+        arr, lo, hi = m.group("arr"), m.group("lo").strip(), m.group("hi").strip()
+        if f"len({arr})" in hi or "min(" in hi:
+            continue                              # already bounded
+        bounded = f"{arr}[{lo}:min({hi}, len({arr}))]"
+        after[i] = lines[i][:m.start()] + bounded + lines[i][m.end():]
+        changed = True
+        break
+    return _diff(text, "".join(after), rel) if changed else None
+
+
 def generic_templates(finding: Finding, root: Path):
     """The template functions worth trying for this finding, in order, as zero-arg closures."""
     cwe = finding.bug_class
@@ -128,4 +161,6 @@ def generic_templates(finding: Finding, root: Path):
         out.append(lambda: c_bound_copy(finding, root))
     if finding.language == "python" and cwe in ("CWE-78", "CWE-77"):
         out.append(lambda: py_shell_safe(finding, root))
+    if finding.language == "go" and cwe in ("CWE-125", "CWE-787", "CWE-129"):
+        out.append(lambda: go_bound_slice(finding, root))
     return out
