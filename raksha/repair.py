@@ -149,3 +149,93 @@ def split_diff_and_test(text: str) -> tuple[str | None, str | None]:
     diff = _extract_diff(text[: m.start()])
     test = _strip_fences(text[m.end():])
     return diff, (test or None)
+
+
+# ---- turning a model's edit into an exact diff ------------------------------------------------
+# Small models are unreliable at unified-diff arithmetic (hunk counts, exact context), so a correct
+# fix can arrive as a patch that will not apply. Two remedies, both deterministic: the model may
+# answer with SEARCH/REPLACE blocks (exact text to find, text to put instead), and any unified diff
+# it does send is re-anchored on the real file. Either way RAKSHA writes the final diff itself with
+# difflib, so the gate always judges a well-formed patch of exactly the change the model meant.
+
+_EDIT_BLOCK = re.compile(r"<{5,}\s*SEARCH\s*\n(.*?)\n={5,}\s*\n(.*?)\n?>{5,}\s*REPLACE", re.DOTALL)
+
+
+def _locate(lines: list[str], block: list[str]) -> int | None:
+    """Index where `block` occurs in `lines`, exactly or ignoring surrounding whitespace; None if
+    absent or ambiguous (more than one place)."""
+    if not block:
+        return None
+    for norm in (lambda s: s, lambda s: s.strip()):
+        want = [norm(b) for b in block]
+        hits = [i for i in range(len(lines) - len(block) + 1)
+                if [norm(x) for x in lines[i:i + len(block)]] == want]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            return None
+    return None
+
+
+def _make_diff(rel: str, before: str, after: str) -> str | None:
+    import difflib
+    if before == after:
+        return None
+    return "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
+                                        fromfile=f"a/{rel}", tofile=f"b/{rel}"))
+
+
+def edits_to_diff(text: str, rel: str, source: str) -> str | None:
+    """SEARCH/REPLACE blocks applied to `source` → an exact unified diff, or None."""
+    blocks = _EDIT_BLOCK.findall(text)
+    if not blocks:
+        return None
+    lines = source.splitlines()
+    for search, replace in blocks:
+        s = search.splitlines()
+        at = _locate(lines, s)
+        if at is None:
+            return None
+        lines[at:at + len(s)] = replace.splitlines()
+    after = "\n".join(lines) + ("\n" if source.endswith("\n") else "")
+    return _make_diff(rel, source, after)
+
+
+def normalise_diff(diff: str, rel: str, source: str) -> str | None:
+    """Re-anchor a possibly malformed unified diff for one file on the real source and rewrite it
+    exactly. Each hunk's old text (context + removed lines) is located in the file; when the model's
+    context is wrong, its removed lines alone are used as the anchor. None if any hunk cannot be
+    placed unambiguously — then the original goes to the gate unchanged and fails honestly there."""
+    hunks: list[tuple[list[str], list[str], list[str]]] = []      # (old, new, removed-only)
+    cur = None
+    for ln in diff.splitlines():
+        if ln.startswith(("--- ", "+++ ")):
+            continue
+        if ln.startswith("@@"):
+            cur = ([], [], [])
+            hunks.append(cur)
+            continue
+        if cur is None:
+            continue
+        tag, body = (ln[:1], ln[1:]) if ln else (" ", "")
+        if tag == " ":
+            cur[0].append(body); cur[1].append(body)
+        elif tag == "-":
+            cur[0].append(body); cur[2].append(body)
+        elif tag == "+":
+            cur[1].append(body)
+    if not hunks:
+        return None
+    lines = source.splitlines()
+    for old, new, removed in hunks:
+        at = _locate(lines, old)
+        if at is not None:
+            lines[at:at + len(old)] = new
+            continue
+        at = _locate(lines, removed)
+        if at is None:
+            return None
+        added = [x for x in new if x not in old]
+        lines[at:at + len(removed)] = added
+    after = "\n".join(lines) + ("\n" if source.endswith("\n") else "")
+    return _make_diff(rel, source, after)

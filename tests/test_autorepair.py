@@ -234,3 +234,23 @@ def test_hygiene_allows_shell_to_argv_swap_but_not_new_capability():
     assert "exec (code)" in hygiene.check(d("os.system('conv ' + x)", "exec(x)"), f)
     assert "socket" in hygiene.check(d("os.system('conv ' + x)", "socket.socket().connect(h)"), f)
     assert "subprocess" in hygiene.check(d("n = len(x)", "subprocess.run(['x'])"), f)
+
+
+def test_model_edits_become_exact_diffs():
+    """Small models write malformed unified diffs; RAKSHA rebuilds the exact patch itself."""
+    from raksha.repair import edits_to_diff, normalise_diff
+    src = 'import os\n\n\ndef convert(v):\n    out = str(os.system("echo " + v))\n    return out\n'
+    edit = ("<<<<<<< SEARCH\nimport os\n=======\nimport os\nimport subprocess\n>>>>>>> REPLACE\n"
+            "<<<<<<< SEARCH\n    out = str(os.system(\"echo \" + v))\n=======\n"
+            "    out = subprocess.run([\"echo\", v], capture_output=True, text=True).stdout\n>>>>>>> REPLACE")
+    d = edits_to_diff(edit, "conv.py", src)
+    assert d.startswith("--- a/conv.py\n+++ b/conv.py\n") and "+import subprocess" in d
+    # a diff with wrong line numbers and invented context is re-anchored on the removed line
+    bad = ("--- a/conv.py\n+++ b/conv.py\n@@ -40,7 +40,7 @@\n made up context\n"
+           "-    out = str(os.system(\"echo \" + v))\n+    out = subprocess.run([\"echo\", v]).stdout\n")
+    fixed = normalise_diff(bad, "conv.py", src)
+    assert "@@ -2," in fixed or "@@ -3," in fixed or "@@ -1," in fixed
+    assert "+    out = subprocess.run" in fixed and "made up context" not in fixed
+    # an anchor that is not in the file is refused, never guessed
+    assert normalise_diff(bad.replace('os.system("echo " + v)', "nowhere()"), "conv.py", src) is None
+    assert edits_to_diff("<<<<<<< SEARCH\nnot there\n=======\nx\n>>>>>>> REPLACE", "conv.py", src) is None
