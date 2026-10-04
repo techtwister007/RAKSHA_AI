@@ -132,6 +132,30 @@ def check_advisory(d, key):
     return problems
 
 
+def check_signed_doc(d, stem, key, expect_prev=None):
+    """A Wave 5 signed document (report / certificate): body + text hashes, chain prev, HMAC."""
+    try:
+        body = open(os.path.join(d, stem + ".json"), "rb").read()
+        text = open(os.path.join(d, stem + ".md"), "rb").read()
+        sig_raw = open(os.path.join(d, stem + ".sig.json"), "rb").read()
+        sig = json.loads(sig_raw)
+    except (OSError, ValueError) as e:
+        return ["document unreadable (%s)" % e], None
+    problems = []
+    hb, ht = hashlib.sha256(body).hexdigest(), hashlib.sha256(text).hexdigest()
+    if hb != sig.get(stem + "_json_sha256"):
+        problems.append("CHANGED %s.json" % stem)
+    if ht != sig.get(stem + "_md_sha256"):
+        problems.append("CHANGED %s.md" % stem)
+    prev = str(sig.get("prev", "0" * 64))
+    if expect_prev is not None and prev != expect_prev:
+        problems.append("CHAIN BROKEN")
+    material = ("%s.json=%s\n%s.md=%s\nprev=%s" % (stem, hb, stem, ht, prev)).encode()
+    if not hmac.compare_digest(hmac.new(key, material, hashlib.sha256).hexdigest(), str(sig.get("signature", ""))):
+        problems.append("SIGNATURE INVALID")
+    return problems, hashlib.sha256(sig_raw).hexdigest()
+
+
 # ---- 3. replay ---------------------------------------------------------------------------------
 _HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
@@ -273,6 +297,17 @@ def main(argv):
         p = check_advisory(os.path.join(HERE, *adv.split("/")), key)
         report["advisories"][adv] = p or "ok"
         failed |= bool(p)
+    report["documents"] = {}
+    chains = {}
+    for doc in media.get("documents", []):
+        prev = chains.get(doc.get("chain")) if doc.get("chain") else None
+        expect = prev if (doc.get("chain") and doc["chain"] in chains) else (
+            doc.get("first_prev") if doc.get("chain") else None)
+        p, h = check_signed_doc(os.path.join(HERE, *doc["path"].split("/")), doc["stem"], key, expect)
+        if doc.get("chain"):
+            chains[doc["chain"]] = h
+        report["documents"][doc["path"]] = p or "ok"
+        failed |= bool(p)
     report["seconds"] = round(time.monotonic() - t0, 2)
     report["ok"] = not failed
     if as_json:
@@ -293,6 +328,8 @@ def main(argv):
                         if "dead_after_patch" in r or "patched" in r else "n/a", r["result"]))
         for a, v in report["advisories"].items():
             print("  advisory %s: %s" % (a.split("/")[-1], v if v == "ok" else "; ".join(v)))
+        for d, v in report["documents"].items():
+            print("  document %s: %s" % (d, v if v == "ok" else "; ".join(v)))
         print("  %.1fs" % report["seconds"])
     return 0 if not failed else 1
 

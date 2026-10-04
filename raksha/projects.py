@@ -110,7 +110,8 @@ class Store:
     def dir(self, pid: str) -> Path:
         return self.projects_dir / pid
 
-    def identify(self, root: str | Path, *, name: str | None = None, registry=None) -> Project:
+    def identify(self, root: str | Path, *, name: str | None = None, registry=None,
+                 save: bool = True) -> Project:
         """The project this tree is (K1): matched by name + structure, minted when new."""
         root = Path(root).resolve()
         name = name or root.name
@@ -128,6 +129,8 @@ class Store:
                 digest = hashlib.sha256((pid + "+").encode()).hexdigest()[:8].upper()
                 pid = f"PRJ-{_slug(name)[:24]}-{digest}"
             best = Project(id=pid, name=name, created=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        if not save:                                           # read-only: match, never record
+            return best
         best.structure = struct                                # track the project as it evolves
         if str(root) not in best.aliases:
             best.aliases.append(str(root))

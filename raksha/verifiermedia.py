@@ -65,7 +65,10 @@ def _sha(p: Path) -> str:
 
 
 def build_media(out: str | Path, entries: list[Entry], *, advisories: list[Path] = (),
-                runtime: Path | None = None, key: bytes | None = None) -> Path:
+                runtime: Path | None = None, key: bytes | None = None,
+                documents: list[dict] = ()) -> Path:
+    """`documents`: Wave 5 signed documents, each {src, dest, stem, chain?, first_prev?}; documents
+    sharing a `chain` are verified in order, each against the previous one's hash."""
     from .bundle import signing_key
     out = Path(out)
     if out.exists() and any(out.iterdir()):
@@ -109,6 +112,14 @@ def build_media(out: str | Path, entries: list[Entry], *, advisories: list[Path]
     for a in advisories:
         shutil.copytree(a, out / "advisories" / a.name)
         adv_rel.append(f"advisories/{a.name}")
+    doc_rows = []
+    for d in documents:
+        shutil.copytree(d["src"], out / d["dest"])
+        row = {"path": d["dest"], "stem": d["stem"]}
+        if d.get("chain"):
+            row["chain"] = d["chain"]
+            row["first_prev"] = d.get("first_prev")
+        doc_rows.append(row)
     if runtime is not None:
         shutil.copytree(runtime, out / "runtime", symlinks=True)
     files = {}
@@ -117,7 +128,8 @@ def build_media(out: str | Path, entries: list[Entry], *, advisories: list[Path]
         if p.is_file() and not rel.startswith("runtime/"):
             files[rel] = _sha(p)
     media = {"tool": "RAKSHA AI verifier media", "schema": 1, "findings": findings,
-             "advisories": adv_rel, "runtime": runtime is not None, "files": files}
+             "advisories": adv_rel, "documents": doc_rows, "runtime": runtime is not None,
+             "files": files}
     raw = json.dumps(media, indent=2, sort_keys=True).encode()
     (out / "MEDIA.json").write_bytes(raw)
     k, key_id = (key, "caller") if key is not None else signing_key()
