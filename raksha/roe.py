@@ -152,6 +152,11 @@ def effective_roe(asset: Asset, finding: Finding, *, advisor_disagrees: bool = F
         step_to(Level.R2, "patch touches auth / crypto / access control")
     if finding.repair_lane is RepairLane.MITIGATION:
         step_to(Level.R2, "fix came from the mitigation floor, not a real fix")
+    if finding.repair_lane is RepairLane.LLM:
+        # D1: a patch written by the model is never deployed autonomously. However clean its gate
+        # result, it is capped at R2 — staged for a human to approve — because a model proposal, even
+        # one that passed every check, carries a residual risk a deterministic template does not.
+        step_to(Level.R2, "patch written by the model lane — human sign-off required, never autonomous")
     if _diff_size(finding.patch_diff) > _LARGE_AST_LINES:
         step_to(Level.R2, "patch is large (change over threshold)")
     quarantined = sum(r.quarantined_inputs for r in finding.gate_history)

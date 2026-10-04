@@ -146,3 +146,30 @@ def test_bundle_carries_two_person_signatures(tmp_path):
     manifest = json.loads((out / "bundle.json").read_text())
     assert len(manifest["approver_signatures"]) == 2
     assert verify_bundle(out).ok
+
+
+def test_d1_model_lane_patch_is_capped_at_human_signoff():
+    """D1: a model-written fix can never be deployed autonomously (R3); it caps at R2, so a human
+    must approve it. A template fix on the same asset keeps the asset's autonomy."""
+    from raksha.roe import AssetTier, Asset, Level, RepairLane, effective_roe, may_deploy, Signature
+    from raksha.finding import Finding, Reproducer, ReplayResult, FixSite, utcnow, GateCheck
+
+    def verified(lane):
+        f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="svc", message="m")
+        f.attach_reproducer(Reproducer.from_bytes(b"x", ["./r"]))
+        f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow()))
+        f.add_fix_site(FixSite(uri="s.c", rank=0, start_line=1)); f.confirm()
+        f.mark_patched("--- a/s.c\n+++ b/s.c\n@@\n-a\n+b\n", lane)
+        for c in list(GateCheck): f.record_gate(c, True, detail="ok")
+        f.record_replay_after(ReplayResult(oracle_fired=False, at=utcnow())); f.verify()
+        return f
+
+    # an asset whose tier permits autonomous action (R3)
+    asset = Asset(name="svc", tier=AssetTier.ROUTINE)
+    d_model = effective_roe(asset, verified(RepairLane.LLM))
+    assert d_model.effective <= Level.R2
+    ok, _ = may_deploy(d_model, [Signature(officer="maj_rao", key_id="k1")])
+    assert ok is True                       # a human signed → R2 deploys
+    assert may_deploy(d_model, [])[0] is False    # without a signature it does NOT auto-deploy
+    d_tmpl = effective_roe(asset, verified(RepairLane.TEMPLATE))
+    assert d_tmpl.effective > Level.R2 or d_tmpl.effective == asset.tier.cap   # template keeps asset autonomy

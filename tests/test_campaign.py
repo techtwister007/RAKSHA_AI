@@ -1,0 +1,81 @@
+"""B1: the campaign loop — many proven fixes on one target, bounded by budget."""
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from raksha import orchestrator
+from raksha.finding import Finding, Reproducer, ReplayResult, FixSite, GateCheck, RepairLane, Status, utcnow
+from raksha.orchestrator import Session
+
+HAVE_GCC = shutil.which("gcc") is not None
+C_TARGET = Path(__file__).parents[1] / "demo-targets" / "c-nolibfuzzer"
+
+
+def _verified(sig_symbol, patch="--- a/s.c\n+++ b/s.c\n@@\n-a\n+b\n"):
+    """A finding driven to VERIFIED, with a distinct signature via its top frame symbol."""
+    from raksha.finding import Frame
+    f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m",
+                frames=[Frame(symbol=sig_symbol, uri="src/s.c", line=10)])
+    f.attach_reproducer(Reproducer.from_bytes(b"A" * 40, ["./r"]))
+    f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow()))
+    f.add_fix_site(FixSite(uri="src/s.c", rank=0, start_line=10)); f.confirm()
+    f.mark_patched(patch, RepairLane.TEMPLATE)
+    for c in list(GateCheck): f.record_gate(c, True, detail="ok")
+    f.record_replay_after(ReplayResult(oracle_fired=False, at=utcnow())); f.verify()
+    return f
+
+
+def test_campaign_loops_until_clean_applying_each_fix(tmp_path, monkeypatch):
+    """Two distinct bugs are found in sequence; each proven fix is applied to the working tree
+    before the next round; the loop stops when a round finds nothing."""
+    src = tmp_path / "t"; src.mkdir(); (src / "s.c").write_text("int main(){return 0;}\n")
+    scripted = [_verified("bug_a"), _verified("bug_b")]
+    calls = {"n": 0}
+
+    def fake_dispatch(root):
+        i = calls["n"]; calls["n"] += 1
+        if i < len(scripted):
+            f = scripted[i]
+            return SimpleNamespace(found=True, finding=f, crashing_input=b"A" * 40,
+                                   target=SimpleNamespace(source_root=root))
+        return SimpleNamespace(found=False, finding=None, note="clean")
+
+    monkeypatch.setattr(orchestrator, "_dispatch_autofuzz", fake_dispatch)
+    monkeypatch.setattr("raksha.autorepair.repair", lambda f, *a, **k: None)  # findings arrive pre-verified
+    monkeypatch.setattr(Session, "_apply_to_tree", staticmethod(lambda diff, tree: True))
+
+    s = Session()
+    t = s.ingest_campaign(src, name="t", max_bugs=6)
+    assert t.name == "t" and len(t.finding_ids) == 2
+    assert all(s.findings[i].status is Status.VERIFIED for i in t.finding_ids)
+    assert calls["n"] == 3   # two finds + one clean round that ends the campaign
+
+
+def test_campaign_stops_when_a_bug_cannot_be_fixed(tmp_path, monkeypatch):
+    """A report-only finding (no proven patch) ends the campaign rather than re-finding it forever."""
+    src = tmp_path / "t"; src.mkdir(); (src / "s.c").write_text("x\n")
+    f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m")
+    f.attach_reproducer(Reproducer.from_bytes(b"x", ["./r"]))
+    f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow())); f.confirm()
+    f.report_only("no candidate cleared the gate")
+
+    def fake_dispatch(root):
+        return SimpleNamespace(found=True, finding=f, crashing_input=b"x",
+                               target=SimpleNamespace(source_root=root))
+    monkeypatch.setattr(orchestrator, "_dispatch_autofuzz", fake_dispatch)
+    monkeypatch.setattr("raksha.autorepair.repair", lambda f, *a, **k: None)
+    s = Session()
+    t = s.ingest_campaign(src, name="t")
+    assert len(t.finding_ids) == 1 and s.findings[t.finding_ids[0]].status is Status.REPORT_ONLY
+
+
+@pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
+def test_campaign_on_the_single_bug_c_demo_verifies_one_then_stops():
+    s = Session()
+    t = s.ingest_campaign(C_TARGET, name="c-demo", corpus=[b"\x01\x04abcd", b"\x02zz", b"\x01\x02ab"])
+    verified = [s.findings[i] for i in t.finding_ids if s.findings[i].status is Status.VERIFIED]
+    assert len(verified) >= 1 and verified[0].reproducer.minimised

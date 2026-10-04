@@ -24,6 +24,8 @@ from . import assets as _assets
 from . import journal as _journal
 from .gate.crossconfirm import cross_confirm
 from .lanes import structure as _structure
+from . import profile as _profile
+from .signature import signature as _sig
 
 
 @dataclass
@@ -215,6 +217,80 @@ class Session:
             return self.ingest_build_free(root, name=name, roe=roe,
                                           note=f"build failed, degraded to build-free ({outcome.summary})")
         return self.ingest_build_free(root, name=name, roe=roe)
+
+    def ingest_campaign(self, root: str | Path, *, name: str | None = None, max_bugs: int = 6,
+                        budget_s: float | None = None, corpus: list[bytes] | None = None,
+                        roe: RoeLevel = RoeLevel.R1) -> Target:
+        """B1: drive ONE target to as many proven fixes as the budget allows. Find a bug, fix and
+        prove it, APPLY the proven patch to a working copy, then fuzz again so the next round meets
+        the next defect — until the tree is clean, the per-target budget is spent, or a bug cannot
+        be fixed (which would otherwise be re-found forever). A real codebase has many bugs; one
+        find-fix is not a campaign.
+        """
+        import shutil
+        import tempfile
+        import time as _time
+        from .autorepair import repair as _repair
+        root = Path(root)
+        name = name or root.name
+        budget = budget_s if budget_s is not None else _profile.current().per_target_budget_s
+        work = Path(tempfile.mkdtemp(prefix="raksha-campaign-")) / root.name
+        try:
+            shutil.copytree(root, work, symlinks=True)
+        except Exception as e:  # noqa: BLE001
+            t = Target(name=name, build_status="red", note=f"campaign could not copy target: {e}")
+            self.targets.append(t); return t
+        found: list[Finding] = []
+        seen: set[str] = set()
+        t0 = _time.monotonic()
+        for _round in range(max_bugs):
+            if _time.monotonic() - t0 > budget:
+                self.emit("campaign_budget_spent", target=name, found=len(found))
+                break
+            r = _dispatch_autofuzz(work)
+            if not r.found:
+                self.emit("campaign_clean", target=name, found=len(found), round=_round)
+                break
+            f = r.finding
+            sig = _sig(f)
+            if sig in seen:            # a bug we already handled — stop rather than loop on it
+                break
+            seen.add(sig)
+            self.emit("campaign_crash", target=name, finding=f.id, signature=sig, round=_round)
+            _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                    corpus=corpus or [b"ok", b"test", b"\x01\x02"])
+            self.add_finding(f); found.append(f)
+            if hasattr(r, "cleanup"):
+                try: r.cleanup()
+                except Exception: pass  # noqa: BLE001
+            if f.status is Status.VERIFIED and f.patch_diff:
+                if not self._apply_to_tree(f.patch_diff, work):
+                    self.emit("campaign_patch_unapplied", target=name, finding=f.id); break
+                self.emit("campaign_patch_applied", target=name, finding=f.id, signature=sig)
+            else:
+                # could not prove a fix; applying nothing would re-find it next round, so stop here
+                self.emit("campaign_unfixed", target=name, finding=f.id, status=f.status.value)
+                break
+        shutil.rmtree(work.parent, ignore_errors=True)
+        return self.attach_target(name, found, build_status="green", roe=roe,
+                                  languages=sorted({f.language for f in found}) or None)
+
+    @staticmethod
+    def _apply_to_tree(patch_diff: str, tree: Path) -> bool:
+        """Apply a proven patch to the campaign's working copy so the next round sees fixed code."""
+        import subprocess
+        patch = tree / ".raksha.campaign.patch"
+        patch.write_text(patch_diff)
+        for cmd in (["git", "apply", "-p1", str(patch)], ["patch", "-p1", "-i", str(patch)]):
+            try:
+                r = subprocess.run(cmd, cwd=str(tree), capture_output=True, timeout=60)
+                if r.returncode == 0:
+                    patch.unlink(missing_ok=True)
+                    return True
+            except (OSError, subprocess.SubprocessError):
+                continue
+        patch.unlink(missing_ok=True)
+        return False
 
     def ingest_autofuzz(self, root: str | Path, *, name: str | None = None,
                         repair_it: bool = True, corpus: list[bytes] | None = None,
