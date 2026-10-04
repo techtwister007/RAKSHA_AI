@@ -29,6 +29,8 @@ from typing import Iterable
 
 from ..finding import Finding, FixSite, GateCheck, ReplayResult, Status, utcnow
 from ..oracles import KEYSTONE_ORACLES, Oracle
+from .. import profile as _profile
+from ..signature import signature
 from .differential import (PERF_FLOOR_SECONDS, Canonicaliser, Mismatch, Quarantined, differential_timed,
                            preflight, regression_vs_previous)
 from .target import BuildResult, RunResult, Target, TestResult
@@ -65,6 +67,16 @@ def oracle_fired(raw: str, oracles: Iterable[Oracle] = KEYSTONE_ORACLES) -> bool
     return any(o.parse(raw, target="<gate>") for o in oracles)
 
 
+def _signatures_in(raw: str, oracles: Iterable[Oracle]) -> set[str]:
+    """Every distinct crash signature an oracle recognises in this output. A crash with no parseable
+    frames still yields one signature (its bug class), so a frameless abort is never invisible."""
+    out: set[str] = set()
+    for o in oracles:
+        for f in o.parse(raw, target="<gate>"):
+            out.add(signature(f))
+    return out
+
+
 @dataclass
 class GateVerdict:
     passed: bool
@@ -79,6 +91,13 @@ class GateVerdict:
     #: Behaviour divergence between a previous known-good build and the current (pre-patch) build,
     #: when a `previous_good` baseline was supplied — a regression that predates this patch.
     regression_vs_previous: int | None = None
+    #: A2: behavioural-evidence units behind this verdict (stable corpus inputs + own tests + the
+    #: reproducer). Below the profile floor, a passing patch is REPORT_ONLY, not VERIFIED.
+    stable_inputs: int = 0
+    insufficient_evidence: bool = False
+    #: A1: signatures of OTHER defects that were present on the vulnerable build and are not what
+    #: this patch fixed. They are not failures of this patch; the campaign loop (B1) harvests them.
+    sibling_signatures: list = field(default_factory=list)
     before: BuildResult | None = None
     after: BuildResult | None = None
     #: patched/baseline wall-time over the stable corpus; None when the baseline was too short to mean anything
@@ -128,6 +147,7 @@ def run_gate(
     perf_tolerance: float = 5.0,
     perf_floor_seconds: float = PERF_FLOOR_SECONDS,
     previous_good: BuildResult | None = None,
+    min_stable_inputs: int | None = None,
 ) -> GateVerdict:
     """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict.
 
@@ -149,7 +169,7 @@ def run_gate(
                       coverage_tolerance=coverage_tolerance, regression_test=regression_test,
                       preflight_runs=preflight_runs, pov_variants=pov_variants,
                       perf_tolerance=perf_tolerance, perf_floor_seconds=perf_floor_seconds,
-                      previous_good=previous_good)
+                      previous_good=previous_good, min_stable_inputs=min_stable_inputs)
     finally:
         discard = getattr(target, "discard", None)
         if discard is not None:
@@ -162,7 +182,7 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
            corpus: list[bytes], refuzz_seconds: float, oracles: tuple, canon: Canonicaliser | None,
            coverage_tolerance: int, regression_test: str | None, preflight_runs: int,
            pov_variants: int, perf_tolerance: float, perf_floor_seconds: float,
-           previous_good: BuildResult | None) -> GateVerdict:
+           previous_good: BuildResult | None, min_stable_inputs: int | None) -> GateVerdict:
 
     # 1 ── COMPILES
     before = target.build(None)
@@ -215,10 +235,16 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
                      f"perf regression: patched build {diff.perf_delta:.2f}× the baseline wall-time over "
                      f"{len(pf.stable)} inputs (tolerance {perf_tolerance:g}×) — a fix this slow disabled something",
                      quarantined_inputs=len(pf.quarantined))
+    floor = min_stable_inputs if min_stable_inputs is not None else _profile.current().min_stable_inputs
+    evidence_units = len(pf.stable) + tests.ran + 1   # + the reproducer, which always replayed here
+    verdict.stable_inputs = len(pf.stable)
+    verdict.insufficient_evidence = evidence_units < floor
+    ev_note = (f"evidence {evidence_units} (floor {floor})"
+               + (" — INSUFFICIENT, report-only" if verdict.insufficient_evidence else ""))
     finding.record_gate(GateCheck.DIFFERENTIAL_CORPUS, True,
                         detail=f"{len(pf.stable)} inputs identical · {tests.ran} own tests pass · "
                                f"{len(pf.quarantined)} quarantined · {len(pf.crashing)} crash on baseline · "
-                               f"{perf_note}",
+                               f"{perf_note} · {ev_note}",
                         quarantined_inputs=len(pf.quarantined))
 
     # Optional second baseline: a previous known-good build vs the current one. A divergence here is
@@ -245,31 +271,63 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
         return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
                      "target provides no fresh-fuzz campaign; CLEAN_REFUZZ cannot be certified — "
                      "reported, not verified")
-    # 5a — the reproducer's neighbourhood, deterministic, on the patched build
+    # 5a — the reproducer's neighbourhood, deterministic, as a controlled A/B over identical inputs.
+    # Multi-bug semantics (A1): the patch must kill the DEFECT it targeted (its signature), and must
+    # not introduce a signature the vulnerable build did not have (a regression). A DIFFERENT defect
+    # that the vulnerable build already had is NOT a failure of this patch — it is a sibling, harvested
+    # for the campaign loop. "Any abort fails" would make a real multi-bug target unfixable.
+    fixed_sig = signature(finding)
     variants = pov_neighbourhood(reproducer, pov_variants) if pov_variants else []
     verdict.refuzz_variants = len(variants)
-    still = 0
-    for v in variants:
-        r = target.run(after, v)
+    inputs = [reproducer, *variants]
+    base_sigs: set[str] = set()
+    for data in inputs:
+        r = target.run(before, data)
         if oracle_fired(r.text, oracles) or r.timed_out:
-            still += 1
-    verdict.refuzz_findings = still
-    if still:
+            base_sigs |= _signatures_in(r.text, oracles)
+    patched_sigs: set[str] = set()
+    fixed_recurs = False
+    for data in inputs:
+        r = target.run(after, data)
+        if r.timed_out:
+            patched_sigs.add(fixed_sig)   # a hang with no parseable frames counts against the fix
+        if oracle_fired(r.text, oracles):
+            patched_sigs |= _signatures_in(r.text, oracles)
+    if fixed_sig in patched_sigs:
+        fixed_recurs = True
+    regressions = patched_sigs - base_sigs - {fixed_sig}
+    verdict.refuzz_findings = len(patched_sigs)
+    if fixed_recurs:
         return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
-                     f"{still} of {len(variants)} variants of the reproducer still fire the oracle on "
-                     f"the patched build — the patch silences the input, not the defect")
-    # 5b — the fresh campaign
+                     f"the targeted defect ({fixed_sig}) still fires on the patched build — the patch "
+                     f"silences the input, not the defect")
+    if regressions:
+        return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
+                     f"the patch introduced {len(regressions)} new defect signature(s) absent from the "
+                     f"vulnerable build: {', '.join(sorted(regressions))}")
+    # siblings: other defects already present on the vulnerable build, untouched by this patch
+    verdict.sibling_signatures = sorted((patched_sigs & base_sigs) - {fixed_sig})
+    # 5b — a fresh exploratory campaign. Here we cannot A/B identical inputs, so only a recurrence of
+    # the fixed defect fails; any other abort is recorded as a sibling candidate, never a failure
+    # (failing a correct patch on a pre-existing bug the neighbourhood did not reach is the worse error).
     verdict.refuzz_ran = True
     crashes = target.refuzz(after, refuzz_seconds)
-    new = [c for c in crashes if oracle_fired(c, oracles)]
-    verdict.refuzz_findings = len(new)
-    if new:
+    campaign_sigs: set[str] = set()
+    for c in crashes:
+        if oracle_fired(c, oracles):
+            campaign_sigs |= _signatures_in(c, oracles)
+    if fixed_sig in campaign_sigs:
         return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
-                     f"fresh campaign found {len(new)} abort(s) on the patched build")
+                     f"a fresh campaign re-triggered the targeted defect ({fixed_sig}) on the patched build")
+    for sib in sorted(campaign_sigs - {fixed_sig}):
+        if sib not in verdict.sibling_signatures:
+            verdict.sibling_signatures.append(sib)
+    sib_note = (f"; {len(verdict.sibling_signatures)} other pre-existing defect(s) noted for follow-up"
+                if verdict.sibling_signatures else "")
     finding.record_gate(GateCheck.CLEAN_REFUZZ, True,
                         detail=f"{len(variants)} reproducer variants dead; fresh fuzzing pass on the "
                                f"patched build found nothing new ({len(crashes)} crash candidate(s) "
-                               f"checked, budget {int(refuzz_seconds)}s)")
+                               f"checked, budget {int(refuzz_seconds)}s){sib_note}")
 
     # The model's test, if any: verified or discarded, never assumed.
     if regression_test is not None:
@@ -300,7 +358,11 @@ def _fix_site_covered(sites: list[FixSite], covered: set[tuple[str, int]], tol: 
 
 def decide(finding: Finding, verdict: GateVerdict) -> Status:
     """Apply the verdict: VERIFIED, back to CONFIRMED for another round, or REPORT_ONLY."""
-    if verdict.passed:
+    if verdict.passed and verdict.insufficient_evidence:
+        finding.report_only(
+            f"all gate checks passed but behavioural evidence is insufficient "
+            f"({verdict.stable_inputs} stable corpus input(s)); not verified on thin evidence")
+    elif verdict.passed:
         finding.verify()
     elif finding.repair_rounds >= MAX_REPAIR_ROUNDS:
         finding.report_only(f"{MAX_REPAIR_ROUNDS} repair rounds exhausted; last failure: "

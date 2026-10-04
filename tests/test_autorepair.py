@@ -116,7 +116,8 @@ def test_a_shallow_fix_that_special_cases_the_reproducer_is_rejected(monkeypatch
     assert not out.verified and r.finding.status is Status.REPORT_ONLY
     from raksha.finding import GateCheck
     refuzz = [g for g in r.finding.gate_history if g.check is GateCheck.CLEAN_REFUZZ]
-    assert refuzz and not refuzz[-1].passed and "variants of the reproducer" in refuzz[-1].detail
+    assert refuzz and not refuzz[-1].passed
+    assert ("targeted defect" in refuzz[-1].detail or "variants of the reproducer" in refuzz[-1].detail)
     assert r.finding.gate[GateCheck.POV_DEAD].passed      # the shallow fix did kill the exact input
 
 

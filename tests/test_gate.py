@@ -380,3 +380,76 @@ def test_previous_known_good_second_baseline_flags_a_pre_existing_regression():
     f2 = patched("real")
     v2 = run_gate(f2, FakeTarget(), reproducer=REPRO, corpus=corpus(), refuzz_seconds=1)
     assert v2.regression_vs_previous is None
+
+
+def test_cross_confirm_matches_on_cwe_family_not_exact_code():
+    """A4: a structural CWE-120 hypothesis and a sanitizer CWE-121 reproducer on the same site are
+    one memory defect and cross-confirm; an unrelated family at the same site does not."""
+    from raksha.finding import Finding, FixSite, Frame, Reproducer, ReplayResult, Status, utcnow
+    from raksha.gate import cross_confirm
+
+    def suspected(cwe):
+        f = Finding(oracle="cpg:c", bug_class=cwe, language="c", target="t", message="m",
+                    frames=[Frame(symbol="parse", uri="src/p.c", line=20)])
+        f.add_fix_site(FixSite(uri="src/p.c", rank=0, start_line=20))
+        return f
+
+    def proven(cwe):
+        f = Finding(oracle="asan", bug_class=cwe, language="c", target="t", message="m",
+                    frames=[Frame(symbol="parse", uri="src/p.c", line=20)])
+        f.add_fix_site(FixSite(uri="src/p.c", rank=0, start_line=20))
+        f.attach_reproducer(Reproducer.from_bytes(b"x", ["./r"]))
+        f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow()))
+        f.confirm()
+        return f
+
+    static, dyn = suspected("CWE-120"), proven("CWE-121")       # same memory family
+    survivors = cross_confirm([static, dyn])
+    assert static.status is Status.CONFIRMED and static.id in dyn.merged_from
+    assert len(survivors) == 1
+
+    other, inj = suspected("CWE-120"), proven("CWE-78")          # memory vs injection: no merge
+    assert cross_confirm([other, inj]) == [other, inj] and other.status is Status.SUSPECTED
+
+
+def test_a_passing_patch_on_thin_evidence_is_report_only_not_verified():
+    """A2: fewer behavioural samples than the floor means the patch cannot be VERIFIED, however
+    cleanly it passed — it is reported for a human instead."""
+    f = patched("real")
+    v = run_gate(f, FakeTarget(), reproducer=REPRO, corpus=[REPRO], refuzz_seconds=1,
+                 min_stable_inputs=5)          # demand more evidence than one input can give
+    assert v.passed and v.insufficient_evidence
+    decide(f, v)
+    assert f.status is Status.REPORT_ONLY
+    # with a real corpus the same patch verifies
+    f2 = patched("real")
+    v2 = run_gate(f2, FakeTarget(), reproducer=REPRO, corpus=corpus(), refuzz_seconds=1, min_stable_inputs=3)
+    decide(f2, v2)
+    assert f2.status is Status.VERIFIED and not v2.insufficient_evidence
+
+
+def test_a_pre_existing_sibling_bug_does_not_fail_a_good_patch():
+    """A1: on a target with two independent defects, fixing defect A must verify even though defect
+    B still fires on the patched build. B is harvested as a sibling, not counted against A's fix."""
+    from raksha.finding import Frame
+
+    class TwoBugTarget(FakeTarget):
+        # 'real' fixes the HDR-overflow (defect A) but a second defect (defect B) fires on inputs
+        # starting with b'ZZ' on BOTH the vulnerable and the patched build.
+        def _program(self, variant, data):
+            if data.startswith(b"ZZ"):
+                return RunResult(1, b"", (ASAN.replace("parse_header", "handle_zz")
+                                          .replace("parser.c:142", "parser.c:999")).encode())
+            return super()._program(variant, data)
+
+        def refuzz(self, build, seconds):
+            # the fresh campaign stumbles on defect B again (a sibling), never on defect A
+            return [(ASAN.replace("parse_header", "handle_zz").replace("parser.c:142", "parser.c:999"))]
+
+    f = patched("real")
+    t = TwoBugTarget()
+    v = run_gate(f, t, reproducer=REPRO, corpus=corpus() + [b"ZZxx"], refuzz_seconds=1, min_stable_inputs=3)
+    assert v.passed, v.detail                 # the good patch verifies despite defect B firing
+    assert v.sibling_signatures               # defect B was harvested, not held against the fix
+    decide(f, v)
+    assert f.status is Status.VERIFIED

@@ -4,8 +4,10 @@ A static-analysis finding has no reproducer and so stays SUSPECTED. If another l
 reproducer on the same fix site with the same bug class, the static finding was right — and the
 reproducer proves it. Two rules keep this honest:
 
-- **same fix site AND same CWE.** A null dereference at line 71 does not confirm a SQL-injection
-  match at line 71.
+- **same fix site AND same CWE family.** A structural CWE-120 hypothesis and a sanitizer CWE-121
+  crash are the same memory defect and may confirm each other; a null-dereference does not confirm
+  a SQL-injection at the same line. Family grouping is `cwe.same_family`, which is conservative:
+  an unmapped code matches only itself, so two unrelated bugs never merge.
 - **the records merge.** One bug, one record, or Performance counts it twice.
 
 The survivor is the finding that actually holds the reproducer; the promoted static finding is
@@ -14,6 +16,7 @@ confirmed (its history records why) and then folded into the survivor's `merged_
 
 from __future__ import annotations
 
+from ..cwe import same_family
 from ..finding import Finding, FixSite, Status
 
 
@@ -36,7 +39,7 @@ def cross_confirm(findings: list[Finding], *, line_tolerance: int = 3) -> list[F
         if f.status is not Status.SUSPECTED or f.reproducer is not None:
             continue
         for g in proven:
-            if g.id == f.id or g.bug_class != f.bug_class:
+            if g.id == f.id or not same_family(g.bug_class, f.bug_class):
                 continue
             if not any(_same_site(a, b, line_tolerance) for a in f.fix_site_set for b in g.fix_site_set):
                 continue
