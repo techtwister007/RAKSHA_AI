@@ -1,7 +1,7 @@
 # RAKSHA AI — Plan V2: close every gap, add every feature
 
-**Status:** Waves 0, 1, 2 and 3 built (2026-10-04); Wave 4 not started. Per-item status, with the
-evidence and the honest caveats, is in the *Wave 1 / 2 / 3 — status* blocks.
+**Status:** Waves 0, 1, 2, 3 and 4 built (2026-10-04); J3 reworded (see its line). Per-item status, with the
+evidence and the honest caveats, is in the *Wave 1 / 2 / 3 — status* blocks and the Wave 4 — status block below.
 **Scope rule:** every item from the two review passes is included — nothing dropped for cost.
 Breadth first; optimisation after. This document is the contract we execute from and tick off.
 
@@ -312,6 +312,32 @@ The console stops being a read-only board and becomes the thing a human runs.
   **Done:** every claim in the brief maps to a built, demonstrable capability, or is reworded; recorded in the dossier.
 - **J11 Deck and dossier refresh.** Fold every capability above into the deck and dossier once built.
   **Done:** deck and dossier describe the system as it then stands, with no stale claim.
+
+### Wave 4 — status (2026-10-04)
+
+- **J1 ✓** `raksha/saysno.py`; the four beats run on the real C gate, hygiene and red team, as
+  scripted in ~25s; console *Demo Beats* screen; test `test_saysno_beat_is_as_scripted`.
+- **J2 ✓** `raksha/intake.py`; allow-listed, bounded, link-refusing staging; off-thread scan merged
+  under the session lock; time-to-first-finding measured (4s on the estate in the UI check).
+- **J3 — reworded.** The runner that executes real ARVO/OSS-Fuzz cases through the pipeline was not
+  built in this environment. The loader seam (`raksha/benchmark_arvo.py`) and the honest offline
+  state (no manifest ⇒ 0 cases, stated) stand; J4/J5 run on the bundled set and the mutation
+  factory. Recorded in `docs/claim-audit.md`; the brief quotes no real-ARVO number not produced.
+- **J4 ✓** `raksha/baseline.py`; static-vs-RAKSHA table on reports-with-reproducer, in the
+  benchmark report. The plain-model arm is recorded as not-run, with why.
+- **J5 ✓** `raksha/recall.py`; 100% on the mutation factory, 54.5% on fuzzable demo ground truth,
+  misses named; in the benchmark report.
+- **J6 ✓** `airgap.egress_counter`; console *Demo Beats* screen; scripted in the rehearsal runbook;
+  test `test_egress_counter_reads_kernel_counters`.
+- **J7 ✓** `raksha/verifiermedia.py` + `raksha/data/verify_standalone.py`; self-verified with only a
+  shipped runtime; fire/dead replay; test `test_verifier_media_builds_and_self_verifies`.
+- **J8 ✓** `raksha/advisory.py` + `Session.issue_advisory`; signed, sequential-id, verifies, tamper
+  detected; test `test_advisory_issued_and_verifies`.
+- **J9 ✓** `raksha/timelapse.py`; verified-journal scrub; shipped 16-min recording
+  (`docs/runs/longrun.jsonl.gz`); console *Time-lapse* screen; tests in `test_wave4.py`.
+- **J10 ✓** `docs/claim-audit.md`; every claim reconciled to a built capability or reworded.
+- **J11 ✓** benchmark report (J4/J5), dossier `08_wow_factors.md` (Wave 4 additions, Hindi-PDF
+  reworded), rehearsal runbook (three scripted beats).
 
 ---
 

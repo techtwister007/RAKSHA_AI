@@ -30,9 +30,10 @@ won't produce.
    in four other systems." (Full spec in file 09.)
 
 6. **Commander's Brief.** Every finding produces two outputs: the technical bundle, and a
-   one-paragraph plain-language brief a non-technical CO can act on — optionally in
-   Hindi, and formattable as a proper JSSD staff paper. A cyber tool that outputs a
-   service document is a quiet show-stopper for *this* jury.
+   one-paragraph plain-language brief a non-technical CO can act on — shown in Hindi on
+   the console and in the text brief, and formattable as a proper JSSD staff paper. (The
+   PDF export is single-font Latin; the Hindi brief is on-screen and in text, not in the
+   PDF.) A cyber tool that outputs a service document is a quiet show-stopper for *this* jury.
 
 7. **Three languages, one screen.** A C bug, a Java bug and a Python bug fixed in
    parallel by the same pipeline. (We support four — C/C++, Java, Node/JS, Python — but
@@ -56,6 +57,34 @@ won't produce.
 
 The difference we are dramatising: most teams *describe* a system; we *operate* one in
 the room, offline, with the jury's own scoresheet visible the entire time.
+
+## Wave 4 additions — the proof, the product, the honesty
+
+These are built and on the console's *Demo Beats* and *Time-lapse* screens; each is in the
+rehearsal runbook as a scripted beat.
+
+- **"It says no."** One button runs four patches through the real gate, live: a shallow fix dies at
+  the fuzz check, an unsafe diff is refused by hygiene before it builds, a weak fix passes the gate
+  and is broken by the red team, the proper fix is accepted. Refusal, demonstrated, is the
+  trust-maker — and it runs in under a minute.
+- **Bring your own target.** A judge's media goes in; time-to-first-finding ticks on screen; a first
+  finding appears with no restart. The intake path is bounded and refuses links, so a hostile medium
+  cannot hang or escape.
+- **Pull the cable, with the counter at zero.** The egress counter reads live; pull the cable, the
+  carrier drops and the transmit delta goes flat. The air-gap claim, shown rather than asserted.
+- **Replay it on your own laptop.** A signed verifier medium a judge runs with nothing but Python:
+  it checks every seal and replays a finding — fires on the vulnerable copy, dead on the patched —
+  in well under a minute.
+- **The internal-CERT advisory.** One verified fix becomes a signed, numbered advisory with
+  affected assets and the proven patch — the product framing a CERT actually ships.
+- **Scrub the run.** The time-lapse replays the hash-chained journal of a long run, so the jury can
+  see what the system was doing at any minute.
+
+Honesty, folded in: the **claim audit** (`docs/claim-audit.md`) reconciles every claim above with a
+built capability or rewords it; **recall** is now measured where the denominator is known (100% on
+the mutation factory, 54.5% on fuzzable demo ground truth) rather than only declined; and the
+real-world ARVO baseline is stated as a prep-node run through the same harness, never quoted as a
+number we did not produce.
 
 ## Backup
 

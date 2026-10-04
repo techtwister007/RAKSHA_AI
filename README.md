@@ -29,8 +29,8 @@ real. Nothing unproven ever ships.
 fixes and proves vulnerabilities across C, Python, Go, Rust, JavaScript/TypeScript and Java through one gate — including
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
-Plan V2 Waves 0, 1, 2 and 3 are built (`PLAN_V2.md`, per-item status with evidence and caveats);
-Wave 4 is next. Last verified run: **840 tests pass**, 0 fail, 2 skipped (the real multi-language benchmark and one
+Plan V2 Waves 0, 1, 2, 3 and 4 are built (`PLAN_V2.md`, per-item status with evidence and caveats);
+Wave 4's J3 (real-ARVO runner) is reworded, not built — see `docs/claim-audit.md`. Last verified run: **840 tests pass**, 0 fail, 2 skipped (the real multi-language benchmark and one
 slow mutation test), with every slow lane, the deep and Java slices and the z3 proofs enabled;
 air-gap guard and pyflakes clean; all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5 and

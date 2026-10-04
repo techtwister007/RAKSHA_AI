@@ -56,6 +56,32 @@ A restart you can see on the Mission Board is a feature. A silent hang is the th
 run — so every restart is a visible timeline event, and `survived` is false if any error occurred or
 any cap was breached.
 
+## The scripted demo beats
+
+Three beats are scripted so they run the same way every time, in front of the jury:
+
+**1. "It says no" (J1) — refusal as the trust-maker.** On the console's *Demo Beats* screen, press
+**Run the beat**. In under a minute, on the real C gate, four patches are judged live: a shallow fix
+that silences the exact crash dies at `CLEAN_REFUZZ`; a diff that adds a shell call is refused by
+patch hygiene before it is ever built; a weak bound passes all five gate checks and is then broken
+by the independent red team; the proper fix passes and the red team cannot break it. Narration: *we
+do not ask you to trust the AI — we show you the three fixes it refused to certify.*
+
+**2. Bring your own target (J2).** Take a judge's media (a USB path under the configured intake
+roots), type it into *Bring your own target* and press **Ingest**. Time-to-first-finding ticks on
+screen; a first finding appears without restarting the console. Rehearse with an unseen target, not
+a demo one. If the media is large or hostile, the staging is bounded and link-refusing — it cannot
+hang or escape.
+
+**3. The air-gap beat (J6) — pull the cable, live.** Before judging, on the *Demo Beats* screen
+press **Zero the counter**. Show the egress counter reading `TX packets since zero: …`, `links up: 1`.
+Now pull the network cable. The carrier drops to `down`, and the transmit-packet delta stops moving:
+nothing leaves the box. `RAKSHA egress calls` stays at `0` throughout — RAKSHA itself never tried.
+Rehearse the physical unplug on the finale node so the operator knows which cable and how the
+counter reads before and after. (The kernel counter also moves for ordinary background traffic while
+a link is up; the beat is that with the link down it goes flat — say so if asked, rather than
+claiming the box was silent before.)
+
 ## The recording
 
 Record the full 7-minute demo arc at a safe point before judging, on a target you control, and copy
@@ -68,6 +94,8 @@ over the recording and lose almost nothing.
 - The recording plays on both backup devices without any software install.
 - The CPU-only degraded profile has been run once and its numbers recorded (so the no-GPU path is
   known, not discovered live).
+- The three scripted beats (says-no, bring-your-own-target, the air-gap cable pull) have each been
+  run on the finale node, end to end, by the operator who will run them live.
 
 ## What this container could and could not do
 

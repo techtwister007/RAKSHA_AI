@@ -78,6 +78,37 @@ Every number below is measured by running the actual pipeline over the target se
 - Negative controls scanned: **11** clean artifacts
 - False positives on them: **0**
 
+## Baseline comparison (J4)
+
+The same demo targets through a static scanner alone and through RAKSHA, on the one measure that
+matters — **reports carrying a reproducer that replays** (`python -m raksha.baseline --report`):
+
+| arm | reports | with reproducer | defect files hit | FPs on clean | time (s) |
+|-----|---------|-----------------|------------------|--------------|----------|
+| static scanner (flawfinder / bandit, defaults) | 8 | 0 | 5 | 0 | ~1 |
+| RAKSHA (synthesized-harness lane, model-free) | 7 | 7 | 7 | 0 | ~5 |
+| plain model alone | — | — | — | — | not run |
+
+A static scanner emits no input, so by construction none of its reports carry a reproducer — that is
+the structural difference, not a dig. The plain-model arm is recorded as not-run: RAKSHA's model use
+(ranking, the repair ladder) is measured instead by the zero-inference share on the Scorecard and by
+the mutation factory below. Small curated set — a reproducible comparison, not a statistical claim.
+
+## Recall (J5)
+
+Recall where the denominator is knowable (`python -m raksha.recall --report`). On an open corpus
+recall is undefined — there is no catalogue of all real bugs to divide by — which is why a
+population recall is still declined. Two sets have an exact denominator:
+
+- **Mutation factory:** **100%** (8/8). Every bug-preserving variant is a real instance of a known
+  defect, so the denominator is exact; recall is the find half, the fix rate (75% of variants) the
+  repair half.
+- **Demo ground truth, fuzzable families:** **54.5%** (6/11), misses named
+  (c-binsink, js-noharness, go-decoder, rust-nolibfuzzer, java-noharness — the deep-lane toolchains
+  absent on this box, or no fuzzable entry point). Families a runtime oracle cannot reach
+  (weak-crypto config, unpinned dependencies, path traversal, ReDoS) are build-free-lane territory
+  and are listed out of scope, not counted as misses.
+
 
 ---
 
