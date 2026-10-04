@@ -14,7 +14,7 @@ from raksha.finding import (
     Status,
     utcnow,
 )
-from raksha.inference import ADVISOR, JUDGE
+from raksha.inference import ADVISOR, JUDGE, RED
 from raksha.parliament import convene, epistemic_conflict
 
 
@@ -56,7 +56,8 @@ def test_divergent_panel_has_high_disagreement_and_flags():
     assert v.flag_for_investigation is True
     # exactly the documented shape is written onto the record
     assert set(f.parliament) == {"votes", "disagreement", "panel", "quorum",
-                                 "flag_for_investigation", "note"}
+                                 "flag_for_investigation", "note", "by_axis", "pairwise",
+                                 "independent_models"}
     assert f.parliament["disagreement"] == v.disagreement
 
 
@@ -146,3 +147,38 @@ def test_deterministic_match_channel_counts_as_dynamic():
     f.structure = {"path": ["a", "b"]}           # dynamic (det-match) + structural = 2 channels
     c = epistemic_conflict(f)
     assert c is not None and c > 0.0             # crossconfirm absent -> mild gap
+
+
+
+# ---------------------------------------------------------------- G4: three roles
+
+def test_three_roles_measured_per_axis_and_per_pair():
+    f = _finding()
+    client = RoleMockClient({
+        ADVISOR: '{"cwe": "CWE-121", "severity": "high", "exploitability": 0.8}',
+        JUDGE: '{"cwe": "CWE-121", "severity": "high", "exploitability": 0.7}',
+        RED: '{"cwe": "CWE-787", "severity": "critical", "exploitability": 0.95, '
+             '"attack": "length byte 0xff overruns value[32] into the return address"}',
+    })
+    v = convene(f, client=client)
+    assert v.quorum == 3 and v.independent_models == 3 and v.note is None
+    assert v.pairwise["advisor|judge"] == 0.0                  # the specialists agree
+    assert v.pairwise["advisor|red"] > 0.5                      # the attacker sees it differently
+    assert v.by_axis["cwe_class"] > 0 and v.by_axis["exp_band"] == 0.0
+    red = next(x for x in f.parliament["votes"] if x["role"] == RED)
+    assert "overruns" in red["attack"]
+
+
+def test_roles_on_one_model_are_marked_not_independent():
+    f = _finding()
+    same = '{"cwe": "CWE-121", "severity": "high", "exploitability": 0.8}'
+    client = RoleMockClient({ADVISOR: same, JUDGE: same, RED: same})
+    client.config = SimpleNamespace(model_for=lambda role: "one-model")
+    v = convene(f, client=client)
+    assert v.independent_models == 1 and "not independent" in v.note
+
+
+def test_attacker_prompt_is_role_specific():
+    from raksha.parliament import _prompt
+    assert "attacker" in _prompt(_finding(), RED)[0]["content"]
+    assert "attack" not in _prompt(_finding(), ADVISOR)[0]["content"].lower().replace("attacker", "")

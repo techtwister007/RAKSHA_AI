@@ -37,7 +37,7 @@ import re
 from dataclasses import dataclass, field
 
 from .finding import DETERMINISTIC_MATCH, EXPLOIT_REPLAY, Finding
-from .inference import ADVISOR, JUDGE, InferenceError
+from .inference import ADVISOR, JUDGE, RED, InferenceError
 
 #: Disagreement above this fraction trips `flag_for_investigation`.
 _DEFAULT_THRESHOLD = 0.5
@@ -137,6 +137,29 @@ def _disagreement(votes: list[dict]) -> float:
     return round(disagreements / comparisons, 3) if comparisons else 0.0
 
 
+_AXES = ("cwe_class", "severity", "exp_band")
+
+
+def _by_axis(votes: list[dict]) -> dict:
+    """G4: disagreement per axis (None where nobody voted on it)."""
+    enriched = [{**v, "exp_band": _exploitability_band(v.get("exploitability"))} for v in votes]
+    out = {}
+    for axis in _AXES:
+        vals = [v.get(axis) for v in enriched if v.get(axis) is not None]
+        pairs = [(a, b) for i, a in enumerate(vals) for b in vals[i + 1:]]
+        out[axis] = round(sum(a != b for a, b in pairs) / len(pairs), 3) if pairs else None
+    return out
+
+
+def _pairwise(votes: list[dict]) -> dict:
+    """G4: disagreement for each pair of roles, e.g. {"advisor|red": 0.667}."""
+    out = {}
+    for i, a in enumerate(votes):
+        for b in votes[i + 1:]:
+            out[f"{a['role']}|{b['role']}"] = _disagreement([a, b])
+    return out
+
+
 @dataclass
 class Verdicts:
     """The panel's record. `disagreement` is None when it could not be measured (no panel)."""
@@ -147,6 +170,9 @@ class Verdicts:
     panel: list[str] = field(default_factory=list)
     flag_for_investigation: bool = False
     note: str | None = None
+    by_axis: dict | None = None            # G4: disagreement per axis
+    pairwise: dict | None = None           # G4: disagreement per pair of roles
+    independent_models: int = 0            # G4: distinct models among the voters
 
     def as_dict(self) -> dict:
         return {
@@ -156,13 +182,16 @@ class Verdicts:
             "quorum": self.quorum,
             "flag_for_investigation": self.flag_for_investigation,
             "note": self.note,
+            "by_axis": self.by_axis,
+            "pairwise": self.pairwise,
+            "independent_models": self.independent_models,
         }
 
 
 _SINGLE_SOURCE_NOTE = ("single-source: no independent panel offline; gate remains sole authority")
 
 
-def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR, JUDGE),
+def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR, JUDGE, RED),
             threshold: float = _DEFAULT_THRESHOLD) -> Verdicts:
     """Ask each role in `panel` to classify the finding independently; record and measure the votes.
 
@@ -178,8 +207,8 @@ def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR,
     """
     votes: list[dict] = []
     if client is not None:
-        prompt = _prompt(finding)
         for role in panel:
+            prompt = _prompt(finding, role)
             try:
                 model = client.config.model_for(role)
             except AttributeError:
@@ -188,7 +217,11 @@ def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR,
                 reply = client.complete(prompt, role=role, temperature=0.1, n=1)[0]
             except (InferenceError, IndexError, KeyError):
                 continue
-            votes.append(_parse_vote(role, reply, model))
+            vote = _parse_vote(role, reply, model)
+            if role == RED:
+                am = re.search(r'"attack"\s*:\s*"([^"]{1,300})"', reply)
+                vote["attack"] = am.group(1) if am else None   # annotation only; never executed
+            votes.append(vote)
 
     if len(votes) < 2:
         verdicts = Verdicts(
@@ -198,6 +231,7 @@ def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR,
             panel=list(panel),
             flag_for_investigation=False,
             note=_SINGLE_SOURCE_NOTE,
+            independent_models=len({v["model"] for v in votes}),
         )
     else:
         d = _disagreement(votes)
@@ -207,7 +241,12 @@ def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR,
             quorum=len(votes),
             panel=list(panel),
             flag_for_investigation=d > threshold,
-            note=None,
+            note=(None if len({v["model"] for v in votes}) == len(votes) else
+                  f"{len({v['model'] for v in votes})} distinct model(s) behind {len(votes)} roles: "
+                  "votes from one model are not independent"),
+            by_axis=_by_axis(votes),
+            pairwise=_pairwise(votes),
+            independent_models=len({v["model"] for v in votes}),
         )
 
     # Annotate only. Status is the gate's; we never call a transition method.
@@ -215,11 +254,22 @@ def convene(finding: Finding, *, client=None, panel: tuple[str, ...] = (ADVISOR,
     return verdicts
 
 
-def _prompt(finding: Finding) -> list[dict]:
+_ROLE_BRIEF = {
+    ADVISOR: "You are the security specialist on a review panel. Classify the reported finding.",
+    JUDGE: "You give an independent second opinion. You have not seen anyone else's review; "
+           "classify the reported finding on its own evidence.",
+    RED: "You are the independent attacker on the panel. Judge the finding as someone who wants to "
+         "exploit it: how real and how reachable is it? Add a one-line \"attack\" sketch (a "
+         "description only; nothing will be run).",
+}
+
+
+def _prompt(finding: Finding, role: str = ADVISOR) -> list[dict]:
+    extra = ', "attack": "<one line>"' if role == RED else ""
     return [
-        {"role": "system", "content": "You are one independent reviewer on a panel. Classify the "
-         "reported finding. Respond ONLY with a JSON object: "
-         '{"cwe": "CWE-nnn", "severity": "critical|high|medium|low", "exploitability": 0.0-1.0}.'},
+        {"role": "system", "content": _ROLE_BRIEF.get(role, _ROLE_BRIEF[ADVISOR]) + " Respond ONLY "
+         'with a JSON object: {"cwe": "CWE-nnn", "severity": "critical|high|medium|low", '
+         '"exploitability": 0.0-1.0' + extra + "}."},
         {"role": "user", "content": f"bug_class={finding.bug_class} oracle={finding.oracle} "
          f"language={finding.language} severity={finding.severity}\nmessage: {finding.message}"},
     ]

@@ -304,6 +304,11 @@ def scorecard(
         "findings_with_2plus_independent_channels": len([e for e in ev if e.get("independent_channels", 0) >= 2]),
         # model parliament / epistemic conflict (offline: disagreement is None, conflict is measured)
         "parliament_quorum": max((p.get("quorum", 0) for p in parl), default=0),
+        # G4: how many distinct models actually voted (roles on one model are not independent), and
+        # the widest measured disagreement; None when no panel sat
+        "parliament_independent_models": max((p.get("independent_models", 0) for p in parl), default=0),
+        "parliament_max_disagreement": max((p["disagreement"] for p in parl
+                                            if p.get("disagreement") is not None), default=None),
         "findings_flagged_for_investigation": len([p for p in parl if p.get("flag_for_investigation")]),
         "epistemic_conflicts": len([p for p in parl if p.get("epistemic_conflict")]),
         # independent red team against verified patches
