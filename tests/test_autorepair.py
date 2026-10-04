@@ -218,3 +218,19 @@ def test_a3_deployment_twin_rechecks_on_an_optimised_build():
     out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
                  corpus=[b"\x01\x04abcd", b"\x02zz", b"\x01\x02ab"], use_model=False)
     assert out.verified and out.verdict is not None and out.verdict.twin_checked is True
+
+
+def test_hygiene_allows_shell_to_argv_swap_but_not_new_capability():
+    """Found by the model benchmark: the model's correct fix for an os.system injection (an
+    argument-list subprocess call) was refused. A plain process call may replace a shell call; a new
+    shell, network, code-loading or deserialising primitive is still refused."""
+    from raksha import hygiene
+    from raksha.finding import Finding, FixSite
+    f = Finding(oracle="pysecsan", bug_class="CWE-78", language="python", target="t", message="m")
+    f.add_fix_site(FixSite(uri="converter.py", rank=0, start_line=5))
+    d = lambda rem, add: f"--- a/converter.py\n+++ b/converter.py\n@@ -5 +5 @@\n-{rem}\n+{add}\n"
+    assert hygiene.check(d("os.system('conv ' + x)", "subprocess.run(['conv', x])"), f) is None
+    assert hygiene.check(d("os.popen('conv ' + x).read()", "subprocess.run(['conv', x])"), f) is None
+    assert "exec (code)" in hygiene.check(d("os.system('conv ' + x)", "exec(x)"), f)
+    assert "socket" in hygiene.check(d("os.system('conv ' + x)", "socket.socket().connect(h)"), f)
+    assert "subprocess" in hygiene.check(d("n = len(x)", "subprocess.run(['x'])"), f)

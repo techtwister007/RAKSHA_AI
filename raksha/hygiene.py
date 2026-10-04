@@ -39,6 +39,31 @@ _PRIMITIVES = [
 _PRIM_RE = [re.compile(p) for p in _PRIMITIVES]
 
 
+#: Each primitive's class. A patch may swap one primitive for another of the SAME class (replace
+#: `os.system(cmd)` with `subprocess.run([...])`, the standard fix for command injection) — that adds
+#: no new capability. What hygiene refuses is a class the original lines did not have at all: a
+#: "fix" that suddenly opens a socket, loads code or spawns a process where none was spawned before.
+_CLASS_RULES = (
+    ("network", ("socket", "connect", "urllib", "requests", "net", "java.net", "curl", "wget", "nc",
+                 "/dev/tcp/", "net.Dial", "require")),
+    ("dynamic-load", ("dlopen", "__import__", "importlib", "ctypes", "Class.forName", "new Function",
+                      "eval", "unsafe", "exec (code)", "ptrace")),
+    ("deserialise", ("pickle", "marshal")),
+    ("shell", ("system", "popen", "os.system", "os.popen", "shell=True")),
+    ("exec", ("system", "popen", "exec", "fork", "ptrace", "subprocess", "shell", "os/exec",
+              "syscall", "Runtime.getRuntime", "ProcessBuilder", "child_process", "std::process")),
+)
+
+
+def _class(label: str) -> str:
+    """The class of a primitive label. Keys match as whole tokens, so "nc" does not match "Function"."""
+    for cls, keys in _CLASS_RULES:
+        for k in keys:
+            if re.search(r"(?<![A-Za-z])" + re.escape(k) + r"(?![A-Za-z])", label):
+                return cls
+    return label
+
+
 def _label(pattern: str) -> str:
     """A readable name for a matched primitive ("os.system", "socket(") for the record."""
     cleaned = re.sub(r"\(\?:[^)]*\)", "", pattern)                    # drop alternation groups
@@ -57,7 +82,8 @@ def _primitives(lines: list[str]) -> set[str]:
     for ln in lines:
         for rx in _PRIM_RE:
             if rx.search(ln):
-                hits.add(_label(rx.pattern))
+                # Python's exec() runs code, not a command: label it apart from the exec*() family
+                hits.add("exec (code)" if rx.pattern == r"\bexec\s*\(" else _label(rx.pattern))
     return hits
 
 
@@ -73,7 +99,13 @@ def check(diff: str, finding: Finding) -> str | None:
     removed = [ln[1:] for ln in diff.splitlines() if ln.startswith("-") and not ln.startswith("---")]
     if len(added) > MAX_ADDED_LINES:
         return f"adds {len(added)} lines (cap {MAX_ADDED_LINES}); a fix is local, a rewrite is not"
-    new = _primitives(added) - _primitives(removed)
+    added_p, removed_p = _primitives(added), _primitives(removed)
+    removed_classes = {_class(p) for p in removed_p}
+    # A new primitive is allowed only when it is a plain argument-list process call ("exec" class)
+    # replacing lines that already ran a command (exec or shell): the standard command-injection fix.
+    # Any new shell-invoking, network, code-loading or deserialising primitive is still refused.
+    new = sorted(p for p in added_p - removed_p
+                 if not (_class(p) == "exec" and removed_classes & {"exec", "shell"}))
     if new:
-        return "introduces an execution/network primitive absent from the original: " + ", ".join(sorted(new))
+        return "introduces an execution/network primitive absent from the original: " + ", ".join(new)
     return None
