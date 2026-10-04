@@ -18,6 +18,10 @@ Read routes (GET):
 
 Write routes (POST, operator actions — F7), each requiring the session token in X-RAKSHA-Token:
   /api/action/approve|reject|false_positive|rerun_red_team|export   {finding, actor, reason}
+  /api/action/advisory    {finding}            issue a signed internal-CERT advisory (J8)
+  /api/action/saysno                       run the "it says no" beat (J1)
+  /api/action/intake      {path, name, deep}   ingest a judge's media without a restart (J2)
+  /api/action/egress_reset                 zero the egress counter for the air-gap beat (J6)
 
 The token is minted per process, injected into the served page, and required on every POST, so a
 stray local page cannot drive operator actions. `serve(session, port)` blocks; `make_handler` returns
@@ -28,6 +32,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, unquote
 from pathlib import Path
@@ -141,6 +146,9 @@ def make_handler(session, *, token: str | None = None):
                 body = json.loads(self.rfile.read(n) or b"{}")
             except (ValueError, TypeError):
                 self._json(400, {"error": "bad JSON body"}); return
+            if action in _JOBS:
+                res = _JOBS[action](session, body)
+                self._json(200 if res.get("ok") else 400, res); return
             fid = body.get("finding", "")
             actor = body.get("actor") or "operator"
             reason = body.get("reason")
@@ -150,6 +158,7 @@ def make_handler(session, *, token: str | None = None):
                 "false_positive": lambda: session.mark_false_positive(fid, actor=actor, reason=reason or ""),
                 "rerun_red_team": lambda: session.rerun_red_team(fid, actor=actor),
                 "export": lambda: session.export_bundle(fid, actor=actor),
+                "advisory": lambda: session.issue_advisory(fid, actor=actor),
             }
             fn = fns.get(action)
             if fn is None:
@@ -158,6 +167,41 @@ def make_handler(session, *, token: str | None = None):
             self._json(200 if res.get("ok") else 400, res)
 
     return Handler
+
+
+_SAYSNO_BUSY = threading.Lock()
+
+
+def _saysno(session, body: dict) -> dict:
+    """J1: run the "it says no" beat in a worker; the console narrates it from the event stream."""
+    if not _SAYSNO_BUSY.acquire(blocking=False):
+        return {"ok": False, "error": "the beat is already running"}
+
+    def work():
+        try:
+            from raksha import saysno
+            saysno.run(session)
+        finally:
+            _SAYSNO_BUSY.release()
+    session.saysno = {"running": True, "beats": []}
+    threading.Thread(target=work, daemon=True, name="raksha-saysno").start()
+    return {"ok": True, "started": True}
+
+
+def _intake(session, body: dict) -> dict:
+    """J2: accept a judge's media path; ingestion runs in the intake worker."""
+    path = body.get("path") or ""
+    return session.intake().submit(path, name=body.get("name") or None, deep=bool(body.get("deep")))
+
+
+def _egress_reset(session, body: dict) -> dict:
+    """J6: zero the egress counter at the start of the air-gap beat."""
+    from raksha.airgap import egress_counter
+    session.emit("egress_reset", actor=body.get("actor") or "operator")
+    return {"ok": True, "egress": egress_counter(reset=True)}
+
+
+_JOBS = {"saysno": _saysno, "intake": _intake, "egress_reset": _egress_reset}
 
 
 def _id(path: str) -> str:

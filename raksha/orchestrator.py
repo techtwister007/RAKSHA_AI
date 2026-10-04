@@ -12,6 +12,8 @@ so the air-gap guard stays simple and the runtime carries no third-party package
 
 from __future__ import annotations
 
+import tempfile
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -95,6 +97,11 @@ class Session:
     #: F7: what a red-team re-run needs per finding (target, reproducer, corpus), kept while the
     #: session lives; absent for findings ingested without a live target.
     _rerun_ctx: dict = field(default_factory=dict, repr=False)
+    #: J1: the last "it says no" run (None until one runs). J2: the intake desk (made on first use).
+    saysno: dict | None = None
+    intake_desk: object | None = field(default=None, repr=False)
+    #: Guards merges from worker threads (intake, demo beats) against the console's snapshot reads.
+    _lock: object = field(default_factory=threading.RLock, repr=False)
 
     def open_journal(self, path: str | Path) -> None:
         """Begin (or continue) journalling pipeline events to `path`."""
@@ -740,6 +747,27 @@ class Session:
             return {"ok": False, "error": "only a reportable finding has a bundle"}
         return self._operator(finding_id, "exported", actor, None, path=str(out))
 
+    def issue_advisory(self, finding_id: str, *, actor: str = "operator") -> dict:
+        """J8: issue a signed internal-CERT advisory for a VERIFIED finding."""
+        from . import advisory as _adv
+        f = self.findings.get(finding_id)
+        if f is None:
+            return {"ok": False, "error": "no such finding"}
+        if f.status is not Status.VERIFIED:
+            return {"ok": False, "error": f"an advisory needs a VERIFIED finding (this one is {f.status.value})"}
+        bdir = self.bundle_dir(finding_id)
+        root = (self.evidence_root or Path(tempfile.gettempdir()) / "raksha-evidence") / "advisories"
+        try:
+            out = _adv.issue(f, root, others=list(self.findings.values()), registry=self.registry,
+                             bundle_dir=bdir)
+        except (ValueError, OSError) as e:
+            return {"ok": False, "error": str(e)}
+        ok, problems = _adv.verify_advisory(out)
+        self.emit("advisory_issued", finding=f.id, target=f.target, advisory=out.name, actor=actor,
+                  verified=ok)
+        return {"ok": ok, "advisory": out.name, "path": str(out), "problems": problems,
+                "text": (out / _adv.TEXT).read_text()}
+
     def save_memory(self, path=None):
         """E5: persist the fix memory so a learned fix survives a reboot."""
         from .retrieval import default_memory
@@ -806,13 +834,48 @@ class Session:
         f = self.findings.get(finding_id)
         return console_api.two_voices(f) if f is not None else None
 
+    def intake(self):
+        """J2: this session's intake desk."""
+        if self.intake_desk is None:
+            from .intake import Intake
+            self.intake_desk = Intake(self)
+        return self.intake_desk
+
     def snapshot(self) -> dict:
-        return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
+        with self._lock:
+            return self._snapshot()
+
+    def _snapshot(self) -> dict:
+        from .airgap import egress_counter
+        return {"intake": self.intake_desk.status() if self.intake_desk else None,
+                "saysno": self.saysno, "egress": egress_counter(),
+"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
                 "risk": self.risk_register(), "pipeline": self.pipeline_stages(),
                 "attack_graph": self.attack_graph(), "pqc": self.pqc_report(),
                 "triage": self.triage(), "structure": self.structure_summaries,
                 "fleet": self.fleet_rollup(), "events": self.event_log(),
                 "lane_trust": self.lane_trust(), "estate_map": self.estate_map()}
+
+
+def _merge_scratch(live: Session, scratch: Session) -> int:
+    """Fold a scratch session's results (built off-thread) into the live one, atomically. Returns
+    the number of findings added."""
+    with live._lock:
+        n = 0
+        for f in scratch.findings.values():
+            if f.id not in live.findings:
+                live.add_finding(f)
+                n += 1
+        live.targets.extend(scratch.targets)
+        live.crypto_uses.extend(scratch.crypto_uses)
+        live.unpinned_deps.extend(scratch.unpinned_deps)
+        live.structure_summaries.update(scratch.structure_summaries)
+        live._rerun_ctx.update(scratch._rerun_ctx)
+        for ev in scratch.events:
+            live.emit(ev["kind"], **{k: v for k, v in ev.items() if k not in ("seq", "at", "kind")})
+        live._annotate_evidence()
+        live.checkpoint()
+        return n
 
 
 def _dispatch_autofuzz(root: Path):

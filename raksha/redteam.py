@@ -58,6 +58,22 @@ class RedResult:
         return self.held
 
 
+#: Lengths a bound is commonly (and wrongly) written against: powers of two and their neighbours.
+SWEEP_LENGTHS = sorted({n + d for n in (16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+                        for d in (-1, 0, 1)} | {65535})
+
+
+def length_sweep(reproducer: bytes) -> list[bytes]:
+    """The reproducer's bytes repeated or truncated to each length in SWEEP_LENGTHS (deterministic)."""
+    unit = reproducer or b"A"
+    out: list[bytes] = []
+    for n in SWEEP_LENGTHS:
+        data = (unit * (n // len(unit) + 1))[:n]
+        if data != reproducer:
+            out.append(data)
+    return out
+
+
 def red_round(finding: Finding, target: Target, *, reproducer: bytes, corpus: list[bytes],
               client=None, rounds: int = 200, seconds: float = 4.0, seed: int = 0x19,
               oracles: Iterable[Oracle] = KEYSTONE_ORACLES) -> RedResult:
@@ -121,6 +137,15 @@ def red_round(finding: Finding, target: Target, *, reproducer: bytes, corpus: li
                         attack(v, "coverage-targeted")
             except Exception:  # noqa: BLE001 — coverage targeting is a best-effort optimisation
                 pass
+
+        # (a0b) length-boundary sweep: the reproducer's own bytes stretched or cut to every length a
+        # bound is commonly written against (powers of two and their neighbours, up to 64 KiB). The
+        # gate's neighbourhood grows inputs by small steps; a patch that only bounds "plausible"
+        # lengths (`len < 1024`) survives those steps and dies here.
+        for data in (length_sweep(reproducer) if rounds > 0 else []):
+            if time.perf_counter() > deadline:
+                break
+            attack(data, "length-sweep")
 
         # (a) the reproducer's neighbourhood, wider than the gate's, from red's own seed
         for v in variants:

@@ -176,3 +176,64 @@ if __name__ == "__main__":
     report = audit()
     print(report.summary())
     sys.exit(0 if report.clean else 1)
+
+
+# ---- J6: the live egress counter the air-gap beat shows ---------------------------------------
+_EGRESS_BASE: dict | None = None
+
+
+def _read_netdev(path: str = "/proc/net/dev") -> dict[str, tuple[int, int]]:
+    """{interface: (tx_bytes, tx_packets)} from the kernel's own counters (Linux)."""
+    out: dict[str, tuple[int, int]] = {}
+    try:
+        lines = Path(path).read_text().splitlines()[2:]
+    except OSError:
+        return out
+    for ln in lines:
+        if ":" not in ln:
+            continue
+        name, rest = ln.split(":", 1)
+        cols = rest.split()
+        if len(cols) >= 10:
+            out[name.strip()] = (int(cols[8]), int(cols[9]))
+    return out
+
+
+def _link(name: str, sys_net: str = "/sys/class/net") -> dict:
+    def rd(f):
+        try:
+            return (Path(sys_net) / name / f).read_text().strip()
+        except OSError:
+            return None
+    carrier = rd("carrier")
+    return {"operstate": rd("operstate"), "carrier": None if carrier is None else carrier == "1"}
+
+
+def egress_counter(*, reset: bool = False, netdev: str = "/proc/net/dev",
+                   sys_net: str = "/sys/class/net") -> dict:
+    """Transmit counters on every non-loopback interface, as a delta since the first reading (or
+    the last `reset`), plus RAKSHA's own counted egress calls.
+
+    This is the kernel's count, not RAKSHA's: it moves for ANY traffic the host sends (ARP, DHCP,
+    router solicitations included) while a link is up. With the cable pulled the carrier drops and
+    the delta stays flat — that is the beat. `available` is False off Linux, and nothing is claimed.
+    """
+    global _EGRESS_BASE
+    now = {k: v for k, v in _read_netdev(netdev).items() if k != "lo"}
+    if _EGRESS_BASE is None or reset:
+        _EGRESS_BASE = dict(now)
+    ifaces = []
+    for name, (tb, tp) in sorted(now.items()):
+        b0, p0 = _EGRESS_BASE.get(name, (tb, tp))
+        ifaces.append({"name": name, **_link(name, sys_net), "tx_bytes_delta": tb - b0,
+                       "tx_packets_delta": tp - p0})
+    try:
+        from .metrics import live_counters
+        calls = live_counters().get("egress_calls", 0)
+    except Exception:  # noqa: BLE001
+        calls = None
+    return {"available": bool(now) or Path(netdev).exists(), "interfaces": ifaces,
+            "links_up": sum(1 for i in ifaces if i["carrier"]),
+            "tx_packets_delta": sum(i["tx_packets_delta"] for i in ifaces),
+            "tx_bytes_delta": sum(i["tx_bytes_delta"] for i in ifaces),
+            "raksha_egress_calls": calls}
