@@ -30,7 +30,7 @@ fixes and proves vulnerabilities across C, Python, Go, Rust, JavaScript/TypeScri
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
 Plan V2 Waves 0, 1, 2, 3 and 4 are built (`PLAN_V2.md`, per-item status with evidence and caveats);
-Wave 4's J3 (real-ARVO runner) is reworded, not built — see `docs/claim-audit.md`. Wave 5 (project memory: signed versioned reports per project, colour-coded diffs, needs-a-human, learning under probation, console *Projects* and *Learning* screens) is built except K21, K24 and K30. Last verified run: **846 tests pass**, 0 fail, 8 skipped (the real multi-language benchmark and one
+Wave 4's J3 (real-ARVO runner) is reworded, not built — see `docs/claim-audit.md`. Wave 5 (project memory: signed versioned reports per project, colour-coded diffs, needs-a-human, learning under probation, console *Projects* and *Learning* screens) is built except K21, K24 and K30. Last verified run: **863 tests pass**, 0 fail, 8 skipped (the real multi-language benchmark and one
 slow mutation test), with every slow lane, the deep and Java slices and the z3 proofs enabled;
 air-gap guard and pyflakes clean; all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5 and
