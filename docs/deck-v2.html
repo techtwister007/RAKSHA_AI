@@ -194,10 +194,37 @@ untrusted input → … → command execution&nbsp;&nbsp;❌ aborts at the sink 
 
   <section class="slide">
     <span class="no">10</span>
+    <p class="kick">Project memory · learning · the owner's view</p>
+    <h2>Every project gets an ID and a signed history it can read any time.</h2>
+    <div class="grid2">
+      <div class="card"><h4>Versioned, colour-coded reports</h4><p>Each run writes report vN, signed and chained to v(N-1): ✓ fixed (only when the absence is a proof), ✚ new, ● still open, ⚑ needs a human with a checklist. Marked-done items are re-checked, never trusted. Posture score, deadlines, exposure-days, secrets tracker, readiness certificate.</p></div>
+      <div class="card"><h4>Learning that only proposes</h4><p>Recurring faults across projects become draft guidelines for ACG, adopted only with a named approver. New frameworks are learned on probation: promoted only on gate-verified cases from two projects, demoted on one false alarm, rolled back in one click.</p></div>
+    </div>
+    <div class="spacer"></div>
+    <p class="foot">Console: Projects and Learning screens · pre-merge check · quarterly compliance pack an auditor verifies on their own machine.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">11</span>
+    <p class="kick">Proven open source, wired in</p>
+    <h2>Our checks are the floor; industry tools add independent evidence.</h2>
+    <table>
+      <tr><th>Tool</th><th>What it adds</th></tr>
+      <tr><td>OSV-Scanner · Gitleaks · Checkov</td><td>dependency advisories, secrets, IaC/config — confirmed by deterministic re-match</td></tr>
+      <tr><td>Semgrep (offline ruleset)</td><td>static leads that count only when RAKSHA's own lanes confirm the same site and CWE</td></tr>
+      <tr><td>cosign</td><td>public-key seal on every evidence bundle, verifiable without being able to forge</td></tr>
+      <tr><td>Open Policy Agent</td><td>rules of engagement as policy code; both must allow, the stricter answer wins</td></tr>
+      <tr><td>Z3 · sanitizers · vLLM</td><td>solver proofs, the alarm bells, and the local model — all on the box</td></tr>
+    </table>
+    <p class="foot">Measured on the demo estate: four scanners add 90 findings in about 15 seconds, offline.</p>
+  </section>
+
+  <section class="slide">
+    <span class="no">12</span>
     <p class="kick">What we hand over · the ask</p>
     <h2>A sealed node, a signed bundle, and a one-command install.</h2>
     <div class="grid2">
-      <div class="card"><h4>Deliverables</h4><p>The offline operator console (six screens, keyboard-only demo), the signed evidence bundle per finding, the Commander's Brief in service-writing style with a Hindi headline, and the rollback script.</p></div>
+      <div class="card"><h4>Deliverables</h4><p>The offline operator console (fourteen screens, English and Hindi, keyboard-driven), the signed evidence bundle per finding, the Commander's Brief in service-writing style with a Hindi headline, and the rollback script.</p></div>
       <div class="card"><h4>Footprint</h4><p>Single node, 32&nbsp;GB VRAM, zero network interfaces, degrades to a CPU-only, model-free profile rather than failing.</p></div>
     </div>
     <div class="spacer"></div>

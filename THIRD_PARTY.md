@@ -23,6 +23,9 @@ sealed bundle when the operator provisions it, or is a planned "take" lane (`HAN
 | OASIS SARIF 2.1.0 schema (vendored in `schemas/`) | record format validation | OASIS, royalty-free |
 | z3-solver (optional `[reasoning]` extra, baked into the sealed image) | bound proofs (A10), reachability proofs (G1); absent → recorded as `unavailable` | MIT |
 | pytest, jsonschema | development only (`[dev]` extra) | MIT |
+| OSV-Scanner, Gitleaks, Checkov, Semgrep (optional take lanes, run when installed and enabled) | independent scanner evidence; Semgrep on a bundled offline ruleset | Apache-2.0 / MIT / Apache-2.0 / LGPL-2.1 |
+| Sigstore cosign (optional) | public-key seal on evidence bundles | Apache-2.0 |
+| Open Policy Agent (optional) | rules of engagement as policy code | Apache-2.0 |
 
 ## Model weights
 

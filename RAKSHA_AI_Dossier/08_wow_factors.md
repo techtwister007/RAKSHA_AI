@@ -91,3 +91,19 @@ number we did not produce.
 Record the full demo at a safe point before judging. If anything dies live, narrate over
 the recording and lose almost nothing. The pre-recorded run is the last rung of the
 fallback ladder (file 06).
+
+## Wave 5 additions — every project remembered
+
+- **One ID per project, for life.** Recognised by name and file layout, not path or contents, so a
+  patch never changes it.
+- **A signed, versioned report every run.** v1, v2, v3 chained like the journal: no finding can
+  quietly disappear between versions. The report shows ✓ fixed (only when the absence is itself a
+  proof), ✚ new, ● still open, ⚑ needs a human — colour, icon and word together.
+- **Needs a human, with a checklist.** Rotate a credential, approve a dependency bump, approve a
+  recommend-only fix. Items marked done are re-checked on the next run, never taken on trust.
+- **For commanders:** posture score whose parts add up, deadlines by severity and asset tier,
+  exposure-days, a readiness certificate issued only when the record supports it.
+- **Learning that only proposes.** Recurring faults become draft guidelines for ACG, adopted with a
+  named approver. New frameworks are learned on probation and rolled back in one click.
+- **Console:** Projects and Learning screens; one-page summaries in English and Hindi; a pre-merge
+  check; a quarterly compliance pack an auditor verifies on their own machine.

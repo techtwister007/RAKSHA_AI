@@ -86,3 +86,18 @@ seven genuinely new pieces — precisely the story that scores on *novelty* whil
 Confirm every weight/tool licence permits our use. Qwen3-Coder is Apache-2.0 (clean);
 Foundation-sec is open-weight; the fuzzers and scanners are permissive/OSS. Keep a
 `THIRD_PARTY.md` of licences in the final bundle — a defence acceptance board will ask.
+
+## Wired in today (October 2026)
+
+| Tool | Where in RAKSHA | How to switch it on |
+|------|-----------------|---------------------|
+| OSV-Scanner | take lane: dependency advisories, confirmed by re-match | `RAKSHA_TAKE_OSV_SCANNER=1` (`RAKSHA_OSV_OFFLINE=1` + local DB on the sealed box) |
+| Gitleaks | take lane: secrets, confirmed by re-match | `RAKSHA_TAKE_GITLEAKS=1` |
+| Checkov | take lane: IaC / configuration, confirmed by re-match | `RAKSHA_TAKE_CHECKOV=1` |
+| Semgrep | take lane: static leads on a bundled offline ruleset; count only when cross-confirmed | `RAKSHA_TAKE_SEMGREP=1` |
+| cosign | public-key seal on every evidence bundle | `RAKSHA_COSIGN_KEY=<key>` (`python -m raksha.cosign init DIR`) |
+| Open Policy Agent | rules of engagement as policy code; stricter answer wins | `RAKSHA_OPA=1` |
+| Z3 | bound and reachability proofs | baked into the image (`[reasoning]` extra) |
+
+`RAKSHA_TAKE_ALL=1` turns on every scanner lane that is installed. Measured on the demo estate:
+90 extra findings in about 15 seconds, fully offline.
