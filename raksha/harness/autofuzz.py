@@ -285,13 +285,18 @@ def _py_runner(work: Path, ep: Entrypoint, oracle: Oracle):
     return ForkClient(["python3", "raksha_harness.py"], work), replay
 
 
+_COV_HELPER = Path(__file__).with_name("raksha_cov.py")
+
+
 def _py_target(work: Path, ep: Entrypoint) -> CommandTarget:
+    import shutil
+    shutil.copy2(_COV_HELPER, work / "raksha_cov.py")   # B4: measured line coverage, not an echo
     return CommandTarget(
         source_root=work,
         build_cmd="python3 -c \"import py_compile,glob; [py_compile.compile(f,doraise=True) for f in glob.glob('**/*.py',recursive=True)]\"",
         run_cmd="python3 raksha_harness.py {input}",
         test_cmd="true",
-        coverage_cmd="python3 raksha_harness.py {input} 2>/dev/null; echo " + shlex.quote(f"{ep.path}:{ep.line}"),
+        coverage_cmd="python3 raksha_cov.py py raksha_harness.py {input} 2>/dev/null",
         refuzz_cmd=("i=0; for p in 'A; id' 'B | cat /etc/hostname' 'C && echo x' 'D `whoami`'; do "
                     "i=$((i+1)); printf '%s' \"$p\" > rf_$i; python3 raksha_harness.py rf_$i > err_$i 2>&1; "
                     "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"),

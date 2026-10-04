@@ -117,14 +117,16 @@ def js_target(work: str | Path, entrypoint: Entrypoint, *, timeout: float = 120.
     battery of injection payloads — the JavaScript shapes of the Python lane's refuzz loop.
     """
     work = Path(work)
-    quoted_site = f"{entrypoint.path}:{entrypoint.line}"
+    # B4: measured line coverage from V8's own block coverage, not an echo of the entry line
+    shutil.copy2(Path(__file__).resolve().parents[1] / "harness" / "raksha_cov.py", work / "raksha_cov.py")
     payloads = " ".join("'" + p.replace("'", "'\\''") + "'" for p in _REFUZZ_PAYLOADS)
     return CommandTarget(
         source_root=work,
         build_cmd=f"node --check {entrypoint.path}",            # "COMPILES" for JS: it parses
         run_cmd="node jssinkguard.js {input}",
         test_cmd="true",
-        coverage_cmd="node jssinkguard.js {input} 2>/dev/null; echo " + _shq(quoted_site),
+        coverage_cmd=("rm -rf .raksha_v8 && NODE_V8_COVERAGE=.raksha_v8 node jssinkguard.js {input} "
+                      ">/dev/null 2>&1; python3 raksha_cov.py v8 .raksha_v8"),
         refuzz_cmd=("i=0; for p in " + payloads + "; do i=$((i+1)); printf '%s' \"$p\" > rf_$i; "
                     "node jssinkguard.js rf_$i > err_$i 2>&1; "
                     "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"),
