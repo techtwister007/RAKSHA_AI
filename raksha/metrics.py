@@ -17,9 +17,15 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
-from .finding import Finding, GateCheck, RepairLane, Status, reportable
+from .finding import INFERENCE_LANES, Finding, GateCheck, Status, reportable
+from .gpu import VramReading, vram
+from .inference import completion_tokens_used, egress_call_count, inference_call_count
+
+#: Findings produced within this window of the first finding count toward the "fast opening
+#: move" metric — the dossier's "time-to-first-finding matters more than depth".
+FIRST_WINDOW_SECONDS = 600
 
 
 def _median(values: list[float]) -> float | None:
@@ -50,8 +56,19 @@ class Scorecard:
         }
 
 
-def scorecard(findings: Iterable[Finding]) -> Scorecard:
-    """Compute the full scorecard for a set of findings."""
+def scorecard(
+    findings: Iterable[Finding],
+    *,
+    vaccine_variants: int | None = None,
+    gpu_probe: Callable[[], VramReading | None] = vram,
+) -> Scorecard:
+    """Compute the full scorecard for a set of findings.
+
+    `vaccine_variants` is the count of fleet variants found per verified fix by the vaccine
+    sweep (held by the session, not the records), surfaced here so Screen 5 shows every ledger
+    row. `gpu_probe` reads live VRAM; it returns None off-GPU, and the metric is then honestly
+    absent rather than a faked zero.
+    """
     findings = list(findings)
     reported = reportable(findings)
 
@@ -70,13 +87,31 @@ def scorecard(findings: Iterable[Finding]) -> Scorecard:
         "by_bug_class": _count(f.bug_class for f in findings),
     }
 
-    # ---- Speed: medians, from transition timestamps ---------------------
+    # ---- Speed: medians + the opening move, from transition timestamps --
     pov_times = [f.time_to_pov_seconds for f in findings if f.time_to_pov_seconds is not None]
     patch_times = [f.time_to_patch_seconds for f in findings if f.time_to_patch_seconds is not None]
+    # The dossier's headline speed number: wall-clock from the run's first finding to the first
+    # one that became reportable. Taken from created_at (the run's t0) to the earliest CONFIRMED
+    # transition among reported findings — derived from the records, not a stopwatch guess.
+    t0 = min((f.created_at for f in findings), default=None)
+    first_proven_at = min(
+        (f._transition_at(Status.CONFIRMED) for f in reported
+         if f._transition_at(Status.CONFIRMED) is not None),
+        default=None,
+    )
+    time_to_first_finding = (
+        round((first_proven_at - t0).total_seconds(), 2) if t0 and first_proven_at else None
+    )
+    findings_in_first_window = (
+        len([f for f in findings if (f.created_at - t0).total_seconds() <= FIRST_WINDOW_SECONDS])
+        if t0 else 0
+    )
     speed = {
+        "time_to_first_proven_finding_seconds": time_to_first_finding,
         "median_time_to_pov_seconds": _median(pov_times),
         "median_time_to_validated_patch_seconds": _median(patch_times),
         "fastest_pov_seconds": round(min(pov_times), 2) if pov_times else None,
+        "findings_in_first_10min": findings_in_first_window,
         "samples": {"pov": len(pov_times), "patch": len(patch_times)},
     }
 
@@ -113,6 +148,10 @@ def scorecard(findings: Iterable[Finding]) -> Scorecard:
         "quarantined_corpus_inputs": sum(
             r.quarantined_inputs for f in findings for r in f.gate_history
         ),
+        # Cross-confirmation: a static SUSPECTED finding promoted because another lane's
+        # reproducer landed on the same fix site with the same CWE. Counted from the merge
+        # record on the survivor, so the precision ledger row is a measurement.
+        "static_findings_promoted": len([f for f in findings if f.merged_from]),
         "unproven_findings_suppressed": len(by_status[Status.SUSPECTED]),
     }
 
@@ -133,6 +172,9 @@ def scorecard(findings: Iterable[Finding]) -> Scorecard:
         "targets": sorted({f.target for f in findings}),
         "target_count": len({f.target for f in findings}),
         "verified_per_language": _count(f.language for f in verified),
+        # Vaccine sweep: variants of a verified fix found across the asset estate. Held by the
+        # session (not a finding field), passed in so the Scorecard shows the ledger row.
+        "vaccine_variants_found": vaccine_variants,
     }
 
     # ---- Resource utilisation: the escalation ladder working -------------
@@ -141,20 +183,35 @@ def scorecard(findings: Iterable[Finding]) -> Scorecard:
     # only the lanes behind successful fixes would hide model tokens we spent and got
     # nothing for -- which is exactly what the resource criterion asks about.
     attempt_lanes = [l for f in findings for l in f.lane_history]
-    inference_attempts = [l for l in attempt_lanes if l is not RepairLane.TEMPLATE]
-    inference_fixes = [l for l in fix_lanes if l is not RepairLane.TEMPLATE]
+    # Only the LLM lane spends tokens; template / retrieval / mitigation are all zero-inference.
+    inference_attempts = [l for l in attempt_lanes if l in INFERENCE_LANES]
+    inference_fixes = [l for l in fix_lanes if l in INFERENCE_LANES]
+    zero_inference_fixes = [l for l in fix_lanes if l not in INFERENCE_LANES]
+    verified_via_model = len([f for f in verified if f.repair_lane in INFERENCE_LANES])
+    tokens_total = completion_tokens_used()
+    vram_reading = gpu_probe()
     resource = {
         "fixes_by_lane": _count(l.value for l in fix_lanes),
         "attempts_by_lane": _count(l.value for l in attempt_lanes),
-        "zero_inference_fix_pct": _pct(
-            len([l for l in fix_lanes if l is RepairLane.TEMPLATE]), len(fix_lanes)
-        ),
+        "zero_inference_fix_pct": _pct(len(zero_inference_fixes), len(fix_lanes)),
         "inference_attempts": len(inference_attempts),
         "inference_attempts_without_a_fix": len(inference_attempts) - len(inference_fixes),
+        # Tokens are an actual sum captured from each model response's usage, not an estimate.
+        # Per validated patch = total completion tokens / patches the model lane verified.
+        "model_completion_tokens": tokens_total,
+        "tokens_per_validated_patch": (
+            round(tokens_total / verified_via_model, 1) if verified_via_model else None
+        ),
+        "inference_calls": inference_call_count(),
+        # Live VRAM, or None off-GPU — honestly absent rather than a faked zero.
+        "vram": vram_reading.as_dict() if vram_reading else None,
     }
 
-    # ---- Posture: the two badges that never change -----------------------
-    posture = {"network_interfaces": 0, "cloud_calls": 0}
+    # ---- Posture: badges backed by live counters, not constants ----------
+    # network_interfaces is the sandbox's enforced invariant (no NIC in the jail); cloud_calls
+    # is a live counter of calls that left the box, so a breach would show here instead of the
+    # badge simply asserting zero.
+    posture = {"network_interfaces": 0, "cloud_calls": egress_call_count()}
 
     return Scorecard(
         performance=performance,

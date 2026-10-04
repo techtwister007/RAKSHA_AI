@@ -40,6 +40,7 @@ class GateVerdict:
     mismatches: list[Mismatch] = field(default_factory=list)
     tests_ran: int = 0
     refuzz_findings: int = 0
+    refuzz_ran: bool = False
     regression_test_verified: bool | None = None
     before: BuildResult | None = None
     after: BuildResult | None = None
@@ -110,7 +111,8 @@ def run_gate(
 
     # 3 ── DIFFERENTIAL_CORPUS  (corpus inputs + the project's own tests)
     canon = canon or Canonicaliser()
-    pf = preflight(target, before, corpus, runs=preflight_runs, canon=canon)
+    pf = preflight(target, before, corpus, runs=preflight_runs, canon=canon,
+                   is_abort=lambda text: oracle_fired(text, oracles))
     verdict.quarantined = pf.quarantined
     mism = differential(target, before, after, corpus, pf.stable, canon=canon)
     verdict.mismatches = mism
@@ -137,6 +139,16 @@ def run_gate(
     finding.record_gate(GateCheck.COVERAGE_HELD, True, detail="fix site still reached")
 
     # 5 ── CLEAN_REFUZZ
+    # A target that cannot fuzz cannot satisfy this check. Failing it OPEN (recording a pass
+    # for a campaign that never ran) would let an overfitting patch — one that silences the
+    # exact reproducer and nothing else — reach VERIFIED with the fifth check a silent no-op.
+    # So fail closed: the finding is reported, not verified, and the record says why.
+    can_refuzz = getattr(target, "can_refuzz", None)
+    if can_refuzz is not None and not can_refuzz():
+        return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
+                     "target provides no fresh-fuzz campaign; CLEAN_REFUZZ cannot be certified — "
+                     "reported, not verified")
+    verdict.refuzz_ran = True
     crashes = target.refuzz(after, refuzz_seconds)
     new = [c for c in crashes if oracle_fired(c, oracles)]
     verdict.refuzz_findings = len(new)

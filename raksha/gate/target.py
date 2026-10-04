@@ -173,6 +173,14 @@ class CommandTarget:
                         covered.add((file.strip(), int(num)))
         return covered
 
+    def can_refuzz(self) -> bool:
+        """Whether this target can run a fresh fuzz campaign.
+
+        The gate reads this: a target with no refuzz command cannot satisfy CLEAN_REFUZZ, and
+        the gate must fail that check closed rather than record a campaign that never ran.
+        """
+        return self.refuzz_cmd is not None
+
     def refuzz(self, build: BuildResult, seconds: float) -> list[str]:
         assert build.root is not None
         if not self.refuzz_cmd:

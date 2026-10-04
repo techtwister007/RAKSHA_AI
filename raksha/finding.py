@@ -60,7 +60,8 @@ class Status(str, Enum):
     SUSPECTED    something looks wrong; NOT reportable
     CONFIRMED    a reproducer was replayed and the oracle fired; reportable
     PATCHED      a candidate fix exists but has not cleared the gate
-    VERIFIED     all five gate checks passed; shippable with a signed bundle
+    VERIFIED     all five gate checks passed and the PoV is dead (the bundling layer
+                 is what signs it; this state attests the proof, not the signature)
     REPORT_ONLY  proven real, no fix validated; a verified vulnerability report
     """
 
@@ -91,12 +92,23 @@ GATE_ORDER: tuple[GateCheck, ...] = (
 
 
 class RepairLane(str, Enum):
-    """Which lane produced the patch. TEMPLATE costs zero inference."""
+    """Which lane produced the patch.
+
+    Only the LLM lane spends model tokens. TEMPLATE (a known bug shape → a known fix),
+    RETRIEVAL (the nearest historical fix) and MITIGATION (a provably-safe hardening floor)
+    are all deterministic and cost zero inference — which is what the resource metric counts.
+    """
 
     TEMPLATE = "TEMPLATE"
     RETRIEVAL = "RETRIEVAL"
     LLM = "LLM"
     MITIGATION = "MITIGATION"
+
+
+#: The only lane that spends model tokens. Everything else is zero-inference. The resource
+#: metric ("% fixes at zero inference", "inference attempts") is defined against this set, so
+#: a retrieval or mitigation fix is never miscounted as model spend.
+INFERENCE_LANES: frozenset[RepairLane] = frozenset({RepairLane.LLM})
 
 
 class RoeLevel(str, Enum):
@@ -249,10 +261,11 @@ _SARIF_LEVEL = {
 
 @dataclass
 class Finding:
-    """One finding, moving through the nine stages.
+    """One finding, moving through the five states of the status machine.
 
-    Construct it in SUSPECTED (the only legal birth state), attach evidence, then drive
-    it with the transition methods. The methods refuse illegal moves.
+    Construct it in SUSPECTED (the only legal birth state — enforced in `__post_init__`),
+    attach evidence, then drive it with the transition methods. The methods refuse illegal
+    moves, and the constructor refuses a forged birth state.
     """
 
     oracle: str
@@ -304,10 +317,30 @@ class Finding:
     _status: Status = Status.SUSPECTED
 
     def __post_init__(self) -> None:
-        if not self.history:
-            self.history.append(
-                Transition(None, Status.SUSPECTED, self.created_at, "created")
+        if self.history:
+            # A record reconstructed from its own history (e.g. deserialised): accept its
+            # birth state only if it is consistent with that history's final state. Anything
+            # else is a forged record and is refused — the invariant is closed at construction,
+            # not merely in the transition methods.
+            if self.history[-1].to_status is not self._status:
+                raise InvariantViolation(
+                    f"finding {self.id}: declared status {self._status.value} does not match "
+                    f"its history (ends at {self.history[-1].to_status.value})"
+                )
+            return
+        # A freshly constructed finding is born SUSPECTED and nothing else. Every other state
+        # is reachable only through the transition methods, which enforce "no reproducer, no
+        # report". Passing `_status=` to the constructor to skip that is the one bypass this
+        # guard exists to forbid.
+        if self._status is not Status.SUSPECTED:
+            raise InvariantViolation(
+                f"finding {self.id}: a finding's only legal birth state is SUSPECTED, not "
+                f"{self._status.value}. Reach any other state through confirm()/verify(), "
+                "which enforce the precision invariant."
             )
+        self.history.append(
+            Transition(None, Status.SUSPECTED, self.created_at, "created")
+        )
 
     # ---------------------------------------------------------------- status
 
@@ -480,8 +513,13 @@ class Finding:
 
     @property
     def zero_inference(self) -> bool:
-        """True if the fix cost no model tokens. Feeds the resource-utilisation metric."""
-        return self.repair_lane is RepairLane.TEMPLATE
+        """True if the fix cost no model tokens. Feeds the resource-utilisation metric.
+
+        Zero-inference is every lane except LLM: template, retrieval and mitigation are all
+        deterministic. Counting only TEMPLATE here understated the resource advantage and made
+        the headline "% fixes at zero inference" wrong against its own definition.
+        """
+        return self.repair_lane is not None and self.repair_lane not in INFERENCE_LANES
 
     def dedup_key(self, depth: int = 3) -> str:
         """Stack hash for the Normalise stage — 800 raw crashes collapse to ~6 bugs.

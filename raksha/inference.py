@@ -39,14 +39,64 @@ class InferenceError(RuntimeError):
     pass
 
 
-def _is_local(host: str) -> bool:
+# ---- live counters, so the posture badge and the token metric are measured, not asserted ----
+# Every actual call increments these. An egress call (one to a non-loopback host) would make
+# `cloud_calls` non-zero on the Scorecard — which is how the air-gap badge detects a breach
+# instead of merely claiming zero. In sealed mode `validate()` refuses non-local endpoints, so
+# the egress counter stays 0 by construction; if it ever isn't, the badge shows it.
+_INFERENCE_CALLS = 0
+_EGRESS_CALLS = 0
+_COMPLETION_TOKENS = 0
+
+
+def inference_call_count() -> int:
+    return _INFERENCE_CALLS
+
+
+def egress_call_count() -> int:
+    """Calls that left the box (non-loopback host). The cloud-calls badge reads this."""
+    return _EGRESS_CALLS
+
+
+def completion_tokens_used() -> int:
+    """Total model completion tokens spent this run. Feeds tokens-per-validated-patch."""
+    return _COMPLETION_TOKENS
+
+
+def reset_counters() -> None:
+    """Zero the live counters (used by tests and at the start of a fresh run)."""
+    global _INFERENCE_CALLS, _EGRESS_CALLS, _COMPLETION_TOKENS
+    _INFERENCE_CALLS = _EGRESS_CALLS = _COMPLETION_TOKENS = 0
+
+
+def _is_loopback(host: str) -> bool:
+    """A loopback / same-box host. The model server at the finale is here (not egress)."""
     if host in ("localhost", "", "host.docker.internal"):
         return True
     try:
-        return ipaddress.ip_address(host).is_loopback or ipaddress.ip_address(host).is_private
+        return ipaddress.ip_address(host).is_loopback
     except ValueError:
-        # a bare service name (e.g. "vllm" in a compose network) is treated as internal
+        # a bare service name (e.g. "vllm" in a compose network) is same-network, not egress
         return "." not in host
+
+
+def _is_local(host: str) -> bool:
+    """Whether `sealed` mode permits this host.
+
+    Loopback / dotless service names always. Private-range (RFC-1918) and explicitly
+    allowlisted internal FQDNs are permitted too — a sealed deployment may serve the model on
+    an internal host — but everything else (any public host) is refused. The allowlist is the
+    escape hatch for a named internal server without disabling the guard entirely.
+    """
+    if _is_loopback(host):
+        return True
+    allow = {h.strip() for h in os.environ.get("RAKSHA_INFERENCE_ALLOWLIST", "").split(",") if h.strip()}
+    if host in allow:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
 
 
 @dataclass(frozen=True)
@@ -108,12 +158,24 @@ class InferenceClient:
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
         url = self.config.base_url.rstrip("/") + "/chat/completions"
+        # Count the call before making it, and flag it as egress if the host is not same-box.
+        # This is what turns the cloud-calls badge into a measurement.
+        global _INFERENCE_CALLS, _EGRESS_CALLS, _COMPLETION_TOKENS
+        host = urlparse(self.config.base_url).hostname or ""
+        _INFERENCE_CALLS += 1
+        if not _is_loopback(host):
+            _EGRESS_CALLS += 1
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:  # noqa: S310 (allowlisted module)
                 data = json.loads(resp.read())
         except Exception as e:  # noqa: BLE001 — any transport error degrades the lane, never crashes the run
             raise InferenceError(f"inference call failed: {e}") from e
+        usage = data.get("usage") or {}
+        try:
+            _COMPLETION_TOKENS += int(usage.get("completion_tokens", 0) or 0)
+        except (TypeError, ValueError):
+            pass
         return [c["message"]["content"] for c in data.get("choices", [])]
 
 

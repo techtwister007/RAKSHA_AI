@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Callable
 
 from .target import BuildResult, Target
 
@@ -65,7 +66,7 @@ class Quarantined:
 class PreflightResult:
     stable: list[int] = field(default_factory=list)
     quarantined: list[Quarantined] = field(default_factory=list)
-    crashing: list[int] = field(default_factory=list)  # inputs that abort on the baseline: not comparable
+    crashing: list[int] = field(default_factory=list)  # inputs that ABORT on the baseline: not comparable
 
 
 def preflight(
@@ -75,23 +76,35 @@ def preflight(
     *,
     runs: int = 3,
     canon: Canonicaliser | None = None,
+    is_abort: Callable[[str], bool] | None = None,
 ) -> PreflightResult:
-    """Run each input `runs` times on the unpatched build; quarantine anything that varies."""
+    """Run each input `runs` times on the unpatched build; quarantine anything that varies.
+
+    An input is "crashing" (dropped from the comparison) only when it genuinely ABORTS on the
+    baseline — a timeout, or output an oracle recognises as a crash. A plain deterministic
+    non-zero exit (a validation reject, a usage error) is NOT an abort: it is comparable
+    behaviour, so it stays in the differential set with its exit code as part of its signature.
+    Treating every non-zero exit as "crashing" used to silently narrow the check to exit-0
+    inputs, letting a patch change every error path unnoticed.
+    """
     canon = canon or Canonicaliser()
+    is_abort = is_abort or (lambda _text: False)
     result = PreflightResult()
     for i, data in enumerate(corpus):
-        outputs = []
+        signatures = []
         aborted = False
         for _ in range(runs):
             r = target.run(baseline, data)
-            if r.timed_out or r.exit_code != 0:
+            if r.timed_out or is_abort(r.text):
                 aborted = True
                 break
-            outputs.append(canon.canon(r.stdout))
+            # The signature is output AND exit code, so an error-path input with a stable
+            # non-zero exit is comparable and a patch that changes it will be caught.
+            signatures.append((canon.canon(r.stdout), r.exit_code))
         if aborted:
             result.crashing.append(i)
             continue
-        if len(set(outputs)) == 1:
+        if len(set(signatures)) == 1:
             result.stable.append(i)
         else:
             result.quarantined.append(Quarantined(i, "output varies across identical runs"))
