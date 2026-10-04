@@ -98,6 +98,14 @@ def step_cost(f: Finding) -> float:
     if f.reproducer is not None and f.reproducer.kind == EXPLOIT_REPLAY:
         return 1.0
     if f.reproducer is not None and f.reproducer.kind == DETERMINISTIC_MATCH:
+        # G6: a dependency step is priced by measured exploitation data where the offline snapshots
+        # have it — CISA KEV (exploited in the wild) costs what a proven exploit costs; otherwise
+        # FIRST EPSS maps 1.0 (certain exploitation) .. 2.0 (none). Without data: the 1.5 prior.
+        if getattr(f, "kev", False):
+            return 1.0
+        epss = getattr(f, "epss", None)
+        if isinstance(epss, (int, float)):
+            return round(1.0 + (1.0 - max(0.0, min(1.0, float(epss)))), 2)
         return 1.5
     return 2.0
 

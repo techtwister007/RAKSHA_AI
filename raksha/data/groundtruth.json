@@ -1,0 +1,171 @@
+{
+  "_comment": "Ground truth for calibration (G6): every defect planted in demo-targets/, by file (relative to demo-targets/) and the CWE family that file's documented defect belongs to. Taken from each demo's own README/docstring, never from what a lane reported. 'any' marks build-free fixtures where every issue in the file is planted on purpose. 'clean' entries are deliberately safe sister code: any finding there is a false positive. Small and curated: a reproducible baseline, not a statistical sample.",
+  "defects": [
+    {
+      "file": "c-nolibfuzzer/src/tlv.c",
+      "families": [
+        "memory"
+      ]
+    },
+    {
+      "file": "c-overflow/src/parser.c",
+      "families": [
+        "memory"
+      ]
+    },
+    {
+      "file": "c-leak/src/store.c",
+      "families": [
+        "alloc"
+      ]
+    },
+    {
+      "file": "c-hang/src/loop.c",
+      "families": [
+        "dos"
+      ]
+    },
+    {
+      "file": "c-intoverflow/src/calc.c",
+      "families": [
+        "numeric"
+      ]
+    },
+    {
+      "file": "c-race/src/worker.c",
+      "families": [
+        "race"
+      ]
+    },
+    {
+      "file": "c-docserver/src/docserver.c",
+      "families": [
+        "path-traversal"
+      ]
+    },
+    {
+      "file": "c-binsink/src/binsink.c",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "py-cmdinject/app/runner.py",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "py-noharness/converter.py",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "py-poisoned/converter.py",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "py-padparser/padparser.py",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "py-redos/redos.py",
+      "families": [
+        "dos"
+      ]
+    },
+    {
+      "file": "js-noharness/converter.js",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "go-decoder/decoder.go",
+      "families": [
+        "memory"
+      ]
+    },
+    {
+      "file": "rust-nolibfuzzer/src/lib.rs",
+      "families": [
+        "memory",
+        "numeric"
+      ]
+    },
+    {
+      "file": "java-noharness/src/main/java/com/example/noharness/Parser.java",
+      "families": [
+        "memory"
+      ]
+    },
+    {
+      "file": "fleet/ops-tools/handler.py",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "fleet/report-worker/worker.py",
+      "families": [
+        "injection"
+      ]
+    },
+    {
+      "file": "mixed-estate/tool-py/ingest.py",
+      "families": [
+        "deserialization"
+      ]
+    },
+    {
+      "file": "mixed-estate/config/app.properties",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "mixed-estate/crypto-svc/signer.py",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "mixed-estate/gateway-go/openapi.json",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "mixed-estate/gateway-go/go.mod",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "mixed-estate/audit-java/pom.xml",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "mixed-estate/service-js/package-lock.json",
+      "families": [
+        "any"
+      ]
+    },
+    {
+      "file": "mixed-estate/tool-py/requirements.txt",
+      "families": [
+        "any"
+      ]
+    }
+  ],
+  "clean": [
+    "fleet/audit-cli/safe.py"
+  ]
+}

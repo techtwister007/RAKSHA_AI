@@ -39,7 +39,9 @@ def test_estate_yields_credential_to_endpoint_to_rce_chain(estate_findings):
     want = [c for c in g.chains if [s.split(" ")[0] for s in c.steps] == ["credential", "unauth-endpoint", "rce"]]
     assert want, [c.steps for c in g.chains]
     chain = want[0]
-    assert chain.cost == 4.5 and chain.viable and chain.combined_severity == "critical"
+    # credential 1.5 + endpoint 1.5 + Log4Shell 1.0: the RCE step is CISA-KEV-listed (exploited in
+    # the wild), so G6 prices it like a proven exploit instead of the 1.5 dependency-match prior
+    assert chain.cost == 4.0 and chain.viable and chain.combined_severity == "critical"
     assert chain.id.startswith("chain-") and len(chain.finding_ids) == 3
     assert "config/app.properties" in chain.steps[0] and "openapi.json" in chain.steps[1]
     # the RCE is an imported Log4Shell-family CVE at the audit service (2.14.1 matches CVE-2021-44228

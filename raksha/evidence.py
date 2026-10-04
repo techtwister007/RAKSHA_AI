@@ -34,6 +34,9 @@ from __future__ import annotations
 import statistics
 from dataclasses import dataclass, field
 
+import json
+from pathlib import Path
+
 from .finding import DETERMINISTIC_MATCH, EXPLOIT_REPLAY, Finding
 
 #: Confidence at or above this is "proven". Reachable only with a reproducing non-model channel.
@@ -50,7 +53,11 @@ INDEP_THRESHOLD = 0.7
 
 #: Per-channel base reliability (how often this evidence, fired, means a real bug) and independence
 #: (how uncorrelated it is with the others). Effective contribution = reliability * independence.
-_RELIABILITY = {
+#: These hand values are the PRIORS. G6 measures reliability on a labelled corpus
+#: (`python -m raksha.calibrate` -> raksha/data/calibration.json) and the calibrated value replaces
+#: the prior wherever there were observations. Independence is not measurable on that corpus and
+#: stays a stated prior.
+_PRIOR_RELIABILITY = {
     "exploit": 0.97,
     "deterministic": 0.95,
     "crossconfirm": 0.80,
@@ -64,6 +71,28 @@ _INDEPENDENCE = {
     "structural": 0.6,    # static: correlated with other static reasoning
     "parliament": 0.3,    # models correlate; low independence
 }
+_CALIBRATION_FILE = Path(__file__).parent / "data" / "calibration.json"
+
+
+def calibration() -> dict | None:
+    """The committed calibration table (G6), or None when it has not been generated."""
+    try:
+        return json.loads(_CALIBRATION_FILE.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def _reliabilities() -> dict[str, float]:
+    rel = dict(_PRIOR_RELIABILITY)
+    table = (calibration() or {}).get("channels") or {}
+    for name, row in table.items():
+        if name in rel and row.get("n"):
+            rel[name] = float(row["calibrated"])
+    return rel
+
+
+_RELIABILITY = _reliabilities()
+
 #: The channels that reproduce (a replay or a deterministic re-match). At least one must be present
 #: for a finding to be allowed past the proven threshold.
 _REPRODUCING = frozenset({"exploit", "deterministic"})
@@ -141,22 +170,9 @@ def fuse(finding: Finding) -> EvidenceScore:
         finding.evidence_score = score.as_dict()
         return score
 
-    # noisy-OR of effective reliabilities.
-    product = 1.0
-    contributions: dict[str, float] = {}
-    for name, rel in chans.items():
-        eff = rel * _INDEPENDENCE[name]
-        contributions[name] = eff
-        product *= (1.0 - eff)
-    confidence = 1.0 - product
-
+    confidence, capped = fuse_channels(chans)
     has_reproducing = bool(_REPRODUCING & chans.keys())
-    capped = False
-    if not has_reproducing and confidence > NONPROVEN_CAP:
-        confidence = NONPROVEN_CAP
-        capped = True
-    confidence = round(max(0.0, min(1.0, confidence)), 3)
-
+    contributions = {name: rel * _INDEPENDENCE[name] for name, rel in chans.items()}
     dominated_by = max(contributions, key=lambda k: contributions[k])
     independent = sum(1 for name in chans if _INDEPENDENCE[name] >= INDEP_THRESHOLD)
     proven = confidence >= PROVEN_THRESHOLD and has_reproducing
@@ -173,6 +189,22 @@ def fuse(finding: Finding) -> EvidenceScore:
     )
     finding.evidence_score = score.as_dict()
     return score
+
+
+def fuse_channels(chans: dict[str, float]) -> tuple[float, bool]:
+    """(confidence, capped) for a channel -> reliability map: the noisy-OR of effective
+    reliabilities, held at NONPROVEN_CAP without a reproducing channel. Shared with the calibrator,
+    so the bands it checks are produced by exactly this formula."""
+    if not chans:
+        return 0.0, False
+    product = 1.0
+    for name, rel in chans.items():
+        product *= (1.0 - rel * _INDEPENDENCE[name])
+    confidence = 1.0 - product
+    capped = False
+    if not (_REPRODUCING & chans.keys()) and confidence > NONPROVEN_CAP:
+        confidence, capped = NONPROVEN_CAP, True
+    return round(max(0.0, min(1.0, confidence)), 3), capped
 
 
 _CHANNEL_PHRASE = {

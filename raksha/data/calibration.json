@@ -1,0 +1,141 @@
+{
+  "generated": "2026-10-04T18:14:04Z",
+  "corpus": "demo-targets/ (planted defects + safe sister code, raksha/data/groundtruth.json) and the benchmark's negative controls; deep lanes incl. Go and Rust",
+  "method": "Beta prior at the hand value worth 4 observations; posterior mean reported as 'calibrated'; Wilson 95% interval on the raw observed precision",
+  "caveat": "small curated corpus: a reproducible measured baseline, not a population estimate",
+  "channels": {
+    "exploit": {
+      "prior": 0.97,
+      "n": 6,
+      "true_positives": 6,
+      "false_positives": 0,
+      "observed_precision": 1.0,
+      "wilson95": [
+        0.61,
+        1.0
+      ],
+      "calibrated": 0.988,
+      "status": "calibrated"
+    },
+    "deterministic": {
+      "prior": 0.95,
+      "n": 21,
+      "true_positives": 21,
+      "false_positives": 0,
+      "observed_precision": 1.0,
+      "wilson95": [
+        0.845,
+        1.0
+      ],
+      "calibrated": 0.992,
+      "status": "calibrated"
+    },
+    "crossconfirm": {
+      "prior": 0.8,
+      "n": 2,
+      "true_positives": 2,
+      "false_positives": 0,
+      "observed_precision": 1.0,
+      "wilson95": [
+        0.342,
+        1.0
+      ],
+      "calibrated": 0.867,
+      "status": "calibrated"
+    },
+    "structural": {
+      "prior": 0.6,
+      "n": 10,
+      "true_positives": 10,
+      "false_positives": 0,
+      "observed_precision": 1.0,
+      "wilson95": [
+        0.722,
+        1.0
+      ],
+      "calibrated": 0.886,
+      "status": "calibrated"
+    },
+    "parliament": {
+      "prior": 0.5,
+      "n": 0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "observed_precision": null,
+      "wilson95": [
+        null,
+        null
+      ],
+      "calibrated": 0.5,
+      "status": "uncalibrated: no labelled observations"
+    }
+  },
+  "in_sample": {
+    "structural": "its rules were corrected on this corpus (string literals, sized allocations), so its observed precision here is in-sample"
+  },
+  "attack_graph": {
+    "exploit_step": {
+      "cost": 1.0,
+      "basis": "reference unit"
+    },
+    "dependency_step": {
+      "cost": "1.0 if CISA-KEV-listed, else 1 + (1 - EPSS); 1.5 without data",
+      "basis": "measured: offline KEV and FIRST EPSS snapshots (raksha/data)"
+    },
+    "unknown_reachability": {
+      "cost": 2.0,
+      "basis": "prior: no labelled exploitation-effort data"
+    },
+    "not_imported": {
+      "cost": 4.0,
+      "basis": "prior: no labelled exploitation-effort data"
+    }
+  },
+  "bands": [
+    {
+      "band": "low",
+      "range": [
+        0.0,
+        0.6
+      ],
+      "n": 8,
+      "true_positives": 8,
+      "observed_precision": 1.0,
+      "wilson95": [
+        0.676,
+        1.0
+      ]
+    },
+    {
+      "band": "moderate",
+      "range": [
+        0.6,
+        0.85
+      ],
+      "n": 0,
+      "true_positives": 0,
+      "observed_precision": null,
+      "wilson95": [
+        null,
+        null
+      ]
+    },
+    {
+      "band": "proven",
+      "range": [
+        0.85,
+        1.0
+      ],
+      "n": 27,
+      "true_positives": 27,
+      "observed_precision": 1.0,
+      "wilson95": [
+        0.875,
+        1.0
+      ]
+    }
+  ],
+  "notes": [
+    "11 negative-control files scanned; 0 finding(s) on them"
+  ]
+}

@@ -67,6 +67,17 @@ class Scorecard:
         }
 
 
+def _calibration_summary() -> dict | None:
+    from .evidence import calibration
+    c = calibration()
+    if not c:
+        return None
+    return {"generated": c.get("generated"),
+            "channels": {k: {"n": v["n"], "calibrated": v["calibrated"], "wilson95": v["wilson95"]}
+                         for k, v in c.get("channels", {}).items()},
+            "bands": c.get("bands")}
+
+
 def _guided_counts() -> dict:
     from .guided import counters
     return counters()
@@ -304,6 +315,8 @@ def scorecard(
         "findings_with_2plus_independent_channels": len([e for e in ev if e.get("independent_channels", 0) >= 2]),
         # model parliament / epistemic conflict (offline: disagreement is None, conflict is measured)
         "parliament_quorum": max((p.get("quorum", 0) for p in parl), default=0),
+        # G6: fusion reliabilities measured on the labelled corpus (None if never generated)
+        "evidence_calibration": _calibration_summary(),
         # G4: how many distinct models actually voted (roles on one model are not independent), and
         # the widest measured disagreement; None when no panel sat
         "parliament_independent_models": max((p.get("independent_models", 0) for p in parl), default=0),
