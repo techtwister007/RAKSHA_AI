@@ -4,6 +4,7 @@ from .asan import AsanOracle
 from .base import Oracle
 from .go_panic import GoOracle
 from .hang import HangOracle
+from .interpose import InterposeOracle
 from .jazzer import JazzerOracle
 from .js_sink import JsSinkOracle
 from .metamorphic import MetamorphicOracle
@@ -26,7 +27,8 @@ KEYSTONE_ORACLES: tuple[Oracle, ...] = (
 #: default oracle set stays the keystone too, and a concurrency gate run passes TsanOracle explicitly.
 ALL_ORACLES: tuple[Oracle, ...] = (*KEYSTONE_ORACLES, GoOracle(), TsanOracle(),
                                    RustPanicOracle(), JsSinkOracle(),
-                                   UbsanOracle(), LeakOracle(), HangOracle(), MetamorphicOracle())
+                                   UbsanOracle(), LeakOracle(), HangOracle(), MetamorphicOracle(),
+                                   InterposeOracle())
 
 __all__ = [
     "Oracle",
@@ -41,6 +43,7 @@ __all__ = [
     "LeakOracle",
     "HangOracle",
     "MetamorphicOracle",
+    "InterposeOracle",
     "ALL_ORACLES",
     "KEYSTONE_ORACLES",
 ]
