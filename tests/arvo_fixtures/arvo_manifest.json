@@ -1,0 +1,10 @@
+[
+  {
+    "name": "arvo-demo-c-nolibfuzzer",
+    "language": "c/c++",
+    "source_path": "demo-targets/c-nolibfuzzer",
+    "bug_class": "CWE-787",
+    "max_execs": 60000,
+    "_comment": "Synthetic ARVO case proving the loader wiring: it points at an in-repo demo target (no network) and drives the real autofuzz -> gate path. A real manifest is written by the networked prep machine and lists hundreds of such entries with their materialised sources, reproducers and gold patches."
+  }
+]

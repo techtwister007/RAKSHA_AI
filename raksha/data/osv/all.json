@@ -1,0 +1,42 @@
+[
+  {
+    "schema_version": "1.6.0",
+    "id": "GHSA-6757-jp84-gxfx",
+    "modified": "2023-11-08T03:52:14Z",
+    "published": "2020-03-24T18:30:00Z",
+    "aliases": ["CVE-2020-1747"],
+    "summary": "Arbitrary code execution in PyYAML",
+    "details": "A vulnerability was discovered in the PyYAML library before 5.3.1, where it is susceptible to arbitrary code execution when it processes untrusted YAML files through the full_load method or with the FullLoader loader.",
+    "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"}],
+    "affected": [
+      {
+        "package": {"ecosystem": "PyPI", "name": "PyYAML"},
+        "ranges": [{"type": "ECOSYSTEM", "events": [
+          {"introduced": "0"},
+          {"fixed": "5.3.1"}
+        ]}]
+      }
+    ],
+    "database_specific": {"cwe_ids": ["CWE-20"], "severity": "CRITICAL"}
+  },
+  {
+    "schema_version": "1.6.0",
+    "id": "GHSA-69ch-w2m2-3vjp",
+    "modified": "2023-11-08T04:07:51Z",
+    "published": "2022-10-14T20:30:18Z",
+    "aliases": ["CVE-2022-32149"],
+    "summary": "Denial of service in golang.org/x/text/language",
+    "details": "An attacker may cause a denial of service by crafting an Accept-Language header which ParseAcceptLanguage will take significant time to parse.",
+    "severity": [{"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"}],
+    "affected": [
+      {
+        "package": {"ecosystem": "Go", "name": "golang.org/x/text"},
+        "ranges": [{"type": "SEMVER", "events": [
+          {"introduced": "0"},
+          {"fixed": "0.3.8"}
+        ]}]
+      }
+    ],
+    "database_specific": {"cwe_ids": ["CWE-400"], "severity": "HIGH"}
+  }
+]
