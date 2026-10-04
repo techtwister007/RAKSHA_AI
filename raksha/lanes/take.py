@@ -11,7 +11,13 @@ explicit flag enables it, we *take* its output as a second, independent channel 
   - `gitleaks`     — secret detection. A hit is a deterministic re-match (the secret is present at a
                      location), so it enters confirmed, as DETERMINISTIC_MATCH evidence.
   - `osv-scanner`  — dependency CVE matching. Also a deterministic re-match against a vuln DB, so it
-                     too enters confirmed as DETERMINISTIC_MATCH.
+                     too enters confirmed as DETERMINISTIC_MATCH. On the sealed box set
+                     RAKSHA_OSV_OFFLINE=1 and carry its local database.
+  - `checkov`      — infrastructure-as-code and configuration checks (Dockerfiles, Kubernetes,
+                     Terraform, CI files). A failed check re-matches deterministically.
+
+Semgrep uses the bundled offline ruleset (`raksha/data/semgrep/raksha-offline.yml`) unless
+RAKSHA_SEMGREP_RULES names another; its "auto" config needs the internet.
 
 None of these tools is required and none is installed in the sealed runtime by default — they are
 carried in the sealed bundle and switched on at the finale on a machine that has them. With nothing
@@ -136,6 +142,36 @@ def _semgrep_findings(stdout: str, root: str) -> list[Finding]:
     return out
 
 
+def _semgrep_rules() -> str:
+    """Rules for the Semgrep lane: RAKSHA_SEMGREP_RULES when set, else the bundled offline ruleset
+    (Semgrep's "auto" config downloads rules, which a sealed box cannot)."""
+    from pathlib import Path
+    return os.environ.get("RAKSHA_SEMGREP_RULES") or str(
+        Path(__file__).parents[1] / "data" / "semgrep" / "raksha-offline.yml")
+
+
+def _checkov_findings(stdout: str, root: str) -> list[Finding]:
+    """Parse `checkov -o json`. A failed configuration check re-matches deterministically on the
+    same file, so each enters as a confirmed DETERMINISTIC_MATCH (CWE-16, configuration)."""
+    data = json.loads(stdout) if stdout.strip() else []
+    reports = data if isinstance(data, list) else [data]
+    out: list[Finding] = []
+    for rep in reports:
+        for r in (rep.get("results") or {}).get("failed_checks", []) or []:
+            path = _rel(str(r.get("file_abs_path") or r.get("file_path", "")).lstrip("/"), root.lstrip("/"))
+            lines = r.get("file_line_range") or [None]
+            check = r.get("check_id", "CKV")
+            name = r.get("check_name") or check
+            out.append(_confirmed_match(
+                oracle="take:checkov", cwe="CWE-16", language="any", path=path, line=lines[0],
+                symbol=check, severity=str(r.get("severity") or "medium").lower(),
+                message=f"[checkov {check}] {name} in {path}",
+                fix_rationale="change the configuration to satisfy the check",
+                signature=check, detail=f"checkov {check} failed at {path}",
+                replay_cmd=["checkov", "-f", path, "--check", check]))
+    return out
+
+
 def _gitleaks_findings(stdout: str, root: str) -> list[Finding]:
     """Parse `gitleaks detect --report-format json`. A secret present at a location re-matches
     deterministically, so each hit enters as a confirmed DETERMINISTIC_MATCH (secret redacted)."""
@@ -252,15 +288,21 @@ def _redact(secret: str) -> str:
 #: argv builders kept here so a test (or an operator) can see exactly what each tool is invoked with.
 LANES: tuple[TakeLane, ...] = (
     TakeLane("semgrep", "semgrep", "RAKSHA_TAKE_SEMGREP",
-             lambda root: ["semgrep", "--quiet", "--json", "--config", "auto", root],
+             lambda root: ["semgrep", "--quiet", "--json", "--metrics=off", "--disable-version-check",
+                           "--config", _semgrep_rules(), root],
              _semgrep_findings),
     TakeLane("gitleaks", "gitleaks", "RAKSHA_TAKE_GITLEAKS",
              lambda root: ["gitleaks", "detect", "--no-git", "--report-format", "json",
                            "--report-path", "/dev/stdout", "--source", root],
              _gitleaks_findings),
     TakeLane("osv-scanner", "osv-scanner", "RAKSHA_TAKE_OSV_SCANNER",
-             lambda root: ["osv-scanner", "--format", "json", "--recursive", root],
+             lambda root: ["osv-scanner", "--format", "json", "--recursive",
+                           *(["--offline"] if _truthy(os.environ.get("RAKSHA_OSV_OFFLINE")) else []), root],
              _osv_scanner_findings),
+    TakeLane("checkov", "checkov", "RAKSHA_TAKE_CHECKOV",
+             lambda root: ["checkov", "-d", root, "-o", "json", "--quiet", "--compact",
+                           "--skip-download", "--skip-results-upload"],
+             lambda stdout, root: _checkov_findings(stdout, root)),
 )
 
 #: Env flag that enables every take lane at once, for the finale run where the tools are present.

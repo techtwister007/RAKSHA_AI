@@ -1,0 +1,82 @@
+# RAKSHA's offline Semgrep ruleset — used by the take lane when no other rules are configured, so
+# Semgrep works on the sealed box (its "auto" config needs the internet). Detection only; findings
+# enter as leads (SUSPECTED) and count only when RAKSHA's own lanes confirm the same site and CWE.
+rules:
+  - id: raksha.python.subprocess-shell-true
+    languages: [python]
+    severity: ERROR
+    message: subprocess call with shell=True; build an argument list and leave the shell out
+    metadata: {cwe: "CWE-78: OS Command Injection"}
+    pattern: subprocess.$FUNC(..., shell=True, ...)
+  - id: raksha.python.os-system
+    languages: [python]
+    severity: WARNING
+    message: os.system runs a shell; prefer subprocess with an argument list
+    metadata: {cwe: "CWE-78: OS Command Injection"}
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+  - id: raksha.python.eval
+    languages: [python]
+    severity: ERROR
+    message: eval/exec of a non-literal value
+    metadata: {cwe: "CWE-95: Eval Injection"}
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: exec($X)
+      - pattern-not: eval("...")
+      - pattern-not: exec("...")
+  - id: raksha.python.yaml-unsafe-load
+    languages: [python]
+    severity: ERROR
+    message: yaml.load without a safe loader can build arbitrary objects; use yaml.safe_load
+    metadata: {cwe: "CWE-502: Deserialization of Untrusted Data"}
+    patterns:
+      - pattern: yaml.load(...)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+      - pattern-not: yaml.load(..., Loader=SafeLoader, ...)
+  - id: raksha.python.pickle-loads
+    languages: [python]
+    severity: WARNING
+    message: pickle deserialisation of data that may be untrusted
+    metadata: {cwe: "CWE-502: Deserialization of Untrusted Data"}
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+  - id: raksha.python.tls-verify-off
+    languages: [python]
+    severity: ERROR
+    message: certificate verification disabled
+    metadata: {cwe: "CWE-295: Improper Certificate Validation"}
+    pattern: requests.$M(..., verify=False, ...)
+  - id: raksha.python.weak-hash
+    languages: [python]
+    severity: WARNING
+    message: MD5/SHA-1 used; not acceptable for signatures or passwords
+    metadata: {cwe: "CWE-328: Use of Weak Hash"}
+    pattern-either:
+      - pattern: hashlib.md5(...)
+      - pattern: hashlib.sha1(...)
+  - id: raksha.c.unbounded-copy
+    languages: [c]
+    severity: ERROR
+    message: unbounded string copy; use a size-checked form bounded by the destination
+    metadata: {cwe: "CWE-120: Buffer Copy without Checking Size of Input"}
+    pattern-either:
+      - pattern: strcpy(...)
+      - pattern: strcat(...)
+      - pattern: sprintf(...)
+      - pattern: gets(...)
+  - id: raksha.js.child-process-exec
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: child_process.exec runs a shell; use execFile with an argument array
+    metadata: {cwe: "CWE-78: OS Command Injection"}
+    pattern: $CP.exec(...)
+  - id: raksha.java.runtime-exec
+    languages: [java]
+    severity: WARNING
+    message: Runtime.exec with a single command string
+    metadata: {cwe: "CWE-78: OS Command Injection"}
+    pattern: Runtime.getRuntime().exec($CMD)

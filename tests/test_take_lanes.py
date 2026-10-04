@@ -19,13 +19,14 @@ from raksha.lanes import take
 
 
 def _install_fake(tmp_path, monkeypatch, name: str, script: str) -> None:
-    """Write an executable `name` emitting `script` to a bin dir and prepend it to PATH."""
+    """Write an executable `name` emitting `script` to a bin dir, and make PATH that dir plus the
+    system shell dirs only — so real scanners installed elsewhere never join a fake-tool test."""
     bindir = tmp_path / "bin"
     bindir.mkdir(exist_ok=True)
     tool = bindir / name
     tool.write_text("#!/bin/sh\n" + script)
     tool.chmod(tool.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
-    monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ.get("PATH", ""))
+    monkeypatch.setenv("PATH", str(bindir) + os.pathsep + "/usr/bin" + os.pathsep + "/bin")
 
 
 # ---------------------------------------------------------------- the offline default

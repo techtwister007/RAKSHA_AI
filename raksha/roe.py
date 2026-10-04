@@ -181,7 +181,43 @@ def may_deploy(decision: RoeDecision, signatures: list[Signature]) -> tuple[bool
     """Whether a verified fix may actually be deployed, given the authority and any signatures.
 
     The two-person rule counts distinct OFFICERS: one officer holding two keys is still one person.
+    With RAKSHA_OPA=1 the same rule, written as policy code (raksha/data/roe.rego), must agree:
+    the stricter answer wins and an OPA failure refuses.
     """
+    ok, why = _builtin_may_deploy(decision, signatures)
+    opa = _opa_allows(decision, signatures)
+    if opa is None:
+        return ok, why
+    if opa is False and ok:
+        return False, "policy engine (OPA) refused this deployment; the stricter answer wins"
+    return ok, why
+
+
+def _opa_allows(decision: RoeDecision, signatures: list[Signature]) -> bool | None:
+    """The OPA policy's verdict, or None when OPA is not enabled. Enabled but failing → False."""
+    import json
+    import os
+    import shutil
+    import subprocess
+    from pathlib import Path
+    if os.environ.get("RAKSHA_OPA", "").lower() not in ("1", "true", "yes", "on"):
+        return None
+    if shutil.which("opa") is None:
+        return False                                  # enabled but absent: fail closed
+    inp = {"verified": decision.verified, "effective": int(decision.effective),
+           "two_person": decision.two_person, "signers": [s.officer for s in signatures]}
+    policy = Path(__file__).parent / "data" / "roe.rego"
+    try:
+        # raksha-own: evaluating RAKSHA's own policy with a local tool; no target code, no network
+        r = subprocess.run(["opa", "eval", "--format", "json", "--stdin-input", "-d", str(policy),
+                            "data.raksha.roe.allow"], input=json.dumps(inp), capture_output=True,
+                           text=True, timeout=30)
+        return bool(json.loads(r.stdout)["result"][0]["expressions"][0]["value"])
+    except Exception:  # noqa: BLE001 — any failure of the policy engine refuses
+        return False
+
+
+def _builtin_may_deploy(decision: RoeDecision, signatures: list[Signature]) -> tuple[bool, str]:
     if not decision.verified:
         return False, "the fix has not cleared the five-check gate — nothing unproven is ever deployed"
     distinct = {s.officer.strip().lower() for s in signatures if s.officer.strip()}

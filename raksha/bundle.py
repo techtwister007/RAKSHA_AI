@@ -166,6 +166,11 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes | None = N
         (out / "signature.pq.json").write_text(json.dumps(pqsig, indent=2, sort_keys=True))
     except Exception:  # noqa: BLE001 — the PQ signature is additive to the HMAC one
         pass
+    try:   # public-key seal (cosign) when a deployment key pair is provisioned; additive
+        from . import cosign
+        cosign.sign_file(out / MANIFEST, out / cosign.SIG_FILE)
+    except Exception:  # noqa: BLE001
+        pass
     return out
 
 
@@ -214,7 +219,8 @@ def verify_bundle(bundle_dir: str | Path, *, key: bytes | None = None) -> Verify
         if actual != recorded_hash:
             problems.append(f"CHANGED {name}")
     for extra in sorted(p.name for p in out.iterdir()
-                        if p.name not in listed and p.name not in (MANIFEST, SIGNATURE, "signature.pq.json")):
+                        if p.name not in listed and p.name not in (MANIFEST, SIGNATURE, "signature.pq.json",
+                                                              "signature.cosign")):
         problems.append(f"UNEXPECTED {extra} (not in the signed manifest)")
 
     manifest_hash = _sha256_bytes(manifest_bytes)
