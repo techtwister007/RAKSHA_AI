@@ -1,0 +1,840 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"></head><body>
+<title>The RAKSHA Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap">
+<style>
+/* Layout: a field manual — sticky contents rail on the left (desktop), single column on phones; chapters as numbered sections, colour-keyed callout boxes carry meaning. */
+:root{
+  --paper:#f6f5f0; --page:#fffefb; --ink:#1d2321; --ink2:#4b5551; --rule:#d9dbd3;
+  --olive:#47603a; --olive-soft:#e8eedf;
+  --plain:#1f5f8b;  --plain-bg:#e7f0f7;    /* blue: in plain words */
+  --built:#2b6b3f;  --built-bg:#e5f2e8;    /* green: built and tested */
+  --part:#9a5b12;   --part-bg:#fbf0de;     /* amber: partial / needs finale hardware */
+  --gap:#a3301f;    --gap-bg:#f9e6e2;      /* red: not built / limitation */
+  --term:#5b3f8f;   --term-bg:#efe9f8;     /* purple: jargon explained */
+  --eng:#4f5754;    --eng-bg:#eeefec;      /* grey: for engineers */
+  --note:#7a6a12;   --note-bg:#fbf7dd;     /* yellow: your suggestions */
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,"Noto Sans Devanagari",serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --hindi:"Noto Sans Devanagari","Source Serif 4",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#141816; --page:#1a1f1d; --ink:#e6e9e4; --ink2:#a9b2ac; --rule:#323a36;
+  --olive:#a6c48f; --olive-soft:#24301f;
+  --plain:#8cc0e6; --plain-bg:#16283a; --built:#86cf9b; --built-bg:#17301f;
+  --part:#e7b26a; --part-bg:#33260f; --gap:#f0917f; --gap-bg:#3a1b16;
+  --term:#c3abef; --term-bg:#2a2140; --eng:#b9c1bc; --eng-bg:#232927; --note:#e3d27a; --note-bg:#302b10;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --paper:#141816; --page:#1a1f1d; --ink:#e6e9e4; --ink2:#a9b2ac; --rule:#323a36;
+  --olive:#a6c48f; --olive-soft:#24301f;
+  --plain:#8cc0e6; --plain-bg:#16283a; --built:#86cf9b; --built-bg:#17301f;
+  --part:#e7b26a; --part-bg:#33260f; --gap:#f0917f; --gap-bg:#3a1b16;
+  --term:#c3abef; --term-bg:#2a2140; --eng:#b9c1bc; --eng-bg:#232927; --note:#e3d27a; --note-bg:#302b10;
+  color-scheme:dark;}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.62;margin:0}
+.wrap{display:grid;grid-template-columns:270px minmax(0,1fr);gap:0;max-width:1240px;margin:0 auto;padding-inline:16px}
+nav.toc{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;max-height:100vh;overflow:auto;padding-block:28px;padding-right:18px;font-family:var(--display);font-size:13px;line-height:1.45}
+nav.toc .brand{font-weight:800;font-size:15px;letter-spacing:.06em;color:var(--olive);margin-bottom:12px}
+nav.toc a{color:var(--ink2);text-decoration:none;display:block;padding:2px 0}
+nav.toc a:hover,nav.toc a:focus-visible{color:var(--ink);text-decoration:underline}
+nav.toc .p{margin-top:12px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.06em;font-size:11.5px}
+main{background:var(--page);border-left:1px solid var(--rule);border-right:1px solid var(--rule);padding-block:40px 80px;padding-inline:clamp(16px,5vw,64px);min-width:0}
+.prose{max-width:68ch}
+h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;line-height:1.2;color:var(--ink)}
+h1{font-size:clamp(34px,6vw,54px);font-weight:800;letter-spacing:-.01em;margin:0 0 10px}
+h2{font-size:clamp(24px,3.4vw,31px);font-weight:800;margin:56px 0 8px;padding-top:14px;border-top:2px solid var(--ink)}
+h2 .n{color:var(--olive);margin-right:.35em}
+h3{font-size:20px;font-weight:700;margin:30px 0 6px}
+h4{font-size:16px;font-weight:700;margin:20px 0 4px;letter-spacing:.01em}
+p{margin:0 0 14px}
+a{color:var(--plain)}
+.part{margin:84px 0 0;padding:26px 0 18px;border-top:6px solid var(--olive)}
+.part .k{font-family:var(--display);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--olive);font-weight:700}
+.part h1{font-size:clamp(28px,4.6vw,42px);margin-top:6px}
+.lede{font-size:19px;color:var(--ink2);max-width:62ch}
+.cover{padding:30px 0 10px}
+.cover .k{font-family:var(--display);letter-spacing:.2em;text-transform:uppercase;font-size:12px;color:var(--olive);font-weight:700}
+.cover .sub{font-size:20px;color:var(--ink2);max-width:60ch}
+.meta{font-family:var(--display);font-size:13px;color:var(--ink2);margin-top:14px}
+.box{border-left:6px solid;padding:12px 16px 4px;margin:18px 0;border-radius:2px;max-width:72ch;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.box .t{font-family:var(--display);font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px;display:block}
+.plain{border-color:var(--plain);background:var(--plain-bg)} .plain .t{color:var(--plain)}
+.built{border-color:var(--built);background:var(--built-bg)} .built .t{color:var(--built)}
+.partial{border-color:var(--part);background:var(--part-bg)} .partial .t{color:var(--part)}
+.gapb{border-color:var(--gap);background:var(--gap-bg)} .gapb .t{color:var(--gap)}
+.term{border-color:var(--term);background:var(--term-bg)} .term .t{color:var(--term)}
+.eng{border-color:var(--eng);background:var(--eng-bg)} .eng .t{color:var(--eng)}
+.note{border:2px dashed var(--note);background:var(--note-bg);padding:12px 16px;margin:18px 0;max-width:72ch}
+.note .t{font-family:var(--display);font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--note)}
+.note .lines{height:54px;background:repeating-linear-gradient(transparent 0 26px,var(--rule) 26px 27px)}
+dfn{font-style:normal;font-weight:600;color:var(--term);border-bottom:1px dotted var(--term)}
+.takeaways{background:var(--olive-soft);padding:12px 18px 6px;margin:22px 0;max-width:72ch;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.takeaways .t{font-family:var(--display);font-weight:800;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--olive)}
+ul,ol{padding-left:1.3em;margin:0 0 14px} li{margin:3px 0}
+code,.mono{font-family:var(--mono);font-size:.86em;background:var(--eng-bg);padding:1px 5px;border-radius:2px;overflow-wrap:anywhere}
+pre{font-family:var(--mono);font-size:13px;background:var(--eng-bg);padding:12px 14px;overflow-x:auto;max-width:100%;line-height:1.5}
+.tw{overflow-x:auto;max-width:100%;margin:14px 0}
+table{border-collapse:collapse;font-size:15px;min-width:520px;width:100%}
+th,td{border-bottom:1px solid var(--rule);padding:7px 10px;text-align:left;vertical-align:top}
+th{font-family:var(--display);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);border-bottom:2px solid var(--ink)}
+td.num{font-variant-numeric:tabular-nums;text-align:right}
+.chip{display:inline-block;font-family:var(--display);font-weight:700;font-size:11.5px;letter-spacing:.04em;padding:1px 8px;border-radius:999px;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.c-built{background:var(--built-bg);color:var(--built);border:1px solid var(--built)}
+.c-part{background:var(--part-bg);color:var(--part);border:1px solid var(--part)}
+.c-gap{background:var(--gap-bg);color:var(--gap);border:1px solid var(--gap)}
+.c-plain{background:var(--plain-bg);color:var(--plain);border:1px solid var(--plain)}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin:16px 0;max-width:900px}
+.legend .box{margin:0}
+.hi{font-family:var(--hindi)}
+figure{margin:22px 0;max-width:100%}
+figure .dia{overflow-x:auto;background:var(--page);border:1px solid var(--rule);padding:10px}
+figcaption{font-family:var(--display);font-size:13px;color:var(--ink2);margin-top:6px}
+svg text{font-family:var(--display);fill:var(--ink)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;max-width:900px}
+.grid2>div{min-width:0}
+.status-now{border-top:4px solid var(--part);background:var(--part-bg);padding:10px 14px}
+.status-ideal{border-top:4px solid var(--built);background:var(--built-bg);padding:10px 14px}
+.status-now,.status-ideal{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.status-now h4,.status-ideal h4{margin-top:0}
+.screen{border:1px solid var(--rule);padding:12px 16px;margin:12px 0;max-width:72ch}
+.screen h4{margin:0 0 4px}
+.screen .kv{font-family:var(--display);font-size:13px;color:var(--ink2)}
+.toggle{display:none}
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr;padding-inline:0}
+  nav.toc{position:static;max-height:none;padding:16px;border-bottom:1px solid var(--rule)}
+  nav.toc .list{display:none} nav.toc.open .list{display:block}
+  .toggle{display:inline-block;font-family:var(--display);font-size:13px;border:1px solid var(--rule);background:var(--page);color:var(--ink);padding:6px 12px;cursor:pointer}
+  main{border:none;padding-inline:16px}
+  body{font-size:16.5px}
+}
+@media print{
+  @page{size:A4;margin:16mm 14mm}
+  body{background:#fff;font-size:11.5pt}
+  .wrap{display:block;max-width:none;padding:0}
+  nav.toc{display:none}
+  main{border:none;padding:0;background:#fff}
+  .part{break-before:page}
+  h2,h3,h4{break-after:avoid}
+  .box,.screen,.takeaways,figure,table,.note,.status-now,.status-ideal{break-inside:avoid}
+  .tw{overflow:visible} table{min-width:0;font-size:9.5pt}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+
+<div class="wrap">
+<nav class="toc" id="toc" aria-label="Contents">
+  <div class="brand">RAKSHA · THE BOOK</div>
+  <button class="toggle" id="toc-toggle" aria-expanded="false" aria-controls="toc-list">Contents ▾</button>
+  <div class="list" id="toc-list">
+    <div class="p">Part 0 · Start here</div>
+    <a href="#c1">1 How to read this book</a><a href="#c2">2 RAKSHA in one page</a>
+    <div class="p">Part I · The problem and the aim</div>
+    <a href="#c3">3 The competition</a><a href="#c4">4 The problem</a><a href="#c5">5 Why today's AI falls short</a><a href="#c6">6 Our aim and promise</a><a href="#c7">7 Scope</a><a href="#c8">8 Ground rules</a>
+    <div class="p">Part II · The solution at a glance</div>
+    <a href="#c9">9 The core idea</a><a href="#c10">10 A finding's life story</a><a href="#c11">11 What makes it different</a><a href="#c12">12 Who uses it</a>
+    <div class="p">Part III · The architecture</div>
+    <a href="#c13">13 The big picture</a><a href="#c14">14 Getting code in</a><a href="#c15">15 Build-free lanes</a><a href="#c16">16 Deep lanes</a><a href="#c17">17 Oracles</a><a href="#c18">18 The finding record</a><a href="#c19">19 The repair ladder</a><a href="#c20">20 Patch hygiene</a><a href="#c21">21 The five-check gate</a><a href="#c22">22 Extra proofs</a><a href="#c23">23 The red team</a><a href="#c24">24 The AI models</a><a href="#c25">25 Evidence bundle</a><a href="#c26">26 Session journal</a><a href="#c27">27 Sandbox and air gap</a><a href="#c28">28 Rules of engagement</a><a href="#c29">29 Risk and scoring</a><a href="#c30">30 Post-quantum readiness</a>
+    <div class="p">Part IV · Memory and learning</div>
+    <a href="#c31">31 Project identity</a><a href="#c32">32 Versioned reports</a><a href="#c33">33 What changed</a><a href="#c34">34 Needs a human</a><a href="#c35">35 Score, deadlines, certificate</a><a href="#c36">36 Self-learning</a><a href="#c37">37 Keeping learning safe</a><a href="#c38">38 Pre-merge and compliance</a>
+    <div class="p">Part V · The console (UI/UX)</div>
+    <a href="#c39">39 Design principles</a><a href="#c40">40 Screen-by-screen tour</a><a href="#c41">41 Operator actions</a><a href="#c42">42 Accessibility</a><a href="#c43">43 What people take away</a>
+    <div class="p">Part VI · Trust and honesty</div>
+    <a href="#c44">44 How claims are proven</a><a href="#c45">45 Measured results</a><a href="#c46">46 Threat model</a><a href="#c47">47 Claim audit</a><a href="#c48">48 Honest limitations</a>
+    <div class="p">Part VII · Deployment and the finale</div>
+    <a href="#c49">49 The sealed box</a><a href="#c50">50 Profiles</a><a href="#c51">51 The demo arc</a><a href="#c52">52 Rehearsals</a><a href="#c53">53 Fallback ladder</a><a href="#c54">54 Needed from the team</a>
+    <div class="p">Part VIII · Present and ideal state</div>
+    <a href="#c55">55 Built, wave by wave</a><a href="#c56">56 What is left</a><a href="#c57">57 Present vs ideal state</a><a href="#c58">58 Future ideas</a><a href="#c59">59 Your suggestions</a>
+    <div class="p">Appendices</div>
+    <a href="#ga">A Glossary</a><a href="#gb">B Project map</a><a href="#gc">C Commands</a><a href="#gd">D Settings</a><a href="#ge">E Evidence index</a><a href="#gf">F Sources</a>
+  </div>
+</nav>
+<main>
+<div class="prose">
+
+<section class="cover">
+  <div class="k">AI Kavach · Grand Finale · Indian Army</div>
+  <h1>The RAKSHA Book</h1>
+  <p class="sub">Everything about RAKSHA AI in one place: what we are building and why, how every part works, what the operator sees, where we stand today, and what the finished system should look like.</p>
+  <p class="meta">Status as of 4 October 2026 · Branch <code>claude/magical-mayer-gs2xno</code> · Last full test run: 863 passed, 0 failed</p>
+</section>
+
+<div class="part" id="part0"><div class="k">Part 0</div><h1>Start here</h1></div>
+
+<h2 id="c1"><span class="n">1</span>How to read this book</h2>
+<p>Every chapter opens with a short summary and closes with key takeaways. Technical words are explained the first time they appear, in a purple box or with a dotted underline. Colour always means the same thing:</p>
+<div class="legend">
+  <div class="box plain"><span class="t">Blue · In plain words</span><p>The simple explanation, first.</p></div>
+  <div class="box built"><span class="t">Green · Built and tested</span><p>Working today, with tests behind it.</p></div>
+  <div class="box partial"><span class="t">Amber · Partial</span><p>Built, but needs the finale hardware or a team step.</p></div>
+  <div class="box gapb"><span class="t">Red · Not built / limitation</span><p>Missing, or an honest weakness.</p></div>
+  <div class="box term"><span class="t">Purple · Term explained</span><p>Jargon, decoded where it first appears.</p></div>
+  <div class="box eng"><span class="t">Grey · For engineers</span><p>Detail you can safely skip.</p></div>
+</div>
+<div class="note"><span class="t">Yellow dashed · Your notes</span><p>Space at the end of chapters for your suggestions.</p></div>
+<p><b>Two reading paths.</b> A commander or reviewer can read Parts 0, I, II, IV, V and VIII and skip the grey boxes. An engineer should read everything, including Part III in full.</p>
+
+<h2 id="c2"><span class="n">2</span>RAKSHA in one page</h2>
+<div class="box plain"><span class="t">In plain words</span>
+<p>RAKSHA is a self-driving security mechanic for software. You give it a program's source code. It finds weaknesses, proves each one is real by making it happen in a safe box, writes a fix, and proves the fix works with five independent checks. It hands you a sealed receipt for every claim. It does all of this offline, with the network cable pulled, because Army networks are sealed.</p></div>
+<ul>
+<li><b>Find:</b> fast checks that need no compiling, plus deep checks that run the code with thousands of test inputs.</li>
+<li><b>Prove the weakness:</b> nothing is reported unless it can be reproduced. "No reproducer, no report."</li>
+<li><b>Fix:</b> a ladder of fixers from cheapest to most expensive: known fix patterns, past fixes, then an AI model.</li>
+<li><b>Prove the fix:</b> a five-check gate decides. The AI never decides anything.</li>
+<li><b>Show it:</b> an offline console for operators and commanders, in English and Hindi, with signed reports a judge can re-check on their own laptop.</li>
+<li><b>Remember:</b> every project gets an ID and a versioned, colour-coded history; recurring faults become proposed guidelines.</li>
+</ul>
+<div class="takeaways"><span class="t">Key takeaways</span><ul><li>RAKSHA shows proof, not opinions.</li><li>It works offline, on unfamiliar code, in several languages.</li><li>Humans keep authority: rules of engagement decide what it may do on each system.</li></ul></div>
+
+<div class="part" id="part1"><div class="k">Part I</div><h1>The problem and the aim</h1><p class="lede">What the competition asks for, why it is hard, and what RAKSHA promises in return.</p></div>
+
+<h2 id="c3"><span class="n">3</span>The competition</h2>
+<p>AI Kavach is a challenge to build working technology for real defence and national-security problems. The task for this track, in the organisers' words, is a cyber-reasoning system that autonomously finds a vulnerability, patches it, and proves the fix holds, pitched to run against customised infrastructure of the Indian Armed Forces.</p>
+<div class="box term"><span class="t">Terms explained</span>
+<p><dfn>Cyber-reasoning system (CRS)</dfn>: a program that reasons about the security of other programs by itself. <dfn>Vulnerability</dfn>: a weakness in software that someone could misuse. <dfn>Patch</dfn>: a change to the code that removes the weakness. <dfn>Autonomously</dfn>: without a human in the loop during the find-fix-prove cycle. <dfn>Air-gapped</dfn>: physically disconnected from any outside network.</p></div>
+<h3>How it is judged</h3>
+<div class="tw"><table><thead><tr><th>Stage</th><th>What is scored</th></tr></thead><tbody>
+<tr><td>Shortlisting (5 slides)</td><td>Resource utilisation · novelty of idea · how lightweight the solution is</td></tr>
+<tr><td>Grand Finale (36-hour build)</td><td>Performance (bugs found and patched) · speed · precision (how often it is right) · functionality (the full loop, autonomously) · scalability (many targets and languages)</td></tr>
+</tbody></table></div>
+
+<h2 id="c4"><span class="n">4</span>The problem</h2>
+<p>Finding and fixing weaknesses in software is slow, skilled work. Army software adds three hard conditions:</p>
+<ul>
+<li><b>Unfamiliar code.</b> Custom systems no public tool has ever seen, in several programming languages.</li>
+<li><b>Sealed networks.</b> No internet, so no cloud AI and no online databases at the point of use.</li>
+<li><b>High stakes.</b> A wrong "fix" on a mission system can do more harm than the weakness. Every claim must be checkable.</li>
+</ul>
+
+<h2 id="c5"><span class="n">5</span>Why today's AI tools fall short</h2>
+<ul>
+<li><b>They guess.</b> General AI models produce plausible fixes that are often wrong; published evaluations show frontier models failing a large share of real repair tasks.</li>
+<li><b>They need the internet.</b> The strongest models run in the cloud, which a sealed network forbids.</li>
+<li><b>They give no proof.</b> A static scanner says "this line might be risky". A commander cannot act on "might".</li>
+</ul>
+<div class="box term"><span class="t">Term explained</span><p><dfn>Static scanner</dfn>: a tool that reads code without running it and flags patterns. Fast, but it cannot show that a problem really happens.</p></div>
+
+<h2 id="c6"><span class="n">6</span>Our aim and promise</h2>
+<div class="box plain"><span class="t">In plain words</span><p>Find real weaknesses in code nobody has seen before, fix them, and hand over evidence anyone can re-check, all offline, with humans in charge of what gets applied.</p></div>
+<p>The promise rests on one design choice: the AI model is an intern, not the judge. It may suggest. Deterministic checks decide.</p>
+<div class="box term"><span class="t">Term explained</span><p><dfn>Deterministic</dfn>: gives the same answer every time for the same input. A check that cannot be talked out of its answer.</p></div>
+
+<h2 id="c7"><span class="n">7</span>Scope</h2>
+<div class="grid2">
+<div class="box built"><span class="t">In scope</span><ul>
+<li>Source code in C/C++, Python, Java, JavaScript/TypeScript, Go and Rust (deep checks)</li>
+<li>Any language for build-free checks (dependencies, secrets, crypto, configuration, API specs, binaries, git history)</li>
+<li>Proving, fixing and re-proving; signed evidence; reports for operators and commanders</li>
+<li>Offline operation on a single sealed machine</li></ul></div>
+<div class="box gapb"><span class="t">Out of scope</span><ul>
+<li>Attacking live systems or networks: RAKSHA only works on code handed to it, inside its own sandbox</li>
+<li>Applying fixes to production by itself on critical systems (humans approve)</li>
+<li>Claiming a system is "secure": RAKSHA reports what it found, never the absence of problems</li></ul></div>
+</div>
+
+<h2 id="c8"><span class="n">8</span>Ground rules we never break</h2>
+<ol>
+<li><b>No reproducer, no report.</b> Every reported weakness can be made to happen again.</li>
+<li><b>The model never decides.</b> It proposes; the five-check gate decides.</li>
+<li><b>Presence, never absence.</b> RAKSHA says what it found. It never says "secure".</li>
+<li><b>Nothing leaves the box.</b> No code, finding or report goes over a network. This is measured, not promised.</li>
+<li><b>Every number is measured or empty.</b> If something was not measured, the screen shows a dash, never a made-up figure.</li>
+<li><b>Untrusted code runs only in the sandbox.</b></li>
+<li><b>Zero false alarms on clean controls.</b> Deliberately clean code must produce no findings, checked after every change.</li>
+</ol>
+<div class="box term"><span class="t">Term explained</span><p><dfn>Reproducer</dfn>: the exact input that makes the weakness happen, kept so anyone can replay it. <dfn>Sandbox</dfn>: a sealed box (a container with no network) where untrusted code runs so it cannot touch anything else.</p></div>
+<div class="note"><span class="t">Your notes · Part I</span><div class="lines"></div></div>
+
+<div class="part" id="part2"><div class="k">Part II</div><h1>The solution at a glance</h1><p class="lede">The core idea, the life of one finding, what is new, and who uses it.</p></div>
+
+<h2 id="c9"><span class="n">9</span>The core idea</h2>
+<p>RAKSHA wraps an AI model inside a frame of hard, checkable tools. Three kinds of work happen in order: <b>find</b> (gather evidence a weakness exists), <b>fix</b> (propose changes, cheapest first), <b>prove</b> (judge each change with checks that cannot be argued with). Only proven results reach a person.</p>
+
+<h2 id="c10"><span class="n">10</span>A finding's life story</h2>
+<figure><div class="dia">
+<svg viewBox="0 0 860 190" width="860" height="190" role="img" aria-label="Status flow: suspected, confirmed, patched, verified or report only">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink2)"/></marker></defs>
+  <g style="stroke:var(--ink2);stroke-width:1.5;fill:none">
+    <line x1="150" y1="60" x2="200" y2="60" marker-end="url(#ar)"/><line x1="350" y1="60" x2="400" y2="60" marker-end="url(#ar)"/>
+    <line x1="550" y1="60" x2="600" y2="60" marker-end="url(#ar)"/><path d="M475 85 L475 140 L600 140" marker-end="url(#ar)"/>
+  </g>
+  <rect x="10" y="30" width="140" height="60" rx="3" style="fill:var(--eng-bg);stroke:var(--eng)"/>
+  <text x="80" y="58" text-anchor="middle" font-size="15" font-weight="700">SUSPECTED</text><text x="80" y="77" text-anchor="middle" font-size="11">a lead, not reported</text>
+  <rect x="200" y="30" width="150" height="60" rx="3" style="fill:var(--plain-bg);stroke:var(--plain)"/>
+  <text x="275" y="58" text-anchor="middle" font-size="15" font-weight="700">CONFIRMED</text><text x="275" y="77" text-anchor="middle" font-size="11">reproducer replays</text>
+  <rect x="400" y="30" width="150" height="60" rx="3" style="fill:var(--part-bg);stroke:var(--part)"/>
+  <text x="475" y="58" text-anchor="middle" font-size="15" font-weight="700">PATCHED</text><text x="475" y="77" text-anchor="middle" font-size="11">a fix is on trial</text>
+  <rect x="600" y="30" width="240" height="60" rx="3" style="fill:var(--built-bg);stroke:var(--built)"/>
+  <text x="720" y="58" text-anchor="middle" font-size="15" font-weight="700">VERIFIED</text><text x="720" y="77" text-anchor="middle" font-size="11">all five gate checks passed</text>
+  <rect x="600" y="115" width="240" height="55" rx="3" style="fill:var(--gap-bg);stroke:var(--gap)"/>
+  <text x="720" y="140" text-anchor="middle" font-size="15" font-weight="700">REPORT ONLY</text><text x="720" y="158" text-anchor="middle" font-size="11">proven weakness, no fix certified</text>
+</svg></div><figcaption>Figure 1 · Every weakness moves through these states. Only CONFIRMED and later are ever reported.</figcaption></figure>
+<ol>
+<li><b>Suspected:</b> a lane notices something. It stays private.</li>
+<li><b>Confirmed:</b> the reproducer makes it happen again, observed by an oracle (Chapter 17).</li>
+<li><b>Patched:</b> a candidate fix is applied to a scratch copy and put on trial.</li>
+<li><b>Verified:</b> the fix passed all five gate checks (Chapter 21). If no candidate passes within three rounds, the finding is <b>report only</b>: proven, but referred to a human.</li>
+</ol>
+
+<h2 id="c11"><span class="n">11</span>What makes RAKSHA different</h2>
+<div class="tw"><table><thead><tr><th>Idea</th><th>What it means</th><th>Why it matters</th></tr></thead><tbody>
+<tr><td>Proof-carrying findings</td><td>Every report carries a replayable reproducer and a signed bundle</td><td>A commander acts on evidence, not opinion</td></tr>
+<tr><td>Five-check gate</td><td>A fix is judged by five independent checks, never by the model</td><td>No plausible-but-wrong fixes ship</td></tr>
+<tr><td>Rules of engagement for autonomy</td><td>Autonomy is a per-system authority level, like fire control</td><td>Humans keep command on critical systems</td></tr>
+<tr><td>Build-free first</td><td>Useful proven findings even when code will not compile</td><td>Something real always comes out</td></tr>
+<tr><td>It says no, in public</td><td>Shallow, unsafe and weak fixes are refused on screen</td><td>Refusal is what makes the yes believable</td></tr>
+<tr><td>Vaccine sweep and memory</td><td>One proven fix becomes a fleet-wide check and a reusable pattern</td><td>The estate gets safer faster</td></tr>
+<tr><td>Offline by construction</td><td>An automated guard and live counters prove nothing leaves</td><td>Fits sealed Army networks</td></tr>
+</tbody></table></div>
+
+<h2 id="c12"><span class="n">12</span>Who uses it</h2>
+<div class="tw"><table><thead><tr><th>Person</th><th>What they need</th><th>Where they get it</th></tr></thead><tbody>
+<tr><td>Operator</td><td>Run it, watch progress, approve or reject fixes</td><td>Console: Mission Board, Live Pipeline, Finding Detail</td></tr>
+<tr><td>Developer / project owner</td><td>What is wrong in my code, what changed, what must I do</td><td>Projects screen, versioned reports, needs-a-human list</td></tr>
+<tr><td>Commander</td><td>Mission risk, readiness, decisions in plain language</td><td>Commander's Brief (English/Hindi), mission view, certificate</td></tr>
+<tr><td>Auditor</td><td>Can every claim be re-checked?</td><td>Evidence Vault, signed reports, compliance pack</td></tr>
+<tr><td>Jury</td><td>Does it really work, offline, honestly?</td><td>Demo beats, Scorecard, verifier media on their own laptop</td></tr>
+</tbody></table></div>
+<div class="takeaways"><span class="t">Key takeaways</span><ul><li>Find, fix, prove: in that order, with proof at every step.</li><li>Seven ideas set RAKSHA apart; all are built.</li><li>Five kinds of people use it, each with their own view.</li></ul></div>
+<div class="note"><span class="t">Your notes · Part II</span><div class="lines"></div></div>
+
+<div class="part" id="part3"><div class="k">Part III</div><h1>The architecture, layer by layer</h1><p class="lede">How code goes in, how weaknesses are found and proven, how fixes are made and judged, and how everything is kept sealed and recorded.</p></div>
+
+<h2 id="c13"><span class="n">13</span>The big picture</h2>
+<figure><div class="dia">
+<svg viewBox="0 0 900 420" width="900" height="420" role="img" aria-label="Architecture overview">
+  <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink2)"/></marker></defs>
+  <rect x="10" y="10" width="880" height="400" rx="4" style="fill:none;stroke:var(--olive);stroke-width:2;stroke-dasharray:6 4"/>
+  <text x="24" y="32" font-size="12" font-weight="700" style="fill:var(--olive)">SEALED BOX · NO NETWORK · ALL TARGET CODE RUNS IN THE SANDBOX</text>
+  <g style="stroke:var(--ink2);stroke-width:1.4;fill:none">
+    <line x1="140" y1="110" x2="185" y2="110" marker-end="url(#ar2)"/><line x1="140" y1="110" x2="185" y2="200" marker-end="url(#ar2)"/>
+    <line x1="345" y1="110" x2="390" y2="150" marker-end="url(#ar2)"/><line x1="345" y1="200" x2="390" y2="160" marker-end="url(#ar2)"/>
+    <line x1="550" y1="155" x2="595" y2="155" marker-end="url(#ar2)"/><line x1="680" y1="185" x2="680" y2="225" marker-end="url(#ar2)"/>
+    <line x1="680" y1="285" x2="680" y2="320" marker-end="url(#ar2)"/><line x1="470" y1="185" x2="470" y2="320" marker-end="url(#ar2)"/>
+  </g>
+  <rect x="25" y="80" width="115" height="60" rx="3" style="fill:var(--eng-bg);stroke:var(--eng)"/><text x="82" y="106" text-anchor="middle" font-size="13" font-weight="700">Target code</text><text x="82" y="124" text-anchor="middle" font-size="11">intake · staging</text>
+  <rect x="185" y="80" width="160" height="60" rx="3" style="fill:var(--plain-bg);stroke:var(--plain)"/><text x="265" y="106" text-anchor="middle" font-size="13" font-weight="700">Build-free lanes</text><text x="265" y="124" text-anchor="middle" font-size="11">deps · secrets · crypto · config</text>
+  <rect x="185" y="170" width="160" height="60" rx="3" style="fill:var(--plain-bg);stroke:var(--plain)"/><text x="265" y="196" text-anchor="middle" font-size="13" font-weight="700">Deep lanes</text><text x="265" y="214" text-anchor="middle" font-size="11">fuzzing · oracles</text>
+  <rect x="390" y="125" width="160" height="60" rx="3" style="fill:var(--term-bg);stroke:var(--term)"/><text x="470" y="151" text-anchor="middle" font-size="13" font-weight="700">Finding record</text><text x="470" y="169" text-anchor="middle" font-size="11">one shape for all</text>
+  <rect x="595" y="125" width="170" height="60" rx="3" style="fill:var(--part-bg);stroke:var(--part)"/><text x="680" y="151" text-anchor="middle" font-size="13" font-weight="700">Repair ladder</text><text x="680" y="169" text-anchor="middle" font-size="11">template · memory · model</text>
+  <rect x="595" y="225" width="170" height="60" rx="3" style="fill:var(--built-bg);stroke:var(--built)"/><text x="680" y="251" text-anchor="middle" font-size="13" font-weight="700">Five-check gate</text><text x="680" y="269" text-anchor="middle" font-size="11">+ red team</text>
+  <rect x="390" y="320" width="470" height="70" rx="3" style="fill:var(--olive-soft);stroke:var(--olive)"/><text x="625" y="348" text-anchor="middle" font-size="13" font-weight="700">Evidence bundle · journal · project reports · console</text><text x="625" y="368" text-anchor="middle" font-size="11">signed, replayable, versioned, offline</text>
+  <rect x="25" y="300" width="300" height="90" rx="3" style="fill:var(--gap-bg);stroke:var(--gap)"/><text x="175" y="326" text-anchor="middle" font-size="13" font-weight="700">Local AI model (optional)</text><text x="175" y="346" text-anchor="middle" font-size="11">ranks, proposes fixes, advises</text><text x="175" y="364" text-anchor="middle" font-size="11">never decides · never leaves the box</text>
+</svg></div><figcaption>Figure 2 · The whole system runs on one sealed machine. Blue finds, purple records, amber fixes, green judges, olive stores and shows.</figcaption></figure>
+<div class="box eng"><span class="t">For engineers</span><p>Python 3.11, standard library only at run time; optional extras (the SMT solver) degrade to a documented fallback when absent. The orchestrator (<code>raksha/orchestrator.py</code>) holds the live session; the console is a stdlib HTTP server (<code>console/server.py</code>). Every spawn of target code goes through one door, <code>raksha/sandbox.py</code>.</p></div>
+
+<h2 id="c14"><span class="n">14</span>Getting code in</h2>
+<p>Code arrives three ways: mounted at start (the finale's <code>/targets</code> folder), ingested on the console from a judge's USB media (<b>bring your own target</b>), or scanned from the command line.</p>
+<div class="box built"><span class="t">Built · safe intake</span><ul>
+<li>Only paths under allowed media folders are accepted.</li>
+<li>The tree is copied as plain data into a private scratch folder, within limits (files, total size, size per file, folder depth).</li>
+<li>Shortcuts (symlinks), devices and other special files are skipped and counted, never followed.</li>
+<li>Scanning happens off to the side and is merged into the live board in one step, so the console never freezes or shows half a result.</li>
+<li>Time to first finding is measured and shown live (4 seconds on the demo estate).</li></ul></div>
+<div class="box term"><span class="t">Term explained</span><p><dfn>Symlink</dfn>: a file that points to another file elsewhere. A hostile medium could use one to trick a tool into reading outside the folder, so RAKSHA refuses them.</p></div>
+
+<h2 id="c15"><span class="n">15</span>Build-free lanes: checks that need no compiling</h2>
+<div class="box plain"><span class="t">In plain words</span><p>Many real weaknesses can be proven just by reading files: an old library with a known flaw, a password left in a config file, encryption turned off. These checks work on any language, need no build, and take seconds.</p></div>
+<div class="tw"><table><thead><tr><th>Lane</th><th>What it proves</th><th>Example</th></tr></thead><tbody>
+<tr><td>Supply chain</td><td>A pinned dependency version is inside a known advisory's affected range; whether the code actually imports it</td><td>log4j-core 2.14.1 (Log4Shell)</td></tr>
+<tr><td>Secrets</td><td>A credential is written in a file</td><td>a cloud access key in <code>app.properties</code></td></tr>
+<tr><td>Crypto</td><td>Weak or outdated cryptography; certificate checks turned off</td><td>MD5 for signatures, TLS 1.0</td></tr>
+<tr><td>Config / infrastructure</td><td>Risky settings in configuration files</td><td>debug mode on in production config</td></tr>
+<tr><td>API specs</td><td>Endpoints with no authorisation, debug endpoints exposed</td><td><code>DELETE /users/{id}</code> with no security</td></tr>
+<tr><td>Binaries</td><td>Library versions read from compiled files; a software bill of materials</td><td>a vulnerable library inside a <code>.jar</code></td></tr>
+<tr><td>Git history</td><td>A secret that was committed once and later deleted</td><td>a key in an old commit</td></tr>
+<tr><td>Structure</td><td>A map of the code (who calls what) used to rank risk</td><td>input reaching a dangerous call</td></tr>
+</tbody></table></div>
+<div class="box term"><span class="t">Terms explained</span><p><dfn>Dependency</dfn>: a library your code borrows. <dfn>Advisory</dfn>: a public notice that a version of a library has a flaw. RAKSHA carries an offline copy of the OSV advisory database. <dfn>SBOM</dfn> (software bill of materials): an ingredients list of the software.</p></div>
+<p>Each build-free finding has a <b>deterministic re-check</b>: <code>python -m raksha secret-match …</code> and similar commands re-run the same detector on the file, so a judge can replay it.</p>
+
+<h2 id="c16"><span class="n">16</span>Deep lanes: running the code to find real crashes</h2>
+<div class="box plain"><span class="t">In plain words</span><p>RAKSHA finds the functions in the code that take input, writes a small test driver for each, and feeds it thousands of varied inputs inside the sandbox. When one input makes the program misbehave, that input becomes the reproducer.</p></div>
+<div class="box term"><span class="t">Terms explained</span><p><dfn>Fuzzing</dfn>: automatically trying huge numbers of varied inputs to make a program fail. <dfn>Harness</dfn>: the small driver that feeds inputs to the code under test. <dfn>Synthesized harness</dfn>: one RAKSHA writes itself, so targets that ship no test driver can still be tested.</p></div>
+<div class="tw"><table><thead><tr><th>Language</th><th>How it is tested</th><th>Needs</th></tr></thead><tbody>
+<tr><td>C / C++</td><td>Synthesized harness, memory-error detector, fast fork-server loop</td><td>gcc or clang</td></tr>
+<tr><td>Python</td><td>Synthesized harness; dangerous calls watched (e.g. a shell built from input)</td><td>Python</td></tr>
+<tr><td>Java</td><td>Synthesized driver for public entry points, one JVM for many inputs</td><td>JDK (Maven for project tests)</td></tr>
+<tr><td>JavaScript / TypeScript</td><td>Node harness with dangerous-call guard</td><td>Node</td></tr>
+<tr><td>Go</td><td>Go's own built-in fuzzing</td><td>Go toolchain</td></tr>
+<tr><td>Rust</td><td>Cargo-based fuzzing; panics caught</td><td>Rust toolchain</td></tr>
+</tbody></table></div>
+<p>Each input runs in a short-lived child process, cut off after two seconds if it hangs, so the search never stalls. Crashes are re-checked twice, shrunk to a minimal input, and attributed: a crash inside RAKSHA's own driver is dropped, never reported.</p>
+<div class="box partial"><span class="t">Partial · depends on toolchains</span><p>A language's deep lane runs only if its toolchain is installed. The current sealed image carries gcc, JDK and Maven; Node, Go, Rust and clang are a team step (Chapter 54).</p></div>
+
+<h2 id="c17"><span class="n">17</span>Oracles: the alarm bells</h2>
+<div class="box plain"><span class="t">In plain words</span><p>An oracle is an alarm that rings only when something genuinely bad happens, such as a write past the end of a buffer. Because the alarm is observed, the finding is a fact, not a guess.</p></div>
+<div class="tw"><table><thead><tr><th>Oracle</th><th>Rings when</th></tr></thead><tbody>
+<tr><td>AddressSanitizer (ASan)</td><td>memory is read or written out of bounds, or used after it was freed</td></tr>
+<tr><td>UndefinedBehaviorSanitizer (UBSan)</td><td>arithmetic overflows or other undefined operations</td></tr>
+<tr><td>LeakSanitizer (LSan)</td><td>memory is never released</td></tr>
+<tr><td>ThreadSanitizer (TSan)</td><td>two threads race on shared data</td></tr>
+<tr><td>Hang detector</td><td>an input makes the program stop responding</td></tr>
+<tr><td>Python / Node sink guards</td><td>untrusted input reaches a shell or code-execution call (recorded and blocked, never executed)</td></tr>
+<tr><td>Java (Jazzer-style) detector</td><td>a known dangerous Java behaviour such as JNDI lookups</td></tr>
+<tr><td>Go / Rust panic</td><td>the program crashes with a panic</td></tr>
+<tr><td>Behaviour baseline</td><td>an input makes the program touch files, sockets or processes it never touches normally</td></tr>
+<tr><td>Metamorphic checks</td><td>two inputs that should give the same answer do not</td></tr>
+</tbody></table></div>
+<div class="box term"><span class="t">Term explained</span><p><dfn>CWE</dfn> (Common Weakness Enumeration): a standard numbering of weakness types, e.g. CWE-121 stack overflow, CWE-78 command injection. Each oracle labels what it saw with a CWE.</p></div>
+
+<h2 id="c18"><span class="n">18</span>The finding record</h2>
+<p>Every lane, in every language, produces the same record. That is why one gate, one console and one report format serve everything.</p>
+<div class="box eng"><span class="t">For engineers · key fields</span><p><code>oracle</code>, <code>bug_class</code> (CWE), <code>language</code>, <code>target</code>, <code>severity</code>, <code>frames</code> (stack), <code>fix_site_set</code> (ranked places to fix), <code>reproducer</code> (bytes + replay command + hash), <code>replay_before/after</code>, <code>gate</code> (five results), <code>patch_diff</code>, <code>repair_lane</code>, <code>red_team</code>, <code>roe_level</code>, plus proofs (bound, reachability, rollback). Status changes are guarded: a record cannot jump to VERIFIED without the gate history behind it. Source: <code>raksha/finding.py</code>.</p></div>
+
+<h2 id="c19"><span class="n">19</span>The repair ladder</h2>
+<p>Fixers are tried cheapest first. Each candidate goes to the gate; the first that passes all five checks wins (or, with the frontier on, the best of several that pass).</p>
+<ol>
+<li><b>Templates</b> (no AI): known fix shapes, e.g. "bound this copy to the buffer size", "pass arguments as a list instead of a shell string".</li>
+<li><b>Fix memory</b> (no AI): a fix proven earlier for the same kind of weakness, re-applied; it can even carry a fix idea across languages.</li>
+<li><b>AI model</b>: proposes a patch, optionally with a test; if the gate refuses it, the model gets the gate's reason and one more try.</li>
+<li><b>Mitigation</b>: a blunt but safe floor, labelled as such.</li>
+</ol>
+<p>At most three rounds. If nothing passes, the finding is <b>report only</b> and the record says exactly which check refused each attempt.</p>
+<div class="box built"><span class="t">Built · measured</span><p>On the demo set, 100% of verified fixes so far cost zero AI calls (templates and memory). The mutation factory shows templates still fix 75% of disguised variants of known bugs.</p></div>
+
+<h2 id="c20"><span class="n">20</span>Patch hygiene: refusing unsafe fixes before they are tried</h2>
+<div class="box plain"><span class="t">In plain words</span><p>Before a fix is even built, three rules check it. A fix may only touch the files where the weakness is; it must stay small (at most 150 added lines); and it may not introduce anything that runs commands, opens network connections or loads code, unless the original already did. A fix that breaks a rule is refused and the refusal is recorded.</p></div>
+<p>This matters because an AI model reads the target's code, and that code could contain text designed to steer the model. Hygiene stops a steered fix before it is ever run.</p>
+
+<h2 id="c21"><span class="n">21</span>The five-check gate</h2>
+<div class="box plain"><span class="t">In plain words</span><p>The gate is a strict examiner. It asks five questions about a fix. Only a fix that passes all five is called verified.</p></div>
+<div class="tw"><table><thead><tr><th>#</th><th>Check</th><th>The question</th><th>Catches</th></tr></thead><tbody>
+<tr><td class="num">1</td><td>COMPILES</td><td>Does the original build, and does the patched one?</td><td>broken fixes</td></tr>
+<tr><td class="num">2</td><td>POV_DEAD</td><td>Does the original reproducer no longer trigger the alarm?</td><td>fixes that do not fix</td></tr>
+<tr><td class="num">3</td><td>DIFFERENTIAL_CORPUS</td><td>Do normal inputs give exactly the same output as before? Do the project's own tests pass? Did it get much slower?</td><td>fixes that break normal behaviour</td></tr>
+<tr><td class="num">4</td><td>COVERAGE_HELD</td><td>Is the fixed code still reached by normal inputs?</td><td>"fixes" that just delete the feature</td></tr>
+<tr><td class="num">5</td><td>CLEAN_REFUZZ</td><td>Do close variations of the reproducer, and a fresh fuzzing pass, still trigger the same weakness?</td><td>shallow fixes that only block the one known input</td></tr>
+</tbody></table></div>
+<div class="box term"><span class="t">Terms explained</span><p><dfn>POV</dfn> (proof of vulnerability): the reproducer. <dfn>Corpus</dfn>: a collection of normal test inputs. <dfn>Coverage</dfn>: which lines of code an input actually runs. <dfn>Differential</dfn>: comparing before and after on the same inputs.</p></div>
+<p>The gate fails closed: if a target cannot run a check (for example, no fuzzing possible), the fix is not verified and the record says why. A fix that passes all checks on too little evidence is also held back as report only.</p>
+
+<h2 id="c22"><span class="n">22</span>Extra proofs</h2>
+<ul>
+<li><b>Deployment twin:</b> the fix is re-checked on an optimised release build, not only the instrumented test build.</li>
+<li><b>Bound proof:</b> for size-limit fixes, a mathematical solver (Z3) proves the new limit always holds.</li>
+<li><b>Reachability proof:</b> the solver shows the bad state was reachable before the fix and is not after.</li>
+<li><b>Rollback proof:</b> undoing the fix returns the code to exactly its original bytes.</li>
+<li><b>Regression test:</b> a test is kept only if it fails before the fix and passes after.</li>
+</ul>
+<div class="box term"><span class="t">Term explained</span><p><dfn>SMT solver</dfn>: a program that proves or disproves mathematical statements about code automatically. These proofs are extra evidence; they never replace the gate.</p></div>
+
+<h2 id="c23"><span class="n">23</span>The red team</h2>
+<div class="box plain"><span class="t">In plain words</span><p>After the gate says yes, an independent checker tries to show the fix still does not hold, using a wider and differently chosen set of test inputs than the gate used. If it succeeds, the fix is marked broken on the record. The red team can only ever take a "yes" away; it can never give one.</p></div>
+<p>The "it says no" demo beat shows this live: a weak fix passes the gate, and the red team catches it.</p>
+
+<h2 id="c24"><span class="n">24</span>The AI models</h2>
+<div class="tw"><table><thead><tr><th>Where the model helps</th><th>Where it is kept out</th></tr></thead><tbody>
+<tr><td>Ranking which functions to test first</td><td>Deciding whether a weakness is real (oracles do)</td></tr>
+<tr><td>Proposing repair candidates and tests</td><td>Deciding whether a fix works (the gate does)</td></tr>
+<tr><td>Advisor, judge and red-team roles whose disagreements are shown</td><td>Anything leaving the box (sealed mode refuses remote endpoints)</td></tr>
+<tr><td>Similarity search over past fixes</td><td>Severity scores (computed from the record)</td></tr>
+</tbody></table></div>
+<div class="box partial"><span class="t">Partial · model server</span><p>RAKSHA talks to any OpenAI-compatible model server. The finale design serves a ~32B coding model with vLLM on the box's GPU. No model is bundled in the repository; without one, RAKSHA runs model-free and still finds and proves, fixing only the shapes its templates and memory know.</p></div>
+<div class="box term"><span class="t">Terms explained</span><p><dfn>LLM</dfn> (large language model): an AI that writes text and code. <dfn>vLLM</dfn>: software that serves a model on a GPU. <dfn>Sealed mode</dfn>: a setting that refuses any model endpoint that is not on the box itself.</p></div>
+
+<h2 id="c25"><span class="n">25</span>The evidence bundle</h2>
+<p>Every reportable finding gets a sealed folder: the proof record, the replay script and reproducer, the patch and rollback script, the regression test, plain-language report, Commander's Brief, environment details, a provenance statement and a signature over all of it.</p>
+<div class="box plain"><span class="t">In plain words</span><p>A bundle is a receipt. Change one byte anywhere in it and verification fails. A judge can check it on the console's Evidence Vault, or on their own laptop with the verifier media.</p></div>
+<div class="box partial"><span class="t">Partial · signing key</span><p>Bundles are signed with HMAC-SHA256. Without a deployment key, the published demo key is used and every bundle says so. A deployment key is generated on the box at install time (team step); stronger public-key signing (cosign/in-toto, post-quantum when available) is the ideal state.</p></div>
+
+<h2 id="c26"><span class="n">26</span>The session journal</h2>
+<p>Every event is appended to a diary in which each line carries a fingerprint of the line before it. Change or delete any line and the chain breaks. The journal lets a crashed run resume exactly, powers the live event log, and feeds the time-lapse that replays a whole run minute by minute.</p>
+<div class="box term"><span class="t">Term explained</span><p><dfn>Hash chain</dfn>: a list where each entry includes a fingerprint (hash) of the previous one, so tampering anywhere is detectable.</p></div>
+
+<h2 id="c27"><span class="n">27</span>Sandbox and air gap</h2>
+<ul>
+<li><b>One door:</b> every launch of target code goes through <code>raksha/sandbox.py</code>; a test forbids any other route.</li>
+<li><b>No network, fewer powers:</b> the sandbox container has no network and drops system capabilities; a setting refuses to run target code at all without it.</li>
+<li><b>Air-gap guard:</b> an automated check proves RAKSHA's own code contains no network client outside the single local model connector, and the console loads nothing from outside.</li>
+<li><b>Live egress counter:</b> the console shows packets sent on every network interface and RAKSHA's own outbound calls. Pull the cable: the counter goes flat.</li>
+<li><b>Per-run names:</b> files RAKSHA places in a target use random names each run, so target code cannot detect and dodge the tests.</li>
+</ul>
+
+<h2 id="c28"><span class="n">28</span>Rules of engagement and the asset registry</h2>
+<div class="tw"><table><thead><tr><th>Level</th><th>Name</th><th>May</th></tr></thead><tbody>
+<tr><td>R0</td><td>Observe</td><td>scan and map only</td></tr>
+<tr><td>R1</td><td>Recommend</td><td>test in sandbox, prove, draft and gate fixes; apply nothing</td></tr>
+<tr><td>R2</td><td>Act with approval</td><td>stage a verified fix; apply after human sign-off</td></tr>
+<tr><td>R3</td><td>Act autonomously</td><td>apply verified fixes within standing orders</td></tr>
+</tbody></table></div>
+<p>The <b>asset registry</b> (<code>raksha/data/assets.json</code>) names each system, its mission function, owner unit and tier. The tier caps the level: mission-critical systems are recommend-only with two approvers. Risky patches (touching authentication or crypto) step down automatically. Unknown systems are treated cautiously.</p>
+
+<h2 id="c29"><span class="n">29</span>Risk and scoring</h2>
+<ul>
+<li><b>CVSS 3.1</b> score computed exactly from the finding; CVSS 4.0 vector recorded (its score table is not bundled, so no score is invented).</li>
+<li><b>MITRE ATT&amp;CK and D3FEND</b> labels: the attacker technique a weakness enables and the matching defence.</li>
+<li><b>Mission impact:</b> severity weighted by the asset's tier.</li>
+<li><b>Attack graph:</b> how findings chain across the estate; the cheapest path is highlighted.</li>
+<li><b>Calibration:</b> each lane's trust is measured against ground truth, with confidence intervals.</li>
+</ul>
+<div class="box term"><span class="t">Terms explained</span><p><dfn>CVSS</dfn>: the standard 0–10 severity score for weaknesses. <dfn>ATT&amp;CK</dfn>: MITRE's catalogue of attacker techniques. <dfn>D3FEND</dfn>: MITRE's matching catalogue of defences.</p></div>
+
+<h2 id="c30"><span class="n">30</span>Post-quantum readiness</h2>
+<p>Future quantum computers will break today's public-key cryptography. RAKSHA inventories every cryptographic primitive in the estate (where RSA, elliptic curves and weak hashes are used) and produces a migration plan to quantum-safe algorithms, shown on its own console screen.</p>
+<div class="takeaways"><span class="t">Key takeaways</span><ul><li>Two kinds of finding (read-only and run-the-code), one record, one gate.</li><li>The gate and the red team decide; the model only proposes.</li><li>Everything is sealed, signed, chained and replayable.</li></ul></div>
+<div class="note"><span class="t">Your notes · Part III</span><div class="lines"></div><div class="lines"></div></div>
+
+<div class="part" id="part4"><div class="k">Part IV</div><h1>Project memory and learning</h1><p class="lede">Every project gets an identity and a signed, versioned history, so its owner can see their security any time, and the system learns which faults keep coming back.</p></div>
+
+<h2 id="c31"><span class="n">31</span>Project identity</h2>
+<p>Each project gets one ID for life, like <code>PRJ-mixed-estate-36273DF0</code>. It is recognised by its name and the shape of its files, not by where it sits on disk and not by file contents, so a patch never changes the ID and scanning from a different folder finds the same project. A different project with the same name gets its own ID.</p>
+<div class="box built"><span class="t">Built</span><p><code>raksha/projects.py</code>. Everything is stored on the box under <code>RAKSHA_HOME</code> (default <code>~/.raksha</code>).</p></div>
+
+<h2 id="c32"><span class="n">32</span>Versioned reports</h2>
+<p>Each run writes the next report version: v1, v2, v3. Every version is signed and chained to the one before, like the journal. Nobody can quietly drop a finding between v3 and v4, edit an old report, or remove one; verification would fail for every later version.</p>
+
+<h2 id="c33"><span class="n">33</span>The colour-coded "what changed" report</h2>
+<div class="tw"><table><thead><tr><th>Mark</th><th>Meaning</th><th>Rule</th></tr></thead><tbody>
+<tr><td><span class="chip c-built">✓ fixed</span></td><td>Gone since last version</td><td>Only when the absence is itself a proof (a deterministic re-check no longer matches)</td></tr>
+<tr><td><span class="chip c-plain" style="color:var(--ink2);border-color:var(--ink2);background:var(--eng-bg)">? not re-found</span></td><td>A crash not seen this run</td><td>Shown, but never counted as fixed</td></tr>
+<tr><td><span class="chip c-gap">✚ new</span></td><td>Not in the last version</td><td>Includes anything a patch introduced</td></tr>
+<tr><td><span class="chip c-part">● still open</span></td><td>In both versions</td><td>With how many versions it has been open</td></tr>
+<tr><td><span class="chip c-plain">⚑ needs a human</span></td><td>RAKSHA may not or cannot close it</td><td>With the reason and a checklist</td></tr>
+</tbody></table></div>
+<p>Colour never appears alone: every line carries an icon and a word, so the report works for colour-blind readers and on a black-and-white printout.</p>
+
+<h2 id="c34"><span class="n">34</span>Needs a human</h2>
+<div class="tw"><table><thead><tr><th>Reason</th><th>Why a person</th></tr></thead><tbody>
+<tr><td>Rotate a credential</td><td>Only its owner can revoke and reissue it</td></tr>
+<tr><td>Policy decision</td><td>Who may call an endpoint is the system owner's call</td></tr>
+<tr><td>Dependency upgrade</td><td>A prepared version bump needs a real build to verify</td></tr>
+<tr><td>Crypto migration</td><td>Changing algorithms needs a key and data plan</td></tr>
+<tr><td>Gate could not certify</td><td>Proven weakness, no fix passed all five checks</td></tr>
+<tr><td>Recommend-only asset</td><td>The fix is proven, but rules of engagement require approval</td></tr>
+</tbody></table></div>
+<p>Each item comes with a checklist. When someone marks it done, RAKSHA does not take their word for it: the next run re-checks, and the report says "confirmed closed" or "still present".</p>
+
+<h2 id="c35"><span class="n">35</span>Score, deadlines, exposure-days, secrets, certificate</h2>
+<ul>
+<li><b>Posture score</b> (0–100): 100 minus weighted open weaknesses (severity × asset tier). The breakdown always adds up exactly. Below the evidence floor it shows "n/a", never a guess.</li>
+<li><b>Deadlines:</b> each severity has a fix deadline (critical 7 days, high 30, …), tightened for mission-critical systems. <b>Exposure-days</b> counts how long each serious weakness has stayed open.</li>
+<li><b>Secrets tracker:</b> every leaked credential, whether it was rotated, and for how long it was exposed.</li>
+<li><b>Data-handling statement:</b> what was read, and the measured proof that nothing left the box during the run.</li>
+<li><b>Attack-surface drift:</b> a warning when a new version adds a network listener, file upload or privileged call, even before any bug is found.</li>
+<li><b>Readiness certificate:</b> a signed statement ("as of v7: no open critical weakness, all fixes proven, 3 items await a human"). Issued only when the record supports it.</li>
+</ul>
+
+<h2 id="c36"><span class="n">36</span>Self-learning</h2>
+<div class="box plain"><span class="t">In plain words</span><p>RAKSHA studies its own history across projects. It counts which kinds of fault keep recurring, which fixed faults came back, and which unfamiliar libraries appear. From that it proposes guidelines for ACG and learns new things to watch for, but nothing it learns takes effect without proof or approval.</p></div>
+<ul>
+<li><b>Recurring-fault analytics:</b> by fault family, language, component and owner unit, with trends and regressions.</li>
+<li><b>Guideline proposals for ACG:</b> a fault family seen across two or more projects becomes a draft rule with evidence counts, anonymised examples and the proven fix pattern. It changes nothing until a named person approves it.</li>
+<li><b>Learning new technology:</b> unfamiliar libraries are logged; a lesson (for example, "treat this call as privileged") starts on probation.</li>
+</ul>
+
+<h2 id="c37"><span class="n">37</span>Keeping learning safe</h2>
+<ul>
+<li>Evidence counts only when it comes from a gate-verified record.</li>
+<li>A lesson on probation applies only inside the project that proposed it. It is promoted only after three verified cases from at least two different projects.</li>
+<li>One false alarm demotes a lesson at once, and the project that taught it is quarantined.</li>
+<li>Every lesson keeps its full history, and any lesson can be rolled back with one click; the test suite proves rollback restores prior behaviour.</li>
+</ul>
+
+<h2 id="c38"><span class="n">38</span>Pre-merge check and compliance pack</h2>
+<p><b>Pre-merge check</b> (<code>python -m raksha.premerge PATH</code>): developers run it before merging a change. It blocks on an approved guideline, on the return of a previously fixed weakness, or on anything critical. <b>Compliance pack:</b> a quarter's signed reports and certificates bundled as verifier media, so an auditor re-checks every signature and the chain on their own machine.</p>
+<div class="box gapb"><span class="t">Not built · for the team</span><p>Three Wave 5 items are left to the team: an explainer of how a weakness could be reached (K21), answering questions about a project from its reports (K24), and a process drill on a copy of a project (K30). Generating them was stopped by an automated safety classifier during the build. Their specifications are in <code>PLAN_V2.md</code>, and the code they plug into exists.</p></div>
+<div class="takeaways"><span class="t">Key takeaways</span><ul><li>Every project has an ID and a tamper-proof, versioned history.</li><li>The report shows what changed, colour-coded, and what a human must do.</li><li>Learning proposes; proof and people decide.</li></ul></div>
+<div class="note"><span class="t">Your notes · Part IV</span><div class="lines"></div></div>
+
+<div class="part" id="part5"><div class="k">Part V</div><h1>The operator console (UI and UX)</h1><p class="lede">One offline web page served from the box. Fourteen screens, English and Hindi, readable on a projector.</p></div>
+
+<h2 id="c39"><span class="n">39</span>Design principles</h2>
+<ul>
+<li><b>Offline:</b> one self-contained page; no font, script or image from outside. The air-gap guard checks it.</li>
+<li><b>Honest:</b> every value comes from the record. If something was not measured, the screen shows a dash.</li>
+<li><b>Glanceable:</b> state is shown by colour, icon and word together.</li>
+<li><b>Two voices:</b> each finding can be read as a staff-officer summary or as engineer detail.</li>
+<li><b>Bilingual:</b> one key switches English and Hindi (<span class="hi">हिन्दी</span>).</li>
+<li><b>Projector-ready:</b> a high-contrast mode with heavier lines and larger text.</li>
+</ul>
+
+<h2 id="c40"><span class="n">40</span>Screen-by-screen tour</h2>
+<div class="screen"><h4>1 · Mission Board</h4><p class="kv">Every target as a card: green (built and deep-tested), amber (build-free mode, still finding), red (could not read). Counts by status and the rules-of-engagement level per target.</p></div>
+<div class="screen"><h4>2 · Live Pipeline</h4><p class="kv">Findings flowing through suspected → confirmed → patched → verified, plus the ranked risk register: fix these first.</p></div>
+<div class="screen"><h4>3 · Event Log</h4><p class="kv">The run's story in plain sentences: "harness synthesized for parse_record", "candidate 2 rejected at CLEAN_REFUZZ", "VERIFIED; fix proven (template lane)".</p></div>
+<div class="screen"><h4>4 · Finding Detail (the main screen)</h4><p class="kv">Search, filter and sort; the five-check gate strip; split-screen replay (vulnerable build fires, patched build silent); the patch; red-team result; proofs; staff and engineer views; operator actions.</p></div>
+<div class="screen"><h4>5 · Attack Graph</h4><p class="kv">Findings as a graph of steps across the estate, with the cheapest path lit and each edge explained on hover.</p></div>
+<div class="screen"><h4>6 · Estate Map</h4><p class="kv">Targets by asset tier against status, and the top three risks.</p></div>
+<div class="screen"><h4>7 · Post-Quantum</h4><p class="kv">The cryptography inventory and the migration table: file, line, primitive, replacement.</p></div>
+<div class="screen"><h4>8 · Evidence Vault</h4><p class="kv">Pick any reportable finding and press Verify: every hash and the signature are re-checked live.</p></div>
+<div class="screen"><h4>9 · Scorecard</h4><p class="kv">The jury's measures, live: precision, findings, fixes, speed, model calls and tokens, cloud calls (0), sandbox status, what the run did not establish.</p></div>
+<div class="screen"><h4>10 · Commander's Brief</h4><p class="kv">A JSSD-style brief per finding, in English or Hindi, exportable as PDF (English).</p></div>
+<div class="screen"><h4>11 · Demo Beats</h4><p class="kv">Run the "it says no" sequence; ingest a judge's media with a live time-to-first-finding clock; the egress counter for the cable pull.</p></div>
+<div class="screen"><h4>12 · Time-lapse</h4><p class="kv">A slider over a recorded run's journal: findings, targets and what the system was doing at any moment.</p></div>
+<div class="screen"><h4>13 · Projects</h4><p class="kv">Every project's latest score and open items; per project the colour-coded "what changed", needs-a-human checklists with Mark done, version picker, English/Hindi one-page summary, readiness certificate, and developer / commander / auditor views; the mission view and posture over versions.</p></div>
+<div class="screen"><h4>14 · Learning</h4><p class="kv">Draft guidelines for ACG with Approve / Reject (a name is required), lessons with Roll back, recurring-fault analytics and unfamiliar libraries.</p></div>
+
+<h2 id="c41"><span class="n">41</span>Operator actions</h2>
+<p>Approve, reject, mark false positive, re-run the red team, export a bundle, issue an advisory, run the demo beat, ingest media, zero the egress counter, mark a needs-human item done, issue a certificate, decide a guideline, roll back a lesson. Every action is recorded in the journal with who did it and why. Actions need a per-session token that only the served page holds, so a stray page on the machine cannot trigger them.</p>
+
+<h2 id="c42"><span class="n">42</span>Accessibility</h2>
+<ul><li>Keyboard: number keys switch screens, <code>/</code> searches, <code>j</code>/<code>k</code> move through findings, <code>h</code> high contrast, <code>e</code> language, <code>?</code> help.</li>
+<li>Colour always paired with icon and word.</li><li>Light and dark themes; works on a phone width.</li></ul>
+
+<h2 id="c43"><span class="n">43</span>What people take away</h2>
+<div class="tw"><table><thead><tr><th>Output</th><th>For</th><th>Form</th></tr></thead><tbody>
+<tr><td>Evidence bundle</td><td>Engineers, auditors</td><td>Signed folder, replay script</td></tr>
+<tr><td>Commander's Brief</td><td>Commanders</td><td>On screen (English/Hindi), PDF (English)</td></tr>
+<tr><td>Findings export</td><td>Staff</td><td>CSV, Excel</td></tr>
+<tr><td>SARIF</td><td>Other security tools</td><td>Standard JSON format</td></tr>
+<tr><td>Internal-CERT advisory</td><td>A CERT</td><td>Signed, numbered RAKSHA-CERT-YYYY-NNNN</td></tr>
+<tr><td>Project report and one-page summary</td><td>Project owners</td><td>Signed, versioned; HTML, phone and print friendly</td></tr>
+<tr><td>Readiness certificate, compliance pack</td><td>Approval files, auditors</td><td>Signed documents, verifier media</td></tr>
+<tr><td>Verifier media</td><td>Judges</td><td>A folder (USB) that re-checks everything with only Python</td></tr>
+</tbody></table></div>
+<div class="box term"><span class="t">Term explained</span><p><dfn>SARIF</dfn>: a standard file format for sharing static-analysis results between tools. <dfn>CERT</dfn>: a computer emergency response team, which issues security advisories.</p></div>
+<div class="note"><span class="t">Your notes · Part V</span><div class="lines"></div></div>
+
+<div class="part" id="part6"><div class="k">Part VI</div><h1>Trust and honesty</h1><p class="lede">How every claim is backed, what has been measured, and where the limits are.</p></div>
+
+<h2 id="c44"><span class="n">44</span>How claims are proven</h2>
+<ul>
+<li><b>Tests:</b> 863 automated tests, run with every slow language lane on; 0 failures at the last run.</li>
+<li><b>Benchmark:</b> <code>python -m raksha.benchmark</code> regenerates every number in the benchmark report from a real run.</li>
+<li><b>Negative controls:</b> a deliberately clean estate scanned after every change; any finding there is a false alarm.</li>
+<li><b>Baseline comparison:</b> the same targets through a standard static scanner and through RAKSHA.</li>
+<li><b>Recall:</b> measured where the number of real bugs is known.</li>
+</ul>
+
+<h2 id="c45"><span class="n">45</span>Measured results so far</h2>
+<div class="box partial"><span class="t">Read with care</span><p>These come from RAKSHA's own small, curated demo set. They are a reproducible baseline, not a statistical claim about real-world code.</p></div>
+<div class="tw"><table><thead><tr><th>Measure</th><th>Result</th><th>Set</th></tr></thead><tbody>
+<tr><td>Reports carrying a replaying reproducer</td><td class="num">100%</td><td>by construction</td></tr>
+<tr><td>False alarms on clean controls</td><td class="num">0 of 11</td><td>negative-control estate</td></tr>
+<tr><td>Static scanner: reports / with reproducer / defect files hit</td><td class="num">8 / 0 / 5</td><td>7 demo targets</td></tr>
+<tr><td>RAKSHA: reports / with reproducer / defect files hit</td><td class="num">7 / 7 / 7</td><td>7 demo targets</td></tr>
+<tr><td>Recall, mutation factory</td><td class="num">100% (8/8)</td><td>disguised variants of known bugs</td></tr>
+<tr><td>Fix rate, mutation factory</td><td class="num">75%</td><td>same variants</td></tr>
+<tr><td>Recall, fuzzable demo ground truth</td><td class="num">54.5% (6/11)</td><td>misses named; some need toolchains absent here</td></tr>
+<tr><td>Verified fixes needing no AI call</td><td class="num">100%</td><td>demo set</td></tr>
+<tr><td>"It says no" beat, all four verdicts as scripted</td><td class="num">≈ 25 s</td><td>C demo target</td></tr>
+<tr><td>Verifier media full check</td><td class="num">≈ 0.3 s</td><td>demo media</td></tr>
+<tr><td>Intake time to first finding</td><td class="num">≈ 4 s</td><td>mixed-language estate</td></tr>
+</tbody></table></div>
+
+<h2 id="c46"><span class="n">46</span>The threat model: how RAKSHA protects itself</h2>
+<p>RAKSHA reads untrusted code, so it treats every target as potentially hostile. Sixteen attack surfaces are listed in <code>docs/threat-model.md</code>, each with its control and test. Highlights: the sandbox door; refusing links and special files at intake; patch hygiene against steered fixes; replay scripts that quote every argument; random per-run names; sealed mode for the model; signed and chained records.</p>
+
+<h2 id="c47"><span class="n">47</span>The claim audit</h2>
+<p><code>docs/claim-audit.md</code> maps every claim made to the jury to the code and test behind it, or rewords the claim. Nothing in the brief claims more than the build does.</p>
+
+<h2 id="c48"><span class="n">48</span>Honest limitations</h2>
+<div class="box gapb"><span class="t">Limitations</span><ul>
+<li>No measured results yet on large, real-world codebases (the real-ARVO benchmark run is not built here).</li>
+<li>Deep testing depends on finding an entry point that takes input; unusual code may yield no crash in the time budget.</li>
+<li>Without a local model, automatic fixes are limited to known shapes.</li>
+<li>The 36-hour endurance runs and the model server under load have not been run on the finale hardware.</li>
+<li>Bundles use symmetric (HMAC) signatures; public-key signing is the ideal state.</li>
+<li>The Hindi Commander's Brief is on screen and in text, not in the PDF export.</li>
+<li>K21, K24 and K30 are not built.</li></ul></div>
+<div class="note"><span class="t">Your notes · Part VI</span><div class="lines"></div></div>
+
+<div class="part" id="part7"><div class="k">Part VII</div><h1>Deployment and the finale</h1><p class="lede">The sealed box, how it is installed, how the demo runs, and how to prepare.</p></div>
+
+<h2 id="c49"><span class="n">49</span>The sealed box</h2>
+<ul>
+<li><b>Hardware:</b> one machine with a 32 GB GPU for the model; a CPU-only fallback profile exists.</li>
+<li><b>Containers:</b> the RAKSHA image (orchestrator and console), the sandbox image (where target code runs, no network), and the model server (vLLM) on an internal network with no route out. The console is published only to the machine itself.</li>
+<li><b>Install:</b> <code>deploy/install.sh</code> from the sealed SSD with the cable out: verify the bundle checksums, load the carried images (no download), confirm the sandbox is present, start the stack.</li>
+</ul>
+
+<h2 id="c50"><span class="n">50</span>Profiles</h2>
+<div class="tw"><table><thead><tr><th>Profile</th><th>For</th><th>Effect</th></tr></thead><tbody>
+<tr><td>Datacenter</td><td>The finale GPU box</td><td>Full budgets</td></tr>
+<tr><td>Node</td><td>A smaller server</td><td>Reduced budgets</td></tr>
+<tr><td>Edge</td><td>A laptop or field machine</td><td>Smallest budgets, slices still run</td></tr>
+<tr><td>CPU-only</td><td>No GPU available</td><td>Model on CPU or model-free</td></tr>
+</tbody></table></div>
+
+<h2 id="c51"><span class="n">51</span>The demo arc</h2>
+<ol>
+<li>The problem, in one line.</li>
+<li><b>Pull the cable:</b> egress counter flat, cloud calls 0, and the system keeps running.</li>
+<li>Mission Board lights up; amber means "build-free mode, still finding".</li>
+<li>A famous weakness (Log4Shell) is found and proven live.</li>
+<li>Split-screen proof: vulnerable build fires, patched build silent.</li>
+<li><b>It says no:</b> three bad fixes refused on screen, the good one accepted.</li>
+<li>Vaccine sweep: one fix, the same mistake found in other systems.</li>
+<li>Rules of engagement: a critical system's fix now waits for two signatures.</li>
+<li>Commander's Brief in Hindi; a project's v1 → v2 report; the judge's own media ingested live.</li>
+</ol>
+
+<h2 id="c52"><span class="n">52</span>Rehearsals on the finale hardware</h2>
+<p>Run the whole system on the actual finale machine before the event: install from the SSD with the cable out; two long runs (up to 36 hours) on unseen code to catch slow failures such as a filling disk, creeping memory or a stalled model server; practise the three scripted beats with the presenter; record a backup video on two devices. Steps are in <code>docs/rehearsal-runbook.md</code>.</p>
+
+<h2 id="c53"><span class="n">53</span>Fallback ladder</h2>
+<ol><li>Model server down: continue model-free (templates, memory) and say so.</li><li>A language toolchain missing: that lane goes amber; build-free still runs.</li><li>Console problem: the command-line slices print the same results.</li><li>Live demo fails: narrate over the recorded backup.</li></ol>
+
+<h2 id="c54"><span class="n">54</span>Needed from the team</h2>
+<div class="tw"><table><thead><tr><th>Item</th><th>Why</th><th>Status</th></tr></thead><tbody>
+<tr><td>Serve a coding model on the box (vLLM) and set the endpoint</td><td>Broader automatic fixes</td><td><span class="chip c-part">to do</span></td></tr>
+<tr><td>Add Node, Go, Rust and clang to the images</td><td>Deep lanes for those languages</td><td><span class="chip c-part">to do</span></td></tr>
+<tr><td>Generate a deployment signing key at install</td><td>Bundles not on the demo key</td><td><span class="chip c-part">to do</span></td></tr>
+<tr><td>Fill the asset registry with the jury's systems</td><td>Correct tiers and approvals</td><td><span class="chip c-part">on the day</span></td></tr>
+<tr><td>Two long runs, three beats, backup recording</td><td>Proven on the real box</td><td><span class="chip c-part">to do</span></td></tr>
+<tr><td>Build K21, K24, K30 (optional)</td><td>Complete Wave 5</td><td><span class="chip c-gap">not built</span></td></tr>
+</tbody></table></div>
+<div class="note"><span class="t">Your notes · Part VII</span><div class="lines"></div></div>
+
+<div class="part" id="part8"><div class="k">Part VIII</div><h1>Present state and ideal state</h1><p class="lede">Where we are now, wave by wave, and what the finished system should look like.</p></div>
+
+<h2 id="c55"><span class="n">55</span>What is built, wave by wave</h2>
+<div class="tw"><table><thead><tr><th>Wave</th><th>Theme</th><th>Status</th></tr></thead><tbody>
+<tr><td>0</td><td>Foundations: event journal and resume, crash signatures, weakness families, profiles, build flavours</td><td><span class="chip c-built">built</span></td></tr>
+<tr><td>1</td><td>Finding and proving: multi-bug campaigns, new oracles, supply chain, Java driver, binaries, behaviour baseline, rollback proof, threat model</td><td><span class="chip c-built">built</span></td></tr>
+<tr><td>2</td><td>Reasoning: solver proofs, guided model output, cross-language fix memory, model roles, calibration, CVSS and ATT&amp;CK</td><td><span class="chip c-built">built</span></td></tr>
+<tr><td>3</td><td>The console: 10 screens, operator actions, Hindi, exports, high contrast</td><td><span class="chip c-built">built</span></td></tr>
+<tr><td>4</td><td>Jury and product: "it says no", intake, egress counter, verifier media, advisory, time-lapse, baseline, recall, claim audit</td><td><span class="chip c-built">built</span> · J3 <span class="chip c-gap">reworded</span></td></tr>
+<tr><td>5</td><td>Project memory and learning: IDs, versioned reports, needs-a-human, score, certificate, learning, pre-merge, compliance pack, Projects and Learning screens</td><td><span class="chip c-built">built</span> · K21/K24/K30 <span class="chip c-gap">team</span></td></tr>
+</tbody></table></div>
+
+<h2 id="c56"><span class="n">56</span>What is left</h2>
+<ul>
+<li><b>Team steps</b> (Chapter 54): model server, toolchains, signing key, asset registry, rehearsals.</li>
+<li><b>Not built:</b> real-ARVO benchmark runner (J3); K21, K24, K30.</li>
+<li><b>Never run here:</b> the long endurance runs and model under load on finale hardware.</li>
+</ul>
+
+<h2 id="c57"><span class="n">57</span>Present state vs ideal state</h2>
+<div class="grid2">
+<div class="status-now"><h4>Present state (today)</h4><p>A complete, tested system that runs offline on one machine. It finds and proves weaknesses in six languages plus any language build-free, fixes known shapes without AI, judges every fix with five checks, signs everything, keeps a versioned history per project and shows it all on a 14-screen bilingual console. It has been demonstrated on RAKSHA's own demo targets, without a model server, toolchain-complete images or a run on the finale hardware.</p></div>
+<div class="status-ideal"><h4>Ideal state (finished)</h4><p>A sealed box that, installed in twenty minutes with the cable out, ingests any estate the jury hands over, deep-tests every language with full toolchains, fixes most proven weaknesses with a local model under the gate, signs with deployment keys, survives 36 hours unattended, and gives every project owner, commander and auditor a live, versioned, colour-coded picture of their security that they can verify themselves.</p></div>
+</div>
+<div class="tw"><table><thead><tr><th>Area</th><th>Present</th><th>Ideal</th></tr></thead><tbody>
+<tr><td>AI model</td><td>Wired, optional; none served here</td><td>Local ~32B coding model on the GPU, measured fix rate on real code</td></tr>
+<tr><td>Languages (deep)</td><td>C/C++, Python, Java in the image; JS, Go, Rust need toolchains</td><td>All six in the sealed images, plus more where demand exists</td></tr>
+<tr><td>Real-world evidence</td><td>Demo-set baseline, recall on known sets</td><td>Published win/loss table on real public bug benchmarks, run on a prep machine</td></tr>
+<tr><td>Fix coverage without AI</td><td>A few template shapes + fix memory</td><td>A larger template library grown from approved guidelines and proven fixes</td></tr>
+<tr><td>Signing</td><td>HMAC; demo key unless a key is provided</td><td>Deployment keys generated at install; public-key and post-quantum signatures</td></tr>
+<tr><td>Endurance</td><td>Harness and watchdog built, short runs only</td><td>Two clean 36-hour runs on the finale box</td></tr>
+<tr><td>Project memory</td><td>Versioned signed reports, learning on probation</td><td>Months of history across the estate driving approved ACG guidelines</td></tr>
+<tr><td>Owner features</td><td>Projects and Learning screens; K21/K24/K30 not built</td><td>All of Wave 5, including questions answered from the record</td></tr>
+<tr><td>Integration</td><td>Pre-merge command</td><td>Hooked into every team's build pipeline, alerts to owners</td></tr>
+<tr><td>Assets</td><td>Demo registry</td><td>Every real system registered with tier, owner and mission</td></tr>
+</tbody></table></div>
+<h3>How the finished system should look and feel</h3>
+<ul>
+<li><b>For the operator:</b> drop in media, watch the board fill, approve fixes with evidence in front of them.</li>
+<li><b>For a project owner:</b> open their project any time and see v1 → v12, what changed, and the short list of what is theirs to do.</li>
+<li><b>For a commander:</b> a one-page Hindi or English summary, mission impact, deadlines, and a readiness certificate for the approval file.</li>
+<li><b>For ACG:</b> a quarterly pack of proposed guidelines backed by evidence, adopted with a signature.</li>
+<li><b>For an auditor or judge:</b> a USB stick that re-checks every claim on their own laptop in under a minute.</li>
+</ul>
+
+<h2 id="c58"><span class="n">58</span>Future ideas</h2>
+<ul>
+<li>A fast classifier model (for example a decision model such as Jev) for triage and labelling, advisory only, where an on-premise version exists.</li>
+<li>Continuous mode across the estate, re-checking every project when the advisory database updates.</li>
+<li>More languages and frameworks learned under probation.</li>
+<li>Spin-offs: a CERT advisory service, a developer training tool built from proven fixes, a supplier-code acceptance check.</li>
+</ul>
+
+<h2 id="c59"><span class="n">59</span>Your suggestions</h2>
+<div class="note"><span class="t">Overall</span><div class="lines"></div><div class="lines"></div></div>
+<div class="note"><span class="t">Features to add or change</span><div class="lines"></div><div class="lines"></div></div>
+<div class="note"><span class="t">For the demo and the jury</span><div class="lines"></div><div class="lines"></div></div>
+
+<div class="part" id="partA"><div class="k">Appendices</div><h1>Reference</h1></div>
+
+<h2 id="ga">A · Glossary</h2>
+<div class="tw"><table><thead><tr><th>Term</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Advisory</td><td>A public notice that a library version has a flaw</td></tr>
+<tr><td>Air gap</td><td>Physically disconnected from all outside networks</td></tr>
+<tr><td>ASan / UBSan / LSan / TSan</td><td>Sanitizers that detect memory errors / undefined behaviour / leaks / data races</td></tr>
+<tr><td>Attack graph</td><td>How weaknesses could chain from one system to another</td></tr>
+<tr><td>Build-free</td><td>A check that reads files without compiling or running anything</td></tr>
+<tr><td>Bundle</td><td>A signed folder of evidence for one finding</td></tr>
+<tr><td>Corpus</td><td>A set of normal test inputs</td></tr>
+<tr><td>Coverage</td><td>Which lines of code an input actually runs</td></tr>
+<tr><td>CVSS</td><td>The standard 0–10 severity score</td></tr>
+<tr><td>CWE</td><td>A standard number for a type of weakness</td></tr>
+<tr><td>Dependency</td><td>A library your code uses</td></tr>
+<tr><td>Deterministic</td><td>Same input, same answer, every time</td></tr>
+<tr><td>Differential check</td><td>Comparing old and new behaviour on the same inputs</td></tr>
+<tr><td>Egress</td><td>Data leaving the machine over a network</td></tr>
+<tr><td>Fuzzing</td><td>Trying many varied inputs to make a program fail</td></tr>
+<tr><td>Gate</td><td>The five checks a fix must pass</td></tr>
+<tr><td>Harness</td><td>A small driver that feeds inputs to code under test</td></tr>
+<tr><td>Hash / hash chain</td><td>A fingerprint of data / a list where each entry fingerprints the last</td></tr>
+<tr><td>HMAC</td><td>A signature made with a shared secret key</td></tr>
+<tr><td>LLM</td><td>Large language model, an AI that writes text and code</td></tr>
+<tr><td>Oracle</td><td>An alarm that rings only on a real failure</td></tr>
+<tr><td>Patch</td><td>A change to code that fixes a weakness</td></tr>
+<tr><td>POV / reproducer</td><td>The exact input that makes a weakness happen</td></tr>
+<tr><td>Red team</td><td>An independent check that tries to show a fix does not hold</td></tr>
+<tr><td>ROE</td><td>Rules of engagement: what RAKSHA may do on each system</td></tr>
+<tr><td>Sandbox</td><td>A sealed container with no network where untrusted code runs</td></tr>
+<tr><td>SARIF</td><td>A standard file format for security findings</td></tr>
+<tr><td>SBOM</td><td>Software bill of materials, an ingredients list</td></tr>
+<tr><td>SMT solver (Z3)</td><td>A program that proves mathematical facts about code</td></tr>
+<tr><td>Template</td><td>A known fix shape applied without AI</td></tr>
+<tr><td>vLLM</td><td>Software that serves an AI model on a GPU</td></tr>
+</tbody></table></div>
+
+<h2 id="gb">B · Project map</h2>
+<div class="tw"><table><thead><tr><th>Where</th><th>What</th></tr></thead><tbody>
+<tr><td><code>raksha/orchestrator.py</code></td><td>The live session; entry point of the deployment</td></tr>
+<tr><td><code>raksha/finding.py</code></td><td>The finding record and its states</td></tr>
+<tr><td><code>raksha/lanes/</code></td><td>Build-free lanes</td></tr>
+<tr><td><code>raksha/harness/</code>, <code>raksha/adapters/</code></td><td>Deep lanes, synthesized harnesses, language adapters</td></tr>
+<tr><td><code>raksha/oracles/</code></td><td>The alarm bells</td></tr>
+<tr><td><code>raksha/autorepair.py</code>, <code>repair.py</code>, <code>hygiene.py</code></td><td>Repair ladder and patch hygiene</td></tr>
+<tr><td><code>raksha/gate/</code></td><td>The five-check gate</td></tr>
+<tr><td><code>raksha/redteam.py</code></td><td>The red team</td></tr>
+<tr><td><code>raksha/bundle.py</code>, <code>journal.py</code></td><td>Evidence bundles and the session journal</td></tr>
+<tr><td><code>raksha/sandbox.py</code>, <code>airgap.py</code></td><td>Sandbox door, air-gap guard, egress counter</td></tr>
+<tr><td><code>raksha/projects.py</code>, <code>reports.py</code>, <code>learning.py</code>, <code>views.py</code></td><td>Wave 5: identity, reports, learning, views</td></tr>
+<tr><td><code>console/</code></td><td>The operator console</td></tr>
+<tr><td><code>deploy/</code></td><td>Images, compose files, install script</td></tr>
+<tr><td><code>docs/</code>, <code>RAKSHA_AI_Dossier/</code></td><td>Reports, runbook, threat model, claim audit, dossier</td></tr>
+</tbody></table></div>
+
+<h2 id="gc">C · Commands</h2>
+<pre>python -m raksha.orchestrator          # serve the console on :8080
+python -m raksha.saysno                # the "it says no" beat
+python -m raksha.benchmark             # regenerate the benchmark report
+python -m raksha.baseline --report     # static scanner vs RAKSHA
+python -m raksha.recall --report       # recall where it is knowable
+python -m raksha.premerge PATH         # pre-merge check
+python -m raksha.verifiermedia demo OUT  # build judge media
+python -m raksha.timelapse show FILE   # replay a recorded run
+python -m raksha.airgap                # air-gap guard
+python -m pytest                       # the test suite</pre>
+
+<h2 id="gd">D · Settings</h2>
+<div class="tw"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody>
+<tr><td><code>RAKSHA_INFERENCE_BASE_URL</code></td><td>Where the model server is</td></tr>
+<tr><td><code>RAKSHA_SEALED</code></td><td>1 (default) refuses any model not on the box</td></tr>
+<tr><td><code>RAKSHA_REPAIR_MODEL</code>, <code>RAKSHA_ADVISOR_MODEL</code></td><td>Which models to use</td></tr>
+<tr><td><code>RAKSHA_SANDBOX_IMAGE</code>, <code>RAKSHA_REQUIRE_SANDBOX</code></td><td>The sandbox image; refuse to run target code without it</td></tr>
+<tr><td><code>RAKSHA_BUNDLE_KEY_FILE</code></td><td>Deployment signing key</td></tr>
+<tr><td><code>RAKSHA_HOME</code></td><td>Where project reports and learning are stored</td></tr>
+<tr><td><code>RAKSHA_INTAKE_ROOTS</code></td><td>Which media folders intake accepts</td></tr>
+<tr><td><code>RAKSHA_TARGETS</code>, <code>RAKSHA_OUT</code></td><td>Where targets are read and results written</td></tr>
+</tbody></table></div>
+
+<h2 id="ge">E · Evidence index</h2>
+<ul><li><code>docs/benchmark-report.md</code>: results, baseline, recall</li><li><code>docs/claim-audit.md</code>: every claim mapped</li><li><code>docs/threat-model.md</code>: 16 surfaces and controls</li><li><code>docs/rehearsal-runbook.md</code>: rehearsals and demo beats</li><li><code>PLAN_V2.md</code>: every item, wave by wave, with status</li><li><code>tests/</code>: 863 tests</li></ul>
+
+<h2 id="gf">F · Sources</h2>
+<ul><li>AI Kavach problem statement (competition brief, dossier file 01)</li><li>DARPA AI Cyber Challenge (AIxCC), the modern cyber-reasoning reference</li><li>MITRE CWE, ATT&amp;CK, D3FEND; FIRST CVSS; OSV advisory database</li><li>ARVO and AutoPatchBench (external benchmarks, for the ideal state)</li></ul>
+<p class="meta">End of the book.</p>
+
+</div>
+</main>
+</div>
+<script>
+(function(){
+  var nav=document.getElementById("toc"), b=document.getElementById("toc-toggle");
+  if(b){ b.addEventListener("click",function(){ var o=nav.classList.toggle("open"); b.setAttribute("aria-expanded",o?"true":"false"); }); }
+  document.querySelectorAll("#toc-list a").forEach(function(a){ a.addEventListener("click",function(){ if(window.innerWidth<=900){ nav.classList.remove("open"); b.setAttribute("aria-expanded","false"); } }); });
+})();
+</script>
+</body></html>
