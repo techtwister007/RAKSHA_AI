@@ -22,9 +22,14 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-_EXCLUDE = {"raksha_harness.py", "raksha_cov.py", "sinkguard.py", "raksha_sinkguard.py",
-            "jssinkguard.js"}
+_EXCLUDE: set[str] = set()   # filled at start: the harness file named on the command line
 _SKIP_DIRS = {"node_modules", ".git", "__pycache__"}
+_TOKEN = ""   # B8: the per-run token in RAKSHA's own file names; set from the harness name
+
+
+def _token_of(name: str) -> str:
+    stem = Path(name).stem
+    return stem.split("_", 1)[1] if stem[:2] in ("h_", "j_") and "_" in stem else ""
 
 
 def _rel(path: str, cwd: str) -> str | None:
@@ -38,7 +43,8 @@ def _rel(path: str, cwd: str) -> str | None:
         return None
     rel = ap[len(cwd) + 1:]
     parts = rel.split(os.sep)
-    if parts[-1] in _EXCLUDE or any(p in _SKIP_DIRS for p in parts):
+    if parts[-1] in _EXCLUDE or any(p in _SKIP_DIRS for p in parts) \
+            or parts[-1] == os.path.basename(__file__) or (_TOKEN and _TOKEN in parts[-1]):
         return None
     return rel
 
@@ -131,13 +137,19 @@ def v8_lines(cov_dir: str, cwd: str) -> set[tuple[str, int]]:
 
 
 def main(argv: list[str]) -> int:
+    global _TOKEN
     if len(argv) >= 2 and argv[0] == "py":
+        _TOKEN = _token_of(argv[1])
+        _EXCLUDE.add(os.path.basename(argv[1]))
         run_python(argv[1], argv[2:])
         return 0
-    if len(argv) == 2 and argv[0] == "v8":
+    if len(argv) in (2, 3) and argv[0] == "v8":
+        _TOKEN = _token_of(argv[2]) if len(argv) == 3 else ""
+        if len(argv) == 3:
+            _EXCLUDE.add(os.path.basename(argv[2]))
         _emit(v8_lines(argv[1], os.path.realpath(os.getcwd())))
         return 0
-    sys.stderr.write("usage: raksha_cov.py py <harness> <input> | v8 <dir>\n")
+    sys.stderr.write("usage: py <harness> <input> | v8 <dir> [guard]\n")
     return 2
 
 

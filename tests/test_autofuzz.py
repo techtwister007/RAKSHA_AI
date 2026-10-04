@@ -113,7 +113,7 @@ def test_autofuzz_reports_nothing_on_a_clean_target(tmp_path):
 def test_fork_server_detects_crash_and_clean_and_survives():
     (ep,) = [e for e in discover(C_TARGET) if e.symbol == "parse_record"]
     q, built = quality_gate(synthesize(ep), C_TARGET)
-    with ForkClient([str(built["root"] / "raksha_harness")], built["root"], env=asan_env()) as c:
+    with ForkClient([str(built["root"] / built["binary"])], built["root"], env=asan_env()) as c:
         crash = bytes([0x01, 0x80]) + b"u" * 40      # length 128 into value[32]
         assert c.run_one(crash) is True              # crash detected
         assert c.run_one(b"\x01\x04abcd") is False   # clean input, same live server

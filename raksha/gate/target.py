@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from .. import names
 from ..sandbox import run_untrusted
 
 
@@ -102,7 +103,7 @@ class CommandTarget:
     run_cmd: str
     test_cmd: str
     added_test_cmd: str | None = None
-    added_test_path: str = "raksha_added_test"
+    added_test_path: str = field(default_factory=lambda: f"t_{names.TOKEN}")
     coverage_cmd: str | None = None
     refuzz_cmd: str | None = None
     apply_patch_cmd: str = "git apply --whitespace=nowarn {patch}"
@@ -136,13 +137,13 @@ class CommandTarget:
 
     def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
         label = ("patched" if patch_diff else "vulnerable") + (":release" if flavour == "release" else "")
-        root = Path(tempfile.mkdtemp(prefix=f"raksha-{label.replace(':', '-')}-"))
+        root = Path(tempfile.mkdtemp(prefix=names.SCRATCH))
         copy = self._sh(f"cp -a {shlex.quote(str(self.source_root))}/. {shlex.quote(str(root))}/", root,
                         untrusted=False)
         if copy.exit_code != 0:
             return BuildResult(False, label, copy.text)
         if patch_diff:
-            patch = root / ".raksha.patch"
+            patch = root / names.dot("patch")
             patch.write_text(patch_diff)
             applied = self._sh(self.apply_patch_cmd.format(patch=shlex.quote(str(patch))), root,
                                untrusted=False)
@@ -212,7 +213,7 @@ class CommandTarget:
         assert build.root is not None
         if not self.refuzz_cmd:
             return []
-        out = Path(tempfile.mkdtemp(prefix="raksha-refuzz-", dir=build.root))
+        out = Path(tempfile.mkdtemp(prefix=names.dot("rf"), dir=build.root))
         self._sh(self.refuzz_cmd.format(root=shlex.quote(str(build.root)), seconds=int(seconds),
                                         out=shlex.quote(str(out))),
                  build.root, timeout=seconds + 60)
@@ -230,5 +231,5 @@ def _discard(build: BuildResult) -> None:
         resolved = Path(root).resolve()
     except OSError:
         return
-    if resolved.parent == tmp and resolved.name.startswith("raksha-"):
+    if resolved.parent == tmp and resolved.name.startswith(("raksha-", names.SCRATCH)):
         shutil.rmtree(resolved, ignore_errors=True)

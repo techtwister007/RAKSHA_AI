@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from raksha.finding import (Finding, Reproducer, ReplayResult, Frame, FixSite, GateCheck,
-                            RepairLane, Status, utcnow, DETERMINISTIC_MATCH)
+                            RepairLane, utcnow, DETERMINISTIC_MATCH)
 
 
 def _dep(target, cve="CVE-2021-44228"):

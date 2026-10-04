@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from raksha.harness import names
 from raksha import autorepair
 from raksha.autorepair import repair
 from raksha.finding import RepairLane, Status
@@ -57,7 +58,7 @@ def test_model_diff_plus_good_test_is_verified_and_shipped(monkeypatch):
     out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
                  corpus=[b"\x01\x04abcd", b"\x02zz"], client=MockClient([completion]))
     assert out.verified and out.lane is RepairLane.LLM
-    assert r.finding.regression_test is not None and "raksha_harness" in r.finding.regression_test
+    assert r.finding.regression_test is not None and names.HARNESS in r.finding.regression_test
 
 
 @pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
@@ -81,4 +82,4 @@ def test_template_regression_generator_verifies_offline():
     assert out.verified and out.lane is RepairLane.TEMPLATE
     # the deterministic (zero-inference) template test was generated AND verified by the gate
     assert r.finding.regression_test is not None
-    assert "REGRESS" in r.finding.regression_test and "raksha_harness" in r.finding.regression_test
+    assert "REGRESS" in r.finding.regression_test and names.HARNESS in r.finding.regression_test

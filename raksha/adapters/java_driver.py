@@ -21,7 +21,6 @@ from __future__ import annotations
 import random
 import re
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,11 +32,12 @@ from ..harness.entrypoints import Entrypoint, _name_bonus
 from ..harness.mutator import _mutate
 from ..minimise import minimise
 from ..oracles.jazzer import JazzerOracle
+from ..harness import names
 from ..sandbox import run_target
 
-DRIVER = "RakshaDriver"
-_OUT = ".raksha_classes"
-_SKIP = {".git", "target", "build", "test", "tests", ".raksha_classes"}
+DRIVER = names.JAVA_DRIVER
+_OUT = names.JAVA_OUT
+_SKIP = {".git", "target", "build", "test", "tests", _OUT}
 
 _PKG = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.MULTILINE)
 _METHOD = re.compile(
@@ -63,7 +63,7 @@ def discover_java(root: str | Path, *, limit: int = 20) -> list[JavaEntrypoint]:
     base = base if base.is_dir() else root
     out: list[JavaEntrypoint] = []
     for p in sorted(base.rglob("*.java")):
-        if any(part in _SKIP for part in p.relative_to(root).parts) or p.name == f"{DRIVER}.java":
+        if any(part in _SKIP for part in p.relative_to(root).parts) or names.is_ours(p.name):
             continue
         text = p.read_text(errors="replace")
         pkg = _PKG.search(text)
@@ -90,8 +90,7 @@ def synthesize_driver(je: JavaEntrypoint) -> str:
     the first throwable, naming the input; a file argument runs that one input."""
     call_arg = "d" if je.arg == "bytes" else "new String(d, java.nio.charset.StandardCharsets.UTF_8)"
     declared = ", ".join(f'"{t}"' for t in je.throws)
-    return f"""// Synthesized by RAKSHA (B5) for {je.fqcn}.{je.ep.symbol} — not part of the target.
-import java.nio.file.*;
+    return f"""import java.nio.file.*;
 import java.util.*;
 
 public final class {DRIVER} {{
@@ -185,7 +184,7 @@ def java_target(work: str | Path, je: JavaEntrypoint, *, timeout: float = 420.0)
     # failing to start is credited with the method's whole span. It cannot tell early-return lines
     # from the rest; the differential corpus and the PoV replay carry the precise evidence.
     span = method_span(work / je.ep.path, je.ep.line)
-    (work / "raksha_cov_lines.txt").write_text(
+    (work / names.dot("lines")).write_text(
         "".join(f"{je.ep.path}:{n}\n" for n in range(span[0], span[1] + 1)))
     return CommandTarget(
         source_root=work,
@@ -193,7 +192,7 @@ def java_target(work: str | Path, je: JavaEntrypoint, *, timeout: float = 420.0)
         run_cmd=f"java -cp {_OUT} {DRIVER} {{input}}",
         test_cmd=tests,
         coverage_cmd=(f"java -cp {_OUT} {DRIVER} {{input}} >/dev/null 2>&1; "
-                      f"[ $? -le 77 ] && cat raksha_cov_lines.txt"),
+                      f"[ $? -le 77 ] && cat {names.dot('lines')}"),
         refuzz_cmd=f"java -cp {_OUT} {DRIVER} --refuzz {{seconds}} {{out}}",
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
         timeout=timeout,
@@ -234,9 +233,9 @@ def java_autofuzz(target_root: str | Path, *, max_execs: int = 4000, batch: int 
     demoted: list[Finding] = []
     execs = 0
     for je in candidates:
-        work = Path(tempfile.mkdtemp(prefix="raksha-java-")) / root.name
+        work = Path(tempfile.mkdtemp(prefix=names.SCRATCH)) / root.name
         shutil.copytree(root, work, symlinks=True,
-                        ignore=shutil.ignore_patterns("target", ".raksha*", _OUT))
+                        ignore=shutil.ignore_patterns("target", ".raksha*", _OUT, f"*{names.TOKEN}*"))
         (work / f"{DRIVER}.java").write_text(synthesize_driver(je))
         built = run_target(_sources_cmd(), str(work), shell=True, timeout=600)
         if built.returncode != 0:
@@ -245,7 +244,7 @@ def java_autofuzz(target_root: str | Path, *, max_execs: int = 4000, batch: int 
         corpus = list(_SEEDS)
         benign: list[bytes] = []
         crashing = None
-        inbox = work / ".raksha_batch"
+        inbox = work / names.dot("batch")
         while execs < max_execs and crashing is None:
             if inbox.exists():
                 shutil.rmtree(inbox)
@@ -266,7 +265,7 @@ def java_autofuzz(target_root: str | Path, *, max_execs: int = 4000, batch: int 
         shutil.rmtree(inbox, ignore_errors=True)
         if crashing is None:
             continue
-        one = work / ".raksha_input"
+        one = work / names.dot("input")
 
         def replay(data: bytes) -> str:
             one.write_bytes(data)

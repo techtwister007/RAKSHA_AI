@@ -22,6 +22,7 @@ from pathlib import Path
 
 from ..finding import Finding, Frame, Reproducer, ReplayResult, utcnow
 from ..gate.target import BuildResult, RunResult, TestResult
+from ..harness import names
 from ..sandbox import run_target
 from ..harness.entrypoints import Entrypoint, discover
 from ..oracles.go_panic import GoOracle
@@ -30,15 +31,14 @@ _FUZZ_TEST = '''package {pkg}
 
 import "testing"
 
-// RAKSHA synthesized fuzz test — generated, not hand-written.
-func FuzzRaksha(f *testing.F) {{
+func {fuzz}(f *testing.F) {{
     f.Add({seed})
     f.Fuzz(func(t *testing.T, {arg} {typ}) {{
         {call}
     }})
 }}
 '''
-_POV_SEED = "raksha_pov"
+_POV_SEED = names.GO_SEED
 _CORPUS_V1 = "go test fuzz v1\n"
 
 
@@ -46,7 +46,7 @@ def _go_env() -> dict:
     env = dict(os.environ)
     env.setdefault("GOFLAGS", "-mod=mod")
     env.setdefault("GOPROXY", "off")
-    env.setdefault("GOCACHE", tempfile.gettempdir() + "/raksha-gocache")
+    env.setdefault("GOCACHE", tempfile.gettempdir() + "/" + names.SCRATCH + "gocache")
     env.setdefault("GOTMPDIR", tempfile.gettempdir())
     return env
 
@@ -59,8 +59,9 @@ def _go_quote(data: bytes) -> str:
 def synthesize_go_test(ep: Entrypoint, pkg: str) -> str:
     if ep.kind == "go_bytes":
         return _FUZZ_TEST.format(pkg=pkg, seed='[]byte("\\x01a")', arg="data", typ="[]byte",
-                                 call=f"{ep.symbol}(data)")
-    return _FUZZ_TEST.format(pkg=pkg, seed='"a"', arg="s", typ="string", call=f"{ep.symbol}(s)")
+                                 call=f"{ep.symbol}(data)", fuzz=names.GO_FUZZ)
+    return _FUZZ_TEST.format(pkg=pkg, seed='"a"', arg="s", typ="string", call=f"{ep.symbol}(s)",
+                             fuzz=names.GO_FUZZ)
 
 
 _GO_CHROME = re.compile(
@@ -102,27 +103,27 @@ class GoFuzzTarget:
 
     def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
         label = "patched" if patch_diff else "vulnerable"
-        root = Path(tempfile.mkdtemp(prefix=f"raksha-go-{label}-"))
+        root = Path(tempfile.mkdtemp(prefix=names.SCRATCH))
         shutil.copytree(self.source_root, root, dirs_exist_ok=True)
         if patch_diff:
-            (root / ".raksha.patch").write_text(patch_diff)
-            applied = self._sh("git apply -p1 .raksha.patch 2>/dev/null || patch -p1 < .raksha.patch", root)
+            (root / names.dot("patch")).write_text(patch_diff)
+            applied = self._sh(f"git apply -p1 {names.dot('patch')} 2>/dev/null || patch -p1 < {names.dot('patch')}", root)
             if applied.exit_code != 0:
                 return BuildResult(False, label, "patch did not apply:\n" + applied.text, root)
         # the synthesized fuzz test is part of the target as far as the gate is concerned
-        (self._pkg(root) / "raksha_fuzz_test.go").write_text(self.fuzz_test)
+        (self._pkg(root) / names.GO_FILE).write_text(self.fuzz_test)
         built = self._sh("go build ./...", self._pkg(root))
         return BuildResult(built.exit_code == 0, label, built.text[-800:], root)
 
     def _write_pov(self, build: BuildResult, data: bytes) -> None:
-        d = self._pkg(build.root) / "testdata" / "fuzz" / "FuzzRaksha"
+        d = self._pkg(build.root) / "testdata" / "fuzz" / names.GO_FUZZ
         d.mkdir(parents=True, exist_ok=True)
         (d / _POV_SEED).write_text(_CORPUS_V1 + _go_quote(data) + "\n")
 
     def run(self, build: BuildResult, data: bytes) -> RunResult:
         assert build.root is not None
         self._write_pov(build, data)
-        r = self._sh(f"go test -run='FuzzRaksha/{_POV_SEED}'", self._pkg(build.root), timeout=90)
+        r = self._sh(f"go test -run='{names.GO_FUZZ}/{_POV_SEED}'", self._pkg(build.root), timeout=90)
         # `go test` chrome (ok/FAIL/--- lines, timings, (cached)) is not the target's behaviour and
         # varies run to run; strip it so the differential compares the program's own output, and the
         # oracle still sees any panic. The fuzz harness discards Decode's return, so behaviour here is
@@ -142,16 +143,16 @@ class GoFuzzTarget:
 
     def covered_lines(self, build: BuildResult, inputs: list[bytes]) -> set[tuple[str, int]]:
         assert build.root is not None
-        d = self._pkg(build.root) / "testdata" / "fuzz" / "FuzzRaksha"
+        d = self._pkg(build.root) / "testdata" / "fuzz" / names.GO_FUZZ
         d.mkdir(parents=True, exist_ok=True)
         for i, data in enumerate(inputs):          # each input as its own seed file
             (d / f"{_POV_SEED}_{i}").write_text(_CORPUS_V1 + _go_quote(data) + "\n")
         pkg = self._pkg(build.root)
         # run the whole fuzz function over its seed corpus under coverage (a single -run=.../seed
         # under -coverprofile records no counts; the function's seed replay does)
-        self._sh("go test -run='FuzzRaksha' -coverprofile=raksha.cov", pkg, timeout=120)
+        self._sh(f"go test -run='{names.GO_FUZZ}' -coverprofile={names.dot('cov')}", pkg, timeout=120)
         covered: set[tuple[str, int]] = set()
-        prof = pkg / "raksha.cov"
+        prof = pkg / names.dot("cov")
         if not prof.exists():
             return covered
         # cover profile lines: file:startline.col,endline.col numstmt count
@@ -169,12 +170,12 @@ class GoFuzzTarget:
 
     def refuzz(self, build: BuildResult, seconds: float) -> list[str]:
         assert build.root is not None
-        r = self._sh(f"go test -run='^$' -fuzz='FuzzRaksha' -fuzztime={max(1, int(seconds))}s",
+        r = self._sh(f"go test -run='^$' -fuzz='{names.GO_FUZZ}' -fuzztime={max(1, int(seconds))}s",
                      self._pkg(build.root), timeout=seconds + 60)
         return [r.text] if r.exit_code != 0 and ("panic" in r.text or "DATA RACE" in r.text) else []
 
     def discard(self, build: BuildResult) -> None:
-        if build.root and Path(build.root).name.startswith("raksha-go-"):
+        if build.root and Path(build.root).name.startswith(names.SCRATCH):
             shutil.rmtree(build.root, ignore_errors=True)
 
 
@@ -200,31 +201,31 @@ def go_autofuzz(target_root: str | Path, *, fuzztime_s: int = 10, max_entrypoint
     for ep in candidates[:max_entrypoints]:
         src = root / ep.path
         pkg_dir = str(src.parent.relative_to(root)) if src.parent != root else "."
-        work = Path(tempfile.mkdtemp(prefix="raksha-go-fuzz-")) / root.name
+        work = Path(tempfile.mkdtemp(prefix=names.SCRATCH)) / root.name
         shutil.copytree(root, work, dirs_exist_ok=True)
         pkgpath = work / pkg_dir
-        (pkgpath / "raksha_fuzz_test.go").write_text(synthesize_go_test(ep, _package_of(src)))
+        (pkgpath / names.GO_FILE).write_text(synthesize_go_test(ep, _package_of(src)))
         env = _go_env()
         if run_target("go build ./...", str(pkgpath), shell=True, env=env).returncode != 0:
             shutil.rmtree(work.parent, ignore_errors=True)
             continue
-        r = run_target(f"go test -run='^$' -fuzz='FuzzRaksha' -fuzztime={fuzztime_s}s",
+        r = run_target(f"go test -run='^$' -fuzz='{names.GO_FUZZ}' -fuzztime={fuzztime_s}s",
                        str(pkgpath), shell=True, env=env, timeout=fuzztime_s + 90)
         text = (r.stdout + b"\n" + r.stderr).decode("utf-8", "replace")
         findings = GoOracle().parse(text, target=root.name)
-        crasher = _read_latest_crasher(pkgpath / "testdata" / "fuzz" / "FuzzRaksha")
+        crasher = _read_latest_crasher(pkgpath / "testdata" / "fuzz" / names.GO_FUZZ)
         shutil.rmtree(work.parent, ignore_errors=True)
         if not findings or crasher is None:
             continue
         f = findings[0]
         _rebase_to(f, work)                       # paths relative to the module root, so a fix applies
         target = GoFuzzTarget(root, synthesize_go_test(ep, _package_of(src)), pkg_dir=pkg_dir)
-        f.attach_reproducer(Reproducer.from_bytes(crasher, ["go", "test", "-run=FuzzRaksha/raksha_pov"],
-                                                  detail=f"go-autofuzz: synthesized FuzzRaksha for {ep.symbol}"))
+        f.attach_reproducer(Reproducer.from_bytes(crasher, ["go", "test", f"-run={names.GO_FUZZ}/{_POV_SEED}"],
+                                                  detail=f"go-autofuzz: synthesized fuzz test for {ep.symbol}"))
         f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(),
                                             abort_signature=f.abort_signature, exit_code=1))
         f.confirm(reason=f"panic reproduced via a synthesized Go fuzz test for {ep.symbol}")
-        return GoAutofuzzResult(f, ep, crasher, target, note=f"panic via FuzzRaksha for {ep.symbol}")
+        return GoAutofuzzResult(f, ep, crasher, target, note=f"panic via the synthesized fuzz test for {ep.symbol}")
     return GoAutofuzzResult(None, candidates[0] if candidates else None, None, None,
                             note="no panic found within the budget")
 

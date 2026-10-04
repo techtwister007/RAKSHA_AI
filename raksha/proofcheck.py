@@ -278,7 +278,7 @@ def claim_from_diff(diff: str) -> tuple[BoundClaim, str] | None:
                     f"C strncpy length sizeof({m.group('d')}) - 1, cap >= 1")
         m = _GO_SLICE.search(line)
         if m:
-            return (BoundClaim("len_a", f"min(hi, len_a)", {"hi": (-(2**63), 2**63 - 1), "len_a": (0, 2**63 - 1)}),
+            return (BoundClaim("len_a", "min(hi, len_a)", {"hi": (-(2**63), 2**63 - 1), "len_a": (0, 2**63 - 1)}),
                     f"Go slice high bound min({m.group('hi').strip()}, len({m.group('a')})), hi: int")
         m = _RS_MIN.search(line)
         if m:

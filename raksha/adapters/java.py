@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 
 from ..gate.target import BuildResult, RunResult, TestResult, _discard
+from ..harness import names
 from ..sandbox import run_untrusted
 
 _PROP = "log4j.version"
@@ -79,11 +80,11 @@ class MavenReplayTarget:
     # -- Target protocol -------------------------------------------------------------------
     def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
         label = "patched" if patch_diff else "vulnerable"
-        root = Path(tempfile.mkdtemp(prefix=f"raksha-java-{label}-"))
+        root = Path(tempfile.mkdtemp(prefix=names.SCRATCH))
         shutil.copytree(self.source_root, root, dirs_exist_ok=True)
         if patch_diff:
-            (root / ".raksha.patch").write_text(patch_diff)
-            applied = self._sh("git apply -p1 .raksha.patch", root)
+            (root / names.dot("patch")).write_text(patch_diff)
+            applied = self._sh(f"git apply -p1 {names.dot('patch')}", root)
             if applied.exit_code != 0:
                 return BuildResult(False, label, "patch did not apply:\n" + applied.text, root)
         compiled = self._sh(f"mvn -q -B {self._o} test-compile", root)
@@ -98,9 +99,9 @@ class MavenReplayTarget:
 
     def run(self, build: BuildResult, data: bytes) -> RunResult:
         assert build.root is not None
-        inp = build.root / ".raksha_input"
+        inp = build.root / names.dot("input")
         inp.write_bytes(data)
-        return self._sh(f'java -cp "{self._cp(build.root)}" {self.driver_class} .raksha_input',
+        return self._sh(f'java -cp "{self._cp(build.root)}" {self.driver_class} {names.dot("input")}',
                         build.root, timeout=120)
 
     def run_tests(self, build: BuildResult) -> TestResult:
@@ -122,9 +123,9 @@ class MavenReplayTarget:
         assert build.root is not None
         covered: set[tuple[str, int]] = set()
         for data in inputs:
-            inp = build.root / ".raksha_cov_input"
+            inp = build.root / names.dot("cinput")
             inp.write_bytes(data)
-            r = self._sh(f'java -cp "{self._cp(build.root)}" {self.driver_class} .raksha_cov_input --coverage',
+            r = self._sh(f'java -cp "{self._cp(build.root)}" {self.driver_class} {names.dot("cinput")} --coverage',
                          build.root, timeout=120)
             for line in r.stdout.decode("utf-8", "replace").splitlines():
                 if ":" in line:

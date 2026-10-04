@@ -36,6 +36,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .harness import names
 from .finding import Finding, FixSite, Frame, Reproducer, ReplayResult, utcnow
 
 SHIM_SOURCE = Path(__file__).parent / "harness" / "raksha_observe.c"
@@ -78,7 +79,7 @@ def build_shim(cc: str = "gcc", *, out_dir: str | os.PathLike[str] | None = None
     """Compile the observer shim; None when there is no compiler (the lane then does not run)."""
     if shutil.which(cc) is None:
         return None
-    base = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="raksha-observe-"))
+    base = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix=names.SCRATCH))
     base.mkdir(parents=True, exist_ok=True)
     so = base / "raksha_observe.so"
     p = subprocess.run([cc, "-shared", "-fPIC", "-O2", "-o", str(so), str(SHIM_SOURCE), "-ldl"],  # raksha-own
@@ -130,7 +131,7 @@ class Observer:
         from .sandbox import run_target
         # Everything the run needs lives under the target root, so the same run works inside the
         # sandbox (which mounts only the root): the shim, the input, the event log.
-        with tempfile.TemporaryDirectory(prefix=".raksha-obs-", dir=self.root) as d:
+        with tempfile.TemporaryDirectory(prefix=names.dot("obs") + "-", dir=self.root) as d:
             inp = os.path.join(d, "input")
             log = os.path.join(d, "events.log")
             shim = os.path.join(d, "observe.so")

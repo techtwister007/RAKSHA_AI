@@ -26,13 +26,15 @@ subprocess; nothing in this module reaches the network.
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
-from ..oracles.interpose import InterposeOracle, _SINK_CWE  # noqa: F401  (re-export)
+from . import names
+from ..oracles.interpose import InterposeOracle, _SINK_CWE
+
+__all__ = ["InterposeOracle", "_SINK_CWE", "build_shim", "run_with_shim"]
 
 #: The C source compiled into the preload shim, shipped beside this module.
 SHIM_SOURCE = Path(__file__).with_name("raksha_interpose.c")
@@ -46,7 +48,7 @@ def build_shim(cc: str = "gcc", *, out_dir: str | os.PathLike[str] | None = None
     """
     if shutil.which(cc) is None:
         return None
-    base = Path(out_dir) if out_dir is not None else Path(tempfile.mkdtemp(prefix="raksha-interpose-"))
+    base = Path(out_dir) if out_dir is not None else Path(tempfile.mkdtemp(prefix=names.SCRATCH))
     base.mkdir(parents=True, exist_ok=True)
     so = base / "raksha_interpose.so"
     cmd = [cc, "-shared", "-fPIC", "-O2", "-o", str(so), str(SHIM_SOURCE), "-ldl"]

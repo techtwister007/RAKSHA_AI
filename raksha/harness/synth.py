@@ -19,19 +19,16 @@ lets the sanitizer print when the input crashes — which is what the oracle rea
 from __future__ import annotations
 
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import names
 from .entrypoints import Entrypoint
 
 # ---- C -----------------------------------------------------------------------------------------
 
-_C_HARNESS = r"""/* RAKSHA synthesized harness for {symbol} — generated, not hand-written.
- * One-shot:  harness <file>   runs the target once on the file (replay / gate).
- * Fork-server: harness         forks a child per input read from stdin (fast fuzzing). */
-#include <stdint.h>
+_C_HARNESS = r"""#include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,20 +111,19 @@ def synthesize(entrypoint: Entrypoint) -> Harness:
         call = _C_CALL[entrypoint.kind].format(symbol=entrypoint.symbol)
         src = _C_HARNESS.format(symbol=entrypoint.symbol, signature_decl=_c_signature_decl(entrypoint),
                                 call=call)
-        return Harness("c/c++", entrypoint, src, "raksha_harness.c", build_cmd="", run_cmd="")
+        return Harness("c/c++", entrypoint, src, f"{names.HARNESS}.c", build_cmd="", run_cmd="")
     if entrypoint.language == "python":
-        src = _PY_HARNESS.format(module=_py_module(entrypoint.path), symbol=entrypoint.symbol)
-        return Harness("python", entrypoint, src, "raksha_harness.py", build_cmd="", run_cmd="")
+        src = _PY_HARNESS.format(module=_py_module(entrypoint.path), symbol=entrypoint.symbol,
+                                 guard=names.GUARD)
+        return Harness("python", entrypoint, src, f"{names.HARNESS}.py", build_cmd="", run_cmd="")
     raise ValueError(f"no harness template for {entrypoint.language}")
 
 
 # ---- Python ------------------------------------------------------------------------------------
 
-_PY_HARNESS = r'''"""RAKSHA synthesized harness for {symbol} — generated, not hand-written.
-One-shot: harness <file>. Fork-server: harness (forks a child per input from stdin)."""
-import os, sys, struct, importlib
-import raksha_sinkguard
-raksha_sinkguard.install()            # install the dangerous-sink oracle before the target loads
+_PY_HARNESS = r'''import os, sys, struct, importlib
+import {guard}
+{guard}.install()
 
 _mod = importlib.import_module("{module}")
 _fn = getattr(_mod, "{symbol}")
@@ -196,7 +192,7 @@ def quality_gate(harness: Harness, target_root: Path, *, benign: bytes = b"ok", 
 
 
 def _scratch(target_root: Path) -> Path:
-    work = Path(tempfile.mkdtemp(prefix="raksha-harness-")) / Path(target_root).name
+    work = Path(tempfile.mkdtemp(prefix=names.SCRATCH)) / Path(target_root).name
     shutil.copytree(target_root, work, symlinks=True)
     return work
 
@@ -214,32 +210,35 @@ def _c_quality(harness, target_root, benign, cc, timeout):
                      if p.name != harness.filename and "int main(" not in p.read_text(errors="replace")
                      and "main (" not in p.read_text(errors="replace"))
     srcs = " ".join(str(s) for s in [Path(harness.filename), *sources])
-    build = (f"{cc} -g -fsanitize=address -fno-omit-frame-pointer -I. "
-             + " ".join(f"-I{s.parent}" for s in sources if s.parent != Path(".")) + f" -o raksha_harness {srcs}")
+    build = (f"{cc} -g -fsanitize=address -fno-omit-frame-pointer -ffile-prefix-map=\"$PWD\"=. -I. "
+             + " ".join(f"-I{s.parent}" for s in sources if s.parent != Path(".")) + f" -o {names.HARNESS} {srcs}")
     r = _sh(build, work, timeout=timeout)
     if r.returncode != 0:
         return QualityResult(False, False, False, "harness did not compile:\n" + r.stderr.decode("utf-8", "replace")[-800:]), {}
-    (work / ".raksha_benign").write_bytes(benign)
-    run = _sh(["./raksha_harness", ".raksha_benign"], work, timeout=timeout)   # one-shot
+    (work / names.dot("benign")).write_bytes(benign)
+    run = _sh([f"./{names.HARNESS}", names.dot("benign")], work, timeout=timeout)   # one-shot
     exercises = run.returncode == 0                 # a benign input must not crash the harness
     res = QualityResult(exercises, True, exercises,
                         "compiles; benign input exits cleanly" if exercises
                         else "harness crashes on a benign input — template rejected")
-    return res, {"root": work, "binary": "./raksha_harness", "cc": cc}
+    return res, {"root": work, "binary": f"./{names.HARNESS}", "cc": cc}
 
 
 def _materialise_python(harness: Harness, work: Path) -> None:
     """Drop the harness and its sink-guard oracle into the work dir so both the quality gate and the
     gate target run identically."""
     (work / harness.filename).write_text(harness.source)
-    (work / "raksha_sinkguard.py").write_text((Path(__file__).parent / "sinkguard.py").read_text())
+    guard = names.scrub_python((Path(__file__).parent / "sinkguard.py").read_text(),
+                               {"raksha_sinkguard.py": f"{names.GUARD}.py",
+                                "raksha_harness.py": f"{names.HARNESS}.py"})
+    (work / f"{names.GUARD}.py").write_text(guard)
 
 
 def _py_quality(harness, target_root, benign, timeout):
     work = _scratch(target_root)
     _materialise_python(harness, work)
-    (work / ".raksha_benign").write_bytes(benign)
-    run = _sh(["python3", harness.filename, ".raksha_benign"], work, timeout=timeout)   # one-shot
+    (work / names.dot("benign")).write_bytes(benign)
+    run = _sh(["python3", harness.filename, names.dot("benign")], work, timeout=timeout)   # one-shot
     ok = run.returncode == 0
     return (QualityResult(ok, ok, ok,
                           "imports and runs on a benign input" if ok

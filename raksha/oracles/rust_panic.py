@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import re
 
+from .. import names as _names
 from ..finding import Finding, Frame
 from .base import Oracle, abort_signature, excerpt, seed_fix_site
 
@@ -41,7 +42,7 @@ _BT_AT = re.compile(r"^\s*at\s+(?P<file>\S.*?\.rs):(?P<line>\d+)(?::(?P<col>\d+)
 #: Frames that are never the crate's own code (std/core/alloc, the compiler's sysroot, the
 #: synthesized harness, and anything under a cargo registry checkout).
 _NOT_TARGET = ("/rustc/", "/library/", "library/std", "library/core", "library/alloc",
-               "raksha_fuzz.rs", "/.cargo/", "/registry/")
+               "raksha_fuzz.rs", f"{_names.RUST_TEST}.rs", "/.cargo/", "/registry/")
 
 #: Rust panic text -> CWE. Longest / most specific key first (resolved by sorting on length), like
 #: the other oracles. A slice/index range panic is an out-of-bounds *read* of the backing buffer

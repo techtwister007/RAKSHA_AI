@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 
+from .. import names as _names
 from ..finding import Finding, Frame
 from .base import Oracle, abort_signature, excerpt, seed_fix_site
 
@@ -41,7 +42,7 @@ _GO_FUNC = re.compile(r"^\s+(?P<fn>[\w./\-]+(?:\.[\w.*()]+)+)\(\)\s*$")
 _GO_FILE = re.compile(r"^\s+(?P<file>[^\s:]+\.go):(?P<line>\d+)(?:\s+\+0x[0-9a-fA-F]+)?\s*$")
 #: Frames that belong to the sanitizer runtime or the Go runtime, never to the target.
 _NOT_TARGET = ("libsanitizer", "tsan_interceptors", "sanitizer_common", "/src/runtime/", "/src/testing/",
-               "/src/sync/", "runtime.", "testing.", "raksha_fuzz_test.go")
+               "/src/sync/", "runtime.", "testing.", "raksha_fuzz_test.go", _names.GO_FILE)
 
 CWE_DATA_RACE = "CWE-362"
 

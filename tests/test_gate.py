@@ -431,7 +431,6 @@ def test_a_passing_patch_on_thin_evidence_is_report_only_not_verified():
 def test_a_pre_existing_sibling_bug_does_not_fail_a_good_patch():
     """A1: on a target with two independent defects, fixing defect A must verify even though defect
     B still fires on the patched build. B is harvested as a sibling, not counted against A's fix."""
-    from raksha.finding import Frame
 
     class TwoBugTarget(FakeTarget):
         # 'real' fixes the HDR-overflow (defect A) but a second defect (defect B) fires on inputs

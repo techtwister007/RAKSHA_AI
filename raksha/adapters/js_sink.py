@@ -23,7 +23,6 @@ from __future__ import annotations
 import difflib
 import re
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +30,7 @@ from pathlib import Path
 from ..finding import Finding, Reproducer, ReplayResult, utcnow
 from ..gate.target import CommandTarget
 from ..harness.entrypoints import Entrypoint, _name_bonus
+from ..harness import names
 from ..harness.mutator import Fuzzer
 from ..oracles.js_sink import JsSinkOracle
 from ..sandbox import run_target
@@ -107,7 +107,7 @@ def discover_js(root: str | Path, *, limit: int = 20) -> list[Entrypoint]:
 
 def _env_for(entrypoint: Entrypoint) -> dict[str, str]:
     spec = entrypoint.path if entrypoint.path.startswith((".", "/")) else "./" + entrypoint.path
-    return {"RAKSHA_JS_MODULE": spec, "RAKSHA_JS_SYMBOL": entrypoint.symbol}
+    return {names.JS_MODULE_ENV: spec, names.JS_SYMBOL_ENV: entrypoint.symbol}
 
 
 def js_target(work: str | Path, entrypoint: Entrypoint, *, timeout: float = 120.0) -> CommandTarget:
@@ -119,17 +119,20 @@ def js_target(work: str | Path, entrypoint: Entrypoint, *, timeout: float = 120.
     """
     work = Path(work)
     # B4: measured line coverage from V8's own block coverage, not an echo of the entry line
-    shutil.copy2(Path(__file__).resolve().parents[1] / "harness" / "raksha_cov.py", work / "raksha_cov.py")
+    _v8 = names.dot("v8")
+    helper = Path(__file__).resolve().parents[1] / "harness" / "raksha_cov.py"
+    (work / f"{names.COV}.py").write_text(names.scrub_python(helper.read_text()))
     payloads = " ".join("'" + p.replace("'", "'\\''") + "'" for p in _REFUZZ_PAYLOADS)
     return CommandTarget(
         source_root=work,
         build_cmd=f"node --check {entrypoint.path}",            # "COMPILES" for JS: it parses
-        run_cmd="node jssinkguard.js {input}",
+        run_cmd="node " + names.JSGUARD + " {input}",
         test_cmd="true",
-        coverage_cmd=("rm -rf .raksha_v8 && NODE_V8_COVERAGE=.raksha_v8 node jssinkguard.js {input} "
-                      ">/dev/null 2>&1; python3 raksha_cov.py v8 .raksha_v8"),
+        coverage_cmd=("rm -rf " + _v8 + " && NODE_V8_COVERAGE=" + _v8 + " node " + names.JSGUARD
+                      + " {input} >/dev/null 2>&1; python3 " + names.COV + ".py v8 " + _v8 + " "
+                      + names.JSGUARD),
         refuzz_cmd=("i=0; for p in " + payloads + "; do i=$((i+1)); printf '%s' \"$p\" > rf_$i; "
-                    "node jssinkguard.js rf_$i > err_$i 2>&1; "
+                    "node " + names.JSGUARD + " rf_$i > err_$i 2>&1; "
                     "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"),
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
         timeout=timeout,
@@ -153,17 +156,17 @@ def _js_runner(work: Path, entrypoint: Entrypoint):
     """
     import os
     env = {**os.environ, **_env_for(entrypoint)}
-    infile = work / ".raksha_js_in"
+    infile = work / names.dot("js")
 
     def run_one(data: bytes) -> bool:
         infile.write_bytes(data)
-        p = run_target(["node", "jssinkguard.js", str(infile)], str(work), timeout=30, env=env)
+        p = run_target(["node", names.JSGUARD, str(infile)], str(work), timeout=30, env=env)
         return p.returncode == 99 or JsSinkOracle().detects(
             (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace"))
 
     def replay(data: bytes) -> str:
         infile.write_bytes(data)
-        p = run_target(["node", "jssinkguard.js", str(infile)], str(work), timeout=30, env=env)
+        p = run_target(["node", names.JSGUARD, str(infile)], str(work), timeout=30, env=env)
         return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
 
     return run_one, replay
@@ -186,9 +189,9 @@ class JsAutofuzzResult:
 
 
 def _scratch(target_root: Path) -> Path:
-    work = Path(tempfile.mkdtemp(prefix="raksha-js-")) / Path(target_root).name
+    work = Path(tempfile.mkdtemp(prefix=names.SCRATCH)) / Path(target_root).name
     shutil.copytree(target_root, work, symlinks=True)
-    shutil.copy2(_HARNESS, work / "jssinkguard.js")
+    (work / names.JSGUARD).write_text(names.materialise_js_guard(_HARNESS.read_text()))
     return work
 
 
@@ -207,7 +210,7 @@ def js_autofuzz(target_root: str | Path, *, max_execs: int = 6000) -> JsAutofuzz
     fuzzer = Fuzzer(run_one=run_one, seed_corpus=list(_SEED_CORPUS), max_execs=max_execs)
     res = fuzzer.run()
     if not res.found:
-        return JsAutofuzzResult(None, ep, "jssinkguard.js", None, None,
+        return JsAutofuzzResult(None, ep, names.JSGUARD, None, None,
                                 note="no crash within the budget")
 
     target = js_target(work, ep)
@@ -218,12 +221,12 @@ def js_autofuzz(target_root: str | Path, *, max_execs: int = 6000) -> JsAutofuzz
             crashing, raw = cand, text
             break
     if crashing is None:
-        return JsAutofuzzResult(None, ep, "jssinkguard.js", None, target,
+        return JsAutofuzzResult(None, ep, names.JSGUARD, None, target,
                                 note="guard fired but no oracle-confirmed crash")
 
     findings = oracle.parse(raw, target=Path(work).name)
     if not findings:
-        return JsAutofuzzResult(None, ep, "jssinkguard.js", None, target,
+        return JsAutofuzzResult(None, ep, names.JSGUARD, None, target,
                                 note="oracle did not parse the crash")
     f = findings[0]
     f.attach_reproducer(Reproducer.from_bytes(
@@ -232,7 +235,7 @@ def js_autofuzz(target_root: str | Path, *, max_execs: int = 6000) -> JsAutofuzz
     f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(),
                                          abort_signature=f.abort_signature, exit_code=99))
     f.confirm(reason=f"injection reproduced via the jssinkguard harness for {ep.symbol}")
-    return JsAutofuzzResult(f, ep, "jssinkguard.js", crashing, target,
+    return JsAutofuzzResult(f, ep, names.JSGUARD, crashing, target,
                             note=f"injection via jssinkguard harness for {ep.symbol}")
 
 

@@ -17,6 +17,7 @@ import difflib
 import re
 from pathlib import Path
 
+from .harness import names
 from .finding import Finding
 
 
@@ -206,6 +207,7 @@ def generic_templates(finding: Finding, root: Path):
 # earns nothing by itself. The test SOURCE is run by the target's `added_test_cmd`; for the
 # synthesized autofuzz targets that is `sh {test}` (C) or `python3 {test}` (Python).
 
+_rin, _rout = names.dot("in"), names.dot("out")   # B8: per-run names in the target's tree
 _C_REGRESSION_CLASSES = ("CWE-121", "CWE-122", "CWE-787", "CWE-125", "CWE-120")
 _PY_REGRESSION_CLASSES = ("CWE-78", "CWE-77")
 
@@ -220,12 +222,12 @@ def _c_overflow_regression(reproducer: bytes) -> str:
     b64 = base64.b64encode(reproducer).decode("ascii")
     return (
         "#!/bin/sh\n"
-        "# RAKSHA generated regression test (C overflow): the reproducer must not abort.\n"
-        f"printf '%s' '{b64}' | base64 -d > .raksha_regress_in 2>/dev/null\n"
-        "./raksha_harness .raksha_regress_in > .raksha_regress_out 2>&1\n"
+        "# generated regression test (C overflow): the reproducer must not abort.\n"
+        f"printf '%s' '{b64}' | base64 -d > {_rin} 2>/dev/null\n"
+        f"./{names.HARNESS} {_rin} > {_rout} 2>&1\n"
         "rc=$?\n"
         'if [ "$rc" -ne 0 ]; then echo "REGRESS-FAIL: harness aborted (rc=$rc)"; exit 1; fi\n'
-        "if grep -Eq 'AddressSanitizer|ERROR: |runtime error:|SUMMARY: ' .raksha_regress_out; then "
+        f"if grep -Eq 'AddressSanitizer|ERROR: |runtime error:|SUMMARY: ' {_rout}; then "
         'echo "REGRESS-FAIL: sanitizer reported an abort"; exit 1; fi\n'
         'echo "REGRESS-PASS: reproducer no longer aborts"; exit 0\n'
     )
@@ -238,17 +240,17 @@ def _py_injection_regression() -> str:
     Fails on the vulnerable build (the metacharacter reaches `shell=True`, the guard aborts
     non-zero); passes on the patched build (no-shell argv — the metacharacter is inert)."""
     return (
-        "# RAKSHA generated regression test (Python shell injection): the sink must stay unreached.\n"
+        "# generated regression test (Python shell injection): the sink must stay unreached.\n"
         "import os, subprocess, sys\n"
-        "marker = '.raksha_injection_marker'\n"
+        f"marker = '{names.dot('marker')}'\n"
         "try:\n"
         "    os.remove(marker)\n"
         "except OSError:\n"
         "    pass\n"
         "payload = b'x; touch ' + marker.encode()\n"
-        "with open('.raksha_regress_in', 'wb') as fh:\n"
+        f"with open('{_rin}', 'wb') as fh:\n"
         "    fh.write(payload)\n"
-        "proc = subprocess.run(['python3', 'raksha_harness.py', '.raksha_regress_in'],\n"
+        f"proc = subprocess.run(['python3', '{names.HARNESS}.py', '{_rin}'],\n"
         "                      capture_output=True)\n"
         "fired = os.path.exists(marker) or b'PySecSan' in proc.stderr or proc.returncode != 0\n"
         "try:\n"

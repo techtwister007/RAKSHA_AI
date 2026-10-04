@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 
+from .. import names as _names
 from ..finding import Finding, Frame
 from .base import Oracle, abort_signature, excerpt, seed_fix_site
 
@@ -41,7 +42,7 @@ _GO_CWE = {
 
 #: Frames that are never the bug's own code.
 _NOT_TARGET = ("/src/runtime/", "/src/testing/", "/src/reflect/", "runtime.", "testing.",
-               "reflect.", "raksha_fuzz_test.go")
+               "reflect.", "raksha_fuzz_test.go", _names.GO_FILE)
 
 
 def _cwe(msg: str) -> str:

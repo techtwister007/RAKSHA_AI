@@ -36,22 +36,20 @@ from pathlib import Path
 
 from ..finding import Finding, Frame, Reproducer, ReplayResult, utcnow
 from ..gate.target import BuildResult, RunResult, TestResult
+from ..harness import names
 from ..sandbox import run_target
 from ..harness.entrypoints import Entrypoint
 from ..oracles.rust_panic import RustPanicOracle
 from ..repair_templates import _diff, _read_fix_site
 
-_INPUT_FILE = "raksha_input.bin"
-_CORPUS_DIR = "raksha_corpus"
+_INPUT_FILE = names.RUST_INPUT
+_CORPUS_DIR = names.RUST_CORPUS
 
-_FUZZ_HARNESS = '''// RAKSHA synthesized fuzz harness — generated, not hand-written.
-// Reads one input file (or a corpus directory) and feeds it to the entry point, so any panic the
-// input triggers fails `cargo test`. Stable cargo, offline — no cargo-fuzz, no nightly.
-use std::fs;
+_FUZZ_HARNESS = '''use std::fs;
 use std::path::PathBuf;
 
 #[test]
-fn raksha_fuzz() {{
+fn {test}() {{
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let single = dir.join("{input}");
     if single.is_file() {{
@@ -105,7 +103,7 @@ def discover_rust(root: str | Path, *, limit: int = 20) -> list[Entrypoint]:
     root = Path(root)
     files = [root] if root.is_file() else [
         p for p in sorted(root.rglob("*.rs"))
-        if p.is_file() and "target" not in p.parts and p.name != "raksha_fuzz.rs"]
+        if p.is_file() and "target" not in p.parts and p.name != f"{names.RUST_TEST}.rs"]
     out: list[Entrypoint] = []
     for p in files:
         try:
@@ -146,7 +144,8 @@ def _crate_name(root: Path) -> str:
 
 
 def synthesize_rust_harness(ep: Entrypoint, crate: str) -> str:
-    return _FUZZ_HARNESS.format(crate=crate, symbol=ep.symbol, input=_INPUT_FILE, corpus=_CORPUS_DIR)
+    return _FUZZ_HARNESS.format(crate=crate, symbol=ep.symbol, input=_INPUT_FILE, corpus=_CORPUS_DIR,
+                                test=names.RUST_TEST)
 
 
 # ---------------------------------------------------------------- cargo env
@@ -182,7 +181,7 @@ class RustFuzzTarget:
         self.ep_symbol = entrypoint.symbol
         self.ep_line = entrypoint.line
         self.timeout = timeout
-        self._home = Path(tempfile.mkdtemp(prefix="raksha-cargo-home-"))
+        self._home = Path(tempfile.mkdtemp(prefix=names.SCRATCH))
         self._bin: dict[str, Path] = {}         # build root -> test binary path
 
     # -- plumbing ----------------------------------------------------------
@@ -202,7 +201,7 @@ class RustFuzzTarget:
         deps = root / "target" / "debug" / "deps"
         if not deps.is_dir():
             return None
-        cands = [p for p in deps.glob("raksha_fuzz-*")
+        cands = [p for p in deps.glob(f"{names.RUST_TEST}-*")
                  if p.is_file() and p.suffix != ".d" and os.access(p, os.X_OK)]
         return max(cands, key=lambda p: p.stat().st_mtime) if cands else None
 
@@ -210,16 +209,16 @@ class RustFuzzTarget:
 
     def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
         label = "patched" if patch_diff else "vulnerable"
-        root = Path(tempfile.mkdtemp(prefix=f"raksha-rust-{label}-"))
+        root = Path(tempfile.mkdtemp(prefix=names.SCRATCH))
         shutil.copytree(self.source_root, root, dirs_exist_ok=True)
         if patch_diff:
-            (root / ".raksha.patch").write_text(patch_diff)
-            applied = self._sh("git apply -p1 .raksha.patch 2>/dev/null || patch -p1 < .raksha.patch",
+            (root / names.dot("patch")).write_text(patch_diff)
+            applied = self._sh(f"git apply -p1 {names.dot('patch')} 2>/dev/null || patch -p1 < {names.dot('patch')}",
                                root, env=self._env(root))
             if applied.exit_code != 0:
                 return BuildResult(False, label, "patch did not apply:\n" + applied.text, root)
         (root / "tests").mkdir(exist_ok=True)
-        (root / "tests" / "raksha_fuzz.rs").write_text(self.harness)
+        (root / "tests" / f"{names.RUST_TEST}.rs").write_text(self.harness)
         built = self._sh("cargo build --tests", root, env=self._env(root))
         ok = built.exit_code == 0
         if ok:
@@ -239,7 +238,7 @@ class RustFuzzTarget:
         b = self._bin.get(str(root)) or self._find_test_bin(root)
         if b is not None:
             return self._sh(f"{b} --test-threads=1", root, env=self._env(root), timeout=60)
-        return self._sh("cargo test --test raksha_fuzz -q", root, env=self._env(root), timeout=90)
+        return self._sh(f"cargo test --test {names.RUST_TEST} -q", root, env=self._env(root), timeout=90)
 
     def run(self, build: BuildResult, data: bytes) -> RunResult:
         return self._run_bin(build, data)
@@ -329,7 +328,7 @@ class RustFuzzTarget:
         return crashes
 
     def discard(self, build: BuildResult) -> None:
-        if build.root and Path(build.root).name.startswith("raksha-rust-"):
+        if build.root and Path(build.root).name.startswith(names.SCRATCH):
             self._bin.pop(str(build.root), None)
             shutil.rmtree(build.root, ignore_errors=True)
 
@@ -445,14 +444,14 @@ def rust_autofuzz(target_root: str | Path, *, fuzztime_s: int = 10,
     if not candidates:
         return RustAutofuzzResult(None, None, None, None, note="no Rust &[u8] entry point found")
     crate = _crate_name(root)
-    home = Path(tempfile.mkdtemp(prefix="raksha-cargo-home-"))
+    home = Path(tempfile.mkdtemp(prefix=names.SCRATCH))
     seeds = [b"\x01\x01\x05", b"\x02ab", b"\x00", b"", b"\x03xyz", b"\x01\x02\x03\x04"]
     for ep in candidates[:max_entrypoints]:
         harness = synthesize_rust_harness(ep, crate)
-        work = Path(tempfile.mkdtemp(prefix="raksha-rust-fuzz-")) / root.name
+        work = Path(tempfile.mkdtemp(prefix=names.SCRATCH)) / root.name
         shutil.copytree(root, work, dirs_exist_ok=True)
         (work / "tests").mkdir(exist_ok=True)
-        (work / "tests" / "raksha_fuzz.rs").write_text(harness)
+        (work / "tests" / f"{names.RUST_TEST}.rs").write_text(harness)
         env = _cargo_env(home, work / "target")
         built = run_target("cargo build --tests", str(work), shell=True, env=env)
         if built.returncode != 0:
@@ -479,13 +478,13 @@ def rust_autofuzz(target_root: str | Path, *, fuzztime_s: int = 10,
         # applies as a/src/lib.rs in the gate's fresh copy — no rebase, unlike the Go lane.
         target = RustFuzzTarget(root, ep, harness)
         f.attach_reproducer(Reproducer.from_bytes(
-            crasher, ["cargo", "test", "--test", "raksha_fuzz"],
+            crasher, ["cargo", "test", "--test", names.RUST_TEST],
             detail=f"rust-autofuzz: synthesized cargo-test harness for {ep.symbol}"))
         f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(),
                                             abort_signature=f.abort_signature, exit_code=101))
         f.confirm(reason=f"panic reproduced via a synthesized cargo-test harness for {ep.symbol}")
         return RustAutofuzzResult(f, ep, crasher, target,
-                                  note=f"panic via raksha_fuzz for {ep.symbol}", found=True)
+                                  note=f"panic via the synthesized harness for {ep.symbol}", found=True)
     return RustAutofuzzResult(None, candidates[0], None, None,
                               note="no panic found within the budget")
 

@@ -26,6 +26,7 @@ from ..gate.target import CommandTarget
 from ..oracles import AsanOracle, PySecSanOracle
 from ..oracles.base import Oracle
 from .entrypoints import Entrypoint, discover, rank_with_model
+from . import names
 from .forkserver import ForkClient, asan_env
 from .mutator import Fuzzer
 from ..contract import demotion_reason
@@ -35,7 +36,7 @@ from ..signature import _owned as _owned_frames
 
 #: Files that are RAKSHA's own synthesized harness, never the target. A crash whose top owned frame
 #: sits in one of these is a harness artifact (B6), not a defect in the system under test.
-_HARNESS_FILES = ("raksha_harness", "raksha_fuzz", "raksha_sinkguard", "jssinkguard")
+_HARNESS_FILES = ("raksha_harness", "raksha_fuzz", "raksha_sinkguard", "jssinkguard")  # legacy names
 
 
 def _crash_is_in_harness(finding) -> bool:
@@ -44,7 +45,7 @@ def _crash_is_in_harness(finding) -> bool:
         return False
     top = own[0]
     base = (top.uri or "").rsplit("/", 1)[-1]
-    return any(h in base for h in _HARNESS_FILES)
+    return names.is_ours(base) or any(h in base for h in _HARNESS_FILES)
 from .synth import Harness, quality_gate, synthesize
 
 
@@ -82,7 +83,7 @@ class AutofuzzResult:
             rp = parent.resolve()
         except OSError:
             return
-        if rp.parent == tmp and rp.name.startswith("raksha-harness-"):
+        if rp.parent == tmp and rp.name.startswith((names.SCRATCH, "raksha-harness-")):
             shutil.rmtree(rp, ignore_errors=True)
 
 
@@ -194,7 +195,12 @@ def _fuzz(ep, built, oracle, max_execs, seed_corpus):
 
 # ---- C: run one input, and a gate-ready CommandTarget (gcov coverage) --------------------------
 
-def _c_sources(work: Path, harness_name: str = "raksha_harness.c") -> list[str]:
+#: B8: the binary records "." instead of the scratch directory's absolute path.
+_PREFIX_MAP = '-ffile-prefix-map="$PWD"=.'
+
+
+def _c_sources(work: Path, harness_name: str | None = None) -> list[str]:
+    harness_name = harness_name or f"{names.HARNESS}.c"
     out = []
     for p in sorted(work.rglob("*.c")):
         if p.name == harness_name:
@@ -207,28 +213,27 @@ def _c_sources(work: Path, harness_name: str = "raksha_harness.c") -> list[str]:
 
 
 def _c_build_cmd(work: Path, cc: str) -> str:
-    srcs = ["raksha_harness.c", *_c_sources(work)]
+    srcs = [f"{names.HARNESS}.c", *_c_sources(work)]
     incdirs = sorted({str(Path(s).parent) for s in srcs if Path(s).parent != Path(".")})
     inc = " ".join(f"-I{d}" for d in incdirs)
-    return (f"{cc} -g -fsanitize=address -fno-omit-frame-pointer -I. {inc} "
-            f"-o raksha_harness {' '.join(srcs)}")
+    return (f"{cc} -g -fsanitize=address -fno-omit-frame-pointer {_PREFIX_MAP} -I. {inc} "
+            f"-o {names.HARNESS} {' '.join(srcs)}")
 
 
 def _c_release_build_cmd(work: Path, cc: str) -> str:
     """The deployment twin's build (A3): optimised, no sanitizer — what the system actually ships."""
-    srcs = ["raksha_harness.c", *_c_sources(work)]
+    srcs = [f"{names.HARNESS}.c", *_c_sources(work)]
     incdirs = sorted({str(Path(s).parent) for s in srcs if Path(s).parent != Path(".")})
     inc = " ".join(f"-I{d}" for d in incdirs)
-    return f"{cc} -O2 -I. {inc} -o raksha_harness {' '.join(srcs)}"
+    return f"{cc} -O2 {_PREFIX_MAP} -I. {inc} -o {names.HARNESS} {' '.join(srcs)}"
 
 
 def _c_runner(work: Path, built: dict, oracle: Oracle):
-    import subprocess
-    binary = work / "raksha_harness"
+    binary = work / names.HARNESS
     env = asan_env()
 
     def replay(data: bytes) -> str:
-        f = work / ".raksha_replay_in"
+        f = work / names.dot("replay")
         f.write_bytes(data)
         p = run_target([str(binary), str(f)], str(work), timeout=30, env=env)
         return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
@@ -245,9 +250,9 @@ def _c_target(work: Path, built: dict, ep: Entrypoint) -> CommandTarget:
     # gcov coverage, with no literal { } (the gate .format()s this string). An executed .gcov line
     # is "   <count>:  <lineno>: <code>"; sed turns each into "<source>:<lineno>".
     cov = (
-        "test -x raksha_cov || " + cc + " -O0 -g --coverage -I. -o raksha_cov "
-        "raksha_harness.c " + srcs_q + " >/dev/null 2>&1; "
-        "./raksha_cov {input} >/dev/null 2>&1 || true; "
+        "test -x " + names.COV + " || " + cc + " -O0 -g --coverage " + _PREFIX_MAP + " -I. -o " + names.COV + " "
+        + names.HARNESS + ".c " + srcs_q + " >/dev/null 2>&1; "
+        "./" + names.COV + " {input} >/dev/null 2>&1 || true; "
         "gcov -o . *.gcda >/dev/null 2>&1; "
         "for s in " + srcs_q + "; do b=$(basename \"$s\"); "
         "grep -E '^ *[0-9]+: *[0-9]+:' \"$b.gcov\" 2>/dev/null | "
@@ -256,19 +261,19 @@ def _c_target(work: Path, built: dict, ep: Entrypoint) -> CommandTarget:
     refuzz = (
         "i=0; for n in 8 16 40 64 120 200; do i=$((i+1)); "
         "head -c $n /dev/urandom > rf_$i 2>/dev/null; printf '\\001\\377' | cat - rf_$i > rf2_$i; "
-        "./raksha_harness rf2_$i > err_$i 2>&1; "
+        "./" + names.HARNESS + " rf2_$i > err_$i 2>&1; "
         "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"
     )
     return CommandTarget(
         source_root=work,
         build_cmd=_c_build_cmd(work, cc),
-        run_cmd="./raksha_harness {input}",
+        run_cmd="./" + names.HARNESS + " {input}",
         test_cmd="true",                          # a discovered target brings no suite of its own
         coverage_cmd=cov,
         refuzz_cmd=refuzz,
         release_build_cmd=_c_release_build_cmd(work, cc),   # A3 deployment twin
         added_test_cmd="sh {test}",               # lets a verified regression test ride to the bundle
-        added_test_path="raksha_regression.sh",
+        added_test_path=f"r_{names.TOKEN}.sh",
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
         timeout=120.0,
     )
@@ -277,34 +282,32 @@ def _c_target(work: Path, built: dict, ep: Entrypoint) -> CommandTarget:
 # ---- Python: run one input, and a gate-ready CommandTarget -------------------------------------
 
 def _py_runner(work: Path, ep: Entrypoint, oracle: Oracle):
-    import subprocess
-
     def replay(data: bytes) -> str:
-        f = work / ".raksha_replay_in"
+        f = work / names.dot("replay")
         f.write_bytes(data)
-        p = run_target(["python3", "raksha_harness.py", str(f)], str(work), timeout=30)
+        p = run_target(["python3", f"{names.HARNESS}.py", str(f)], str(work), timeout=30)
         return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
 
-    return ForkClient(["python3", "raksha_harness.py"], work), replay
+    return ForkClient(["python3", f"{names.HARNESS}.py"], work), replay
 
 
 _COV_HELPER = Path(__file__).with_name("raksha_cov.py")
 
 
 def _py_target(work: Path, ep: Entrypoint) -> CommandTarget:
-    import shutil
-    shutil.copy2(_COV_HELPER, work / "raksha_cov.py")   # B4: measured line coverage, not an echo
+    # B4: measured line coverage, not an echo (B8: copied as code only, under a per-run name)
+    (work / f"{names.COV}.py").write_text(names.scrub_python(_COV_HELPER.read_text()))
     return CommandTarget(
         source_root=work,
         build_cmd="python3 -c \"import py_compile,glob; [py_compile.compile(f,doraise=True) for f in glob.glob('**/*.py',recursive=True)]\"",
-        run_cmd="python3 raksha_harness.py {input}",
+        run_cmd="python3 " + names.HARNESS + ".py {input}",
         test_cmd="true",
-        coverage_cmd="python3 raksha_cov.py py raksha_harness.py {input} 2>/dev/null",
+        coverage_cmd="python3 " + names.COV + ".py py " + names.HARNESS + ".py {input} 2>/dev/null",
         refuzz_cmd=("i=0; for p in 'A; id' 'B | cat /etc/hostname' 'C && echo x' 'D `whoami`'; do "
-                    "i=$((i+1)); printf '%s' \"$p\" > rf_$i; python3 raksha_harness.py rf_$i > err_$i 2>&1; "
+                    "i=$((i+1)); printf '%s' \"$p\" > rf_$i; python3 " + names.HARNESS + ".py rf_$i > err_$i 2>&1; "
                     "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"),
         added_test_cmd="python3 {test}",          # lets a verified regression test ride to the bundle
-        added_test_path="raksha_regression.py",
+        added_test_path=f"r_{names.TOKEN}.py",
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
         timeout=120.0,
     )

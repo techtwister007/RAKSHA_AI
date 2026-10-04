@@ -22,6 +22,6 @@ def _isolated_tempdir(tmp_path_factory):
     evidence bundles) lands in a pytest-managed directory and is cleaned up with it."""
     import tempfile
     previous = tempfile.tempdir
-    tempfile.tempdir = str(tmp_path_factory.mktemp("raksha-tmp"))
+    tempfile.tempdir = str(tmp_path_factory.mktemp("scratch-tmp"))
     yield
     tempfile.tempdir = previous

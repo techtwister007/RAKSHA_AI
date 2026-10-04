@@ -143,7 +143,7 @@ def test_d3_a_large_reproducer_is_compressed_and_still_ships_and_verifies(tmp_pa
     """D3: a reproducer over the inline cap is kept zlib-compressed and still ships as real bytes,
     never silently dropped."""
     from raksha.finding import (Finding, Reproducer, ReplayResult, FixSite, GateCheck, RepairLane,
-                                Status, utcnow, MAX_REPRO_BYTES)
+                                utcnow, MAX_REPRO_BYTES)
     big = b"\x41" * (MAX_REPRO_BYTES + 5000)
     f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m")
     f.attach_reproducer(Reproducer.from_bytes(big, ["./raksha_harness", "repro"]))
@@ -160,7 +160,7 @@ def test_d3_a_large_reproducer_is_compressed_and_still_ships_and_verifies(tmp_pa
 def test_d6_purging_a_reproducer_keeps_the_record_valid():
     """D6: purging the exploit bytes keeps the content hash and replay command, so the record is
     still a valid, reportable finding — the bytes are simply no longer on the node."""
-    from raksha.finding import Finding, Reproducer, ReplayResult, utcnow, EXPLOIT_REPLAY
+    from raksha.finding import Finding, Reproducer, ReplayResult, utcnow
     f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m")
     f.attach_reproducer(Reproducer.from_bytes(b"A" * 48, ["./r", "repro"]))
     f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow())); f.confirm()
