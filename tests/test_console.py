@@ -61,7 +61,7 @@ def test_unreadable_target_is_red_not_a_crash(tmp_path):
 def test_snapshot_shape():
     s = demo_session(REPO)
     snap = s.snapshot()
-    assert set(snap) == {"board", "findings", "scorecard"}
+    assert {"board", "findings", "scorecard", "risk", "pipeline"} <= set(snap)
     assert snap["scorecard"]["posture"] == {"network_interfaces": 0, "cloud_calls": 0}
     assert all("id" in r and "severity" in r for r in snap["findings"])
 

@@ -124,8 +124,46 @@ class Session:
         f = self.findings.get(finding_id)
         return f.proof_block() if f else None
 
+    def risk_register(self) -> list[dict]:
+        from .risk import register
+        return [r.as_dict() for r in register(self.findings.values())]
+
+    def commanders_brief(self, finding_id: str) -> dict | None:
+        from .brief import jssd_brief, plain_summary
+        f = self.findings.get(finding_id)
+        if f is None or not f.is_reportable:
+            return None
+        return {"id": f.id, "plain": plain_summary(f), "jssd": jssd_brief(f)}
+
+    def verify_bundle(self, finding_id: str) -> dict | None:
+        """Build the finding's signed bundle in a temp dir and verify it — the live Vault check."""
+        import tempfile
+        from .bundle import build_bundle, verify_bundle as _verify
+        f = self.findings.get(finding_id)
+        if f is None or not f.is_reportable:
+            return None
+        out = tempfile.mkdtemp(prefix="raksha-bundle-")
+        build_bundle(f, out)
+        res = _verify(out)
+        return {"id": f.id, "ok": res.ok, "summary": res.summary(), "path": out}
+
+    def pipeline_stages(self) -> list[dict]:
+        """The nine stages with a live count of findings at or past each — for the Live Pipeline."""
+        from .finding import Status
+        order = [Status.SUSPECTED, Status.CONFIRMED, Status.PATCHED, Status.VERIFIED]
+        rank = {s: i for i, s in enumerate(order)}
+        rank[Status.REPORT_ONLY] = rank[Status.CONFIRMED]  # proven, no validated fix
+        counts = {s.value: 0 for s in order}
+        counts["REPORT_ONLY"] = 0
+        for f in self.findings.values():
+            counts[f.status.value] = counts.get(f.status.value, 0) + 1
+        return [{"status": s.value, "count": counts.get(s.value, 0),
+                 "at_or_past": sum(1 for f in self.findings.values()
+                                   if rank.get(f.status, 0) >= rank[s])} for s in order]
+
     def snapshot(self) -> dict:
-        return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard()}
+        return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
+                "risk": self.risk_register(), "pipeline": self.pipeline_stages()}
 
 
 def demo_session(repo_root: Path | None = None) -> Session:

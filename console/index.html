@@ -45,6 +45,18 @@
            padding:10px 12px;cursor:pointer;white-space:nowrap}
   nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--amber)}
   main{flex:1;overflow:auto;padding:18px;min-height:0}
+  /* live pipeline */
+  .pipe{display:flex;gap:0;flex-wrap:wrap;align-items:stretch}
+  .stage{flex:1 1 120px;min-width:110px;border:1px solid var(--line);border-radius:5px;background:var(--panel);
+         padding:12px;margin:4px;text-align:center}
+  .stage .n{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stage .s{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:4px}
+  .stage.on{border-color:var(--amber)} .stage .arrow{color:var(--faint)}
+  .verify-btn{font-family:var(--mono);font-size:11px;border:1px solid var(--green);color:var(--green);
+         background:none;border-radius:3px;padding:4px 10px;cursor:pointer}
+  .verify-ok{color:var(--green);font-weight:600} .verify-bad{color:var(--red);font-weight:600}
+  pre.brief{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:12px;
+         overflow:auto;font-family:var(--mono);font-size:11.5px;line-height:1.5;white-space:pre-wrap;max-height:60vh}
   section[hidden]{display:none}
   h2{font-size:13px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
      margin:0 0 12px;font-weight:600}
@@ -131,18 +143,38 @@
   </header>
   <nav class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-screen="board">1 · Mission Board</button>
+    <button role="tab" aria-selected="false" data-screen="pipeline">2 · Live Pipeline</button>
     <button role="tab" aria-selected="false" data-screen="detail">3 · Finding Detail</button>
+    <button role="tab" aria-selected="false" data-screen="vault">4 · Evidence Vault</button>
     <button role="tab" aria-selected="false" data-screen="score">5 · Scorecard</button>
+    <button role="tab" aria-selected="false" data-screen="brief">6 · Commander's Brief</button>
   </nav>
   <main>
     <section id="board"><h2>Targets</h2><div class="board" id="board-grid"></div></section>
+    <section id="pipeline" hidden>
+      <h2>Findings flowing through the nine stages</h2>
+      <div class="pipe" id="pipe-flow"></div>
+      <h2 style="margin-top:22px">Ranked risk register — fix these first</h2>
+      <div class="flist" id="risk-list"></div>
+    </section>
     <section id="detail" hidden>
       <div class="split">
         <div><h2>Findings</h2><div class="flist" id="flist"></div></div>
         <div><h2>Detail</h2><div class="detail" id="fdetail"><p class="empty">Select a finding.</p></div></div>
       </div>
     </section>
+    <section id="vault" hidden>
+      <h2>Signed evidence bundles — verify one yourself</h2>
+      <div class="flist" id="vault-list"></div>
+      <div class="detail" id="vault-result" style="margin-top:14px"><p class="empty">Pick a verified finding and press Verify.</p></div>
+    </section>
     <section id="score" hidden><h2>The jury's scoresheet, live</h2><div id="score-body"></div></section>
+    <section id="brief" hidden>
+      <div class="split">
+        <div><h2>Reportable findings</h2><div class="flist" id="brief-list"></div></div>
+        <div><h2>Commander's Brief</h2><div class="detail" id="brief-body"><p class="empty">Select a finding.</p></div></div>
+      </div>
+    </section>
   </main>
   <footer>
     <span>offline · self-contained · no external assets</span>
@@ -158,10 +190,11 @@ const el = (tag, cls, txt) => { const e=document.createElement(tag); if(cls)e.cl
 let STATE = null, SELECTED = null;
 
 // ---- tabs
+const SCREENS = ['board','pipeline','detail','vault','score','brief'];
 document.querySelectorAll('nav.tabs button').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b===btn));
-    ['board','detail','score'].forEach(s => $('#'+s).hidden = (s !== btn.dataset.screen));
+    SCREENS.forEach(s => $('#'+s).hidden = (s !== btn.dataset.screen));
   });
 });
 
@@ -170,9 +203,69 @@ async function refresh(){
   try{
     const r = await fetch('/api/snapshot'); STATE = await r.json();
     renderBoard(); renderList(); renderScore(); renderBadges();
+    renderPipeline(); renderRisk(); renderVaultList(); renderBriefList();
     $('#foot-count').textContent = STATE.findings.length + ' findings · ' + STATE.board.length + ' targets';
     $('#foot-time').textContent = 'updated ' + new Date().toLocaleTimeString();
   }catch(e){ $('#foot-time').textContent = 'offline'; }
+}
+
+function renderPipeline(){
+  const flow = $('#pipe-flow'); if(!STATE.pipeline) return; flow.textContent='';
+  STATE.pipeline.forEach((st,i)=>{
+    const d = el('div','stage'+(st.count?' on':''));
+    d.appendChild(el('div','n', String(st.at_or_past)));
+    d.appendChild(el('div','s', st.status.replace(/_/g,' ')));
+    flow.appendChild(d);
+  });
+}
+function renderRisk(){
+  const list = $('#risk-list'); if(!STATE.risk) return; list.textContent='';
+  STATE.risk.slice(0,12).forEach((r,i)=>{
+    const row = el('div','frow'); row.appendChild(el('span','sev '+r.severity));
+    const b = el('div','fmsg');
+    b.appendChild(el('div',null, '#'+(i+1)+'  '+(r.message||r.bug_class)));
+    b.appendChild(el('div','fmeta', 'score '+r.score+' · '+r.language+' · '+r.status+(r.has_fix?' · fix ready':'')));
+    row.appendChild(b); list.appendChild(row);
+  });
+}
+function reportable(){ return STATE.findings.filter(f=>f.status!=='SUSPECTED'); }
+function renderVaultList(){
+  const list = $('#vault-list'); list.textContent='';
+  reportable().forEach(f=>{
+    const row = el('div','frow'); row.appendChild(el('span','sev '+f.severity));
+    const b = el('div','fmsg');
+    b.appendChild(el('div',null, f.bug_class+' · '+f.status));
+    b.appendChild(el('div','fmeta', f.target+' · '+(f.evidence||'')));
+    row.appendChild(b);
+    const btn = el('button','verify-btn','Verify'); btn.style.alignSelf='center';
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); verifyBundle(f.id); });
+    row.appendChild(btn); list.appendChild(row);
+  });
+}
+async function verifyBundle(id){
+  const box = $('#vault-result'); box.innerHTML='<p class="empty">verifying…</p>';
+  const r = await fetch('/api/verify/'+encodeURIComponent(id));
+  if(!r.ok){ box.innerHTML='<p class="empty">not reportable</p>'; return; }
+  const v = await r.json(); box.textContent='';
+  box.appendChild(el('div', v.ok?'verify-ok':'verify-bad', v.ok?'✓ SIGNATURE VALID':'✗ VERIFICATION FAILED'));
+  box.appendChild(el('div','evidence', v.summary));
+}
+function renderBriefList(){
+  const list = $('#brief-list'); list.textContent='';
+  reportable().forEach(f=>{
+    const row = el('div','frow'); row.appendChild(el('span','sev '+f.severity));
+    const b = el('div','fmsg');
+    b.appendChild(el('div',null, f.bug_class)); b.appendChild(el('div','fmeta', f.target+' · '+f.status));
+    row.appendChild(b); row.addEventListener('click', ()=>showBrief(f.id)); list.appendChild(row);
+  });
+}
+async function showBrief(id){
+  const body = $('#brief-body'); body.innerHTML='<p class="empty">loading…</p>';
+  const r = await fetch('/api/brief/'+encodeURIComponent(id));
+  if(!r.ok){ body.innerHTML='<p class="empty">not reportable</p>'; return; }
+  const d = await r.json(); body.textContent='';
+  body.appendChild(el('p', null, d.plain));
+  const pre = el('pre','brief', d.jssd); body.appendChild(pre);
 }
 
 function renderBadges(){

@@ -53,12 +53,16 @@ def make_handler(session):
                 self._json(200, session.snapshot())
                 return
             if self.path.startswith("/api/finding/"):
-                fid = self.path.rsplit("/", 1)[-1]
-                detail = session.finding_detail(fid)
-                if detail is None:
-                    self._json(404, {"error": "not found"})
-                else:
-                    self._json(200, detail)
+                detail = session.finding_detail(self.path.rsplit("/", 1)[-1])
+                self._json(200, detail) if detail else self._json(404, {"error": "not found"})
+                return
+            if self.path.startswith("/api/brief/"):
+                brief = session.commanders_brief(self.path.rsplit("/", 1)[-1])
+                self._json(200, brief) if brief else self._json(404, {"error": "not found"})
+                return
+            if self.path.startswith("/api/verify/"):
+                res = session.verify_bundle(self.path.rsplit("/", 1)[-1])
+                self._json(200, res) if res else self._json(404, {"error": "not found"})
                 return
             self._send(404, b"not found", "text/plain")
 

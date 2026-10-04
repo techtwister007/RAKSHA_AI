@@ -100,7 +100,7 @@ kill-switches are in the campaign plan, Part 2.
 | 5 | Console screens 1, 3, 5; Scorecard live | serves live board/scorecard/detail offline; badges read 0; air-gap guard covers it | **done** (`console/`, `raksha/orchestrator.py`) |
 | 6 | C and Python deep slices — three languages on one screen | C (gcc+ASan), Python (shell-injection) and Java each find→fix→prove through the one gate | **done** (`raksha/adapters/c_asan.py`, `python_sink.py`, `raksha/slice_three.py`) |
 | 7 | WOW: bad-patch rejection, ROE slider, vaccine | all three real & tested: gate rejects a planted overfit; ROE tiers + two-person rule; vaccine mines→proves→sweeps | **done** (`raksha/roe.py`, `raksha/vaccine.py`, `raksha/slice_wow.py`) |
-| 8 | Screens 2, 4, 6; Commander's Brief; rollback; risk register | A stranger verifies a bundle signature unaided | next |
+| 8 | Screens 2/4/6; signed evidence bundle; Commander's Brief (JSSD); rollback; risk register | bundle builds, signs, verifies & tamper-detects; brief + risk + pipeline live in console | **done** (`raksha/bundle.py`, `brief.py`, `risk.py`, `rollback.py`) |
 | 9 | Our own numbers on ARVO / AutoPatchBench; self-score; licence register | Every number we will say traces to this run | |
 | 10 | Two full 36-hour rehearsals; record the demo | Second run finishes with no manual intervention | |
 
