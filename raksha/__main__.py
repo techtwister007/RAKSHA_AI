@@ -8,6 +8,7 @@ re-read the target's file and re-run the same detector:
     python -m raksha secret-match RULE PATH LINE
     python -m raksha spec-check ORACLE METHOD API_PATH --spec SPEC_PATH
     python -m raksha crypto-match RULE PATH LINE
+    python -m raksha binary-match RULE PATH [OFFSET]
 
 Exit status mirrors a crashing exploit: 1 = the finding REPRODUCED, 0 = it did not (e.g. the manifest
 was bumped, the secret removed), 2 = the replay could not run. Run from the target's root.
@@ -107,6 +108,17 @@ def _iac(a: argparse.Namespace) -> int:
     return REPRODUCED if hit else NOT_REPRODUCED
 
 
+def _binary(a: argparse.Namespace) -> int:
+    from .lanes import binary
+    try:
+        hit = binary.replay(a.rule, a.path, a.offset)
+    except (FileNotFoundError, ValueError) as e:
+        print(e); return ERROR
+    where = f"{a.path}" + (f"+{a.offset}" if a.offset is not None else "")
+    print(("REPRODUCED" if hit else "NOT REPRODUCED") + f": {a.rule} in {where}")
+    return REPRODUCED if hit else NOT_REPRODUCED
+
+
 def _githistory(a: argparse.Namespace) -> int:
     from .lanes import githistory
     try:
@@ -137,6 +149,9 @@ def main(argv: list[str] | None = None) -> int:
     im = sub.add_parser("iac-match", help="re-check an IaC/config misconfiguration at a file:line")
     im.add_argument("rule"); im.add_argument("path"); im.add_argument("line", type=int)
     im.set_defaults(fn=_iac)
+    bm = sub.add_parser("binary-match", help="re-check a binary-lane finding in a compiled artifact")
+    bm.add_argument("rule"); bm.add_argument("path"); bm.add_argument("offset", type=int, nargs="?")
+    bm.set_defaults(fn=_binary)
     gm = sub.add_parser("git-secret-match", help="re-check a secret in a past commit")
     gm.add_argument("rule"); gm.add_argument("commit"); gm.add_argument("path"); gm.add_argument("line", type=int)
     gm.set_defaults(fn=_githistory)

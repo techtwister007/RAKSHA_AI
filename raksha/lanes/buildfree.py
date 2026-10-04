@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..finding import Finding, dedup
-from . import crypto, githistory, iac, kev, secrets, service, supply, transitive, vulndb
+from . import binary, crypto, githistory, iac, kev, secrets, service, supply, transitive, vulndb
 
 #: Files worth reading for secrets. Covers every language with source here (C/C++, Rust, C#,
 #: Kotlin, Scala, Swift included, not only the three with deep adapters), config, and the files
@@ -50,6 +50,7 @@ class BuildFreeResult:
     #: Cryptographic primitives in use (not findings) for the post-quantum migration plan.
     crypto_uses: list = field(default_factory=list)
     unpinned: list = field(default_factory=list)   # C2: open-range deps (exposure of unknown status)
+    binary_components: list = field(default_factory=list)   # B10: versions read from artifacts' bytes
 
     def by_lane(self) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -115,12 +116,20 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
         findings.extend(githistory.scan_git_history(root))
     except Exception:  # noqa: BLE001
         pass
+    # Compiled artifacts with no source (B10): embedded versions, weak-crypto constants, SBOM.
+    bin_components: list = []
+    try:
+        br = binary.scan_artifacts(root, db=db)
+        findings.extend(br.findings)
+        bin_components = br.components
+    except Exception:  # noqa: BLE001
+        pass
     pinned_pkgs = {d.package for d in deps}
     unpinned = [u for u in unpinned if u["package"] not in pinned_pkgs]
     findings = dedup(findings)
     return BuildFreeResult(findings=findings, files_scanned=files, manifests_found=manifests,
                            seconds=round(time.monotonic() - started, 3), crypto_uses=crypto_uses,
-                           unpinned=unpinned)
+                           unpinned=unpinned, binary_components=bin_components)
 
 
 def _looks_like_openapi(name: str, text: str) -> bool:
