@@ -27,7 +27,7 @@ def python_target(root: str | Path, *, driver: str = "fuzz_cmd.py",
         refuzz_cmd=(
             "i=0; for p in 'a; id' 'b | cat /etc/hostname' 'c && echo x' 'd `whoami`' 'e > /tmp/z'; do "
             "i=$((i+1)); printf '%s' \"$p\" > rf_$i; "
-            "python3 " + driver + " rf_$i > /dev/null 2> err_$i; "
+            "python3 " + driver + " rf_$i > err_$i 2>&1; "
             "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"
         ),
         apply_patch_cmd="git apply -p1 {patch}",
