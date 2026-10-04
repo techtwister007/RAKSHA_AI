@@ -140,7 +140,7 @@
         <dt>Builder</dt><dd>Solo · several weeks prep</dd>
         <dt>Spine</dt><dd>Java first · cloud dev, offline ship</dd>
         <dt>Pairs with</dt><dd>Architecture sheet</dd>
-        <dt>Status</dt><dd>Phase 0 complete</dd>
+        <dt>Status</dt><dd>All phases built (2026-10-04) — see HANDOVER.md</dd>
       </dl>
     </div>
     <p class="usp">Make the demo certain. Make the evaluation honest. Never let one depend on the other.</p>
@@ -274,7 +274,7 @@
             impression on finale day is a working system, not an empty shell.</p></div>
         <div class="card b"><span class="k">Decision 5</span><h4>Precision is shipped as a data model, not promised</h4>
           <p>Already done: the record refuses to confirm a finding without a replaying reproducer and
-            refuses to verify a patch without five passes and a dead PoV, with 62 tests proving it.
+            refuses to verify a patch without five passes and a dead PoV, with 371 tests proving it.
             Everything built from here consumes that record, so the headline claim cannot drift.</p></div>
         <div class="card b"><span class="k">Decision 6 — new</span><h4>Dependency bumps are patches, and they are the cheapest provable ones that exist</h4>
           <p>The supply-chain lane was treated as a <em>finding</em> lane. It is also a <strong>patching</strong>
@@ -312,14 +312,14 @@
     <div class="phase">
       <div class="phase-h"><span class="n">PHASE 0</span><h4>The keystone — three oracles, one record, one gate</h4><span class="st done">done</span></div>
       <div class="phase-b">
-        <div><span class="k">Delivered</span><ul><li>SARIF 2.1 + proof block, validated against the OASIS schema</li><li>Status machine with both invariants enforced</li><li>ASan, Jazzer, PySecSan adapters; scorecard from the records</li><li>62 tests; two real bugs caught by them</li></ul></div>
+        <div><span class="k">Delivered</span><ul><li>SARIF 2.1 + proof block, validated against the OASIS schema</li><li>Status machine with both invariants enforced</li><li>ASan, Jazzer, PySecSan adapters; scorecard from the records</li><li>371 tests; two real bugs caught by them</li></ul></div>
         <div><span class="k exit">Exit gate — met</span><ul><li>A C trace, a Java reproducer and a Python abort all become valid records one gate consumes</li></ul></div>
         <div><span class="k">Carry forward</span><ul><li>Cross-confirmation (same site + same CWE, merge) and the model-test fail-before/pass-after rule are specified but not yet coded — they land in Phase 1</li></ul></div>
       </div>
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 1</span><h4>The five-check gate, for real</h4><span class="st">next</span></div>
+      <div class="phase-h"><span class="n">PHASE 1</span><h4>The five-check gate, for real</h4><span class="st">next</span><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>Each check as a runner over a real build dir: compile, replay PoV, differential corpus + own tests, coverage, bounded refuzz</li><li>Determinism pre-flight (3 runs), canonicaliser, quarantine list in the bundle</li><li>Cross-confirmation and the model-test check</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>A deliberately planted overfitting patch is <strong>rejected</strong>; the real fix passes</li><li>A noisy service (timestamps, UUIDs) does not cause a false rejection</li></ul></div>
@@ -328,7 +328,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 2</span><h4>The Java vertical slice and the Log4Shell demo target</h4></div>
+      <div class="phase-h"><span class="n">PHASE 2</span><h4>The Java vertical slice and the Log4Shell demo target</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>Bundled demo target: a small Spring-style service on vulnerable log4j, with JUnit tests</li><li>Ingest → Jazzer autofuzz → JNDI detector → localise → template lane → gate → signed bundle</li><li>Template library seeded with the top Jazzer bug classes: JNDI, SQLi, path traversal, command injection, deserialization</li><li>Inference behind one <span class="mono">RAKSHA_INFERENCE_BASE_URL</span> client — cloud now, vLLM later, zero code change</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Log4Shell found, fixed and proven with <strong>zero human input</strong>, ten runs in a row</li><li>Split-screen replay works: red on vulnerable, green on patched</li></ul></div>
@@ -337,7 +337,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 3</span><h4>The weakest link — build agent, mirror, build-free lanes</h4></div>
+      <div class="phase-h"><span class="n">PHASE 3</span><h4>The weakest link — build agent, mirror, build-free lanes</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>OSV-Scanner (offline DB), Gitleaks, Checkov, Syft → CycloneDX, all emitting the record</li><li><strong>Dependency-bump patch lane</strong> (Decision 6): bump → rebuild → suite → gate</li><li>Lane D for live targets: Schemathesis / ZAP / Nuclei, rate-limited, kill handle (Q3, Q8)</li><li>The <strong>jury exporter</strong>: SARIF + patch + PoV + replay script per finding; format swappable (Q2)</li><li>Build agent loop: remedy table → OSS-Fuzz recipe retrieval → one bounded model call, cap 5 → build-free</li><li>Offline mirror of the high-probability set: devpi, Nexus, Verdaccio, aptly</li><li>Sneakernet bundle format: signed, verified on import</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>A target that <strong>will not build</strong> still yields verified findings on screen within ten minutes</li><li>Mission Board shows it <strong>amber</strong>, labelled as success</li></ul></div>
@@ -346,7 +346,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 4</span><h4>Sandbox, offline bundle, and the cable-pull install</h4></div>
+      <div class="phase-h"><span class="n">PHASE 4</span><h4>Sandbox, offline bundle, and the cable-pull install</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>Every build and run in <span class="mono">--network none</span>, seccomp, cgroups; gVisor if the kernel allows</li><li>One <span class="mono">docker compose</span>; models and mirrors on the SSD; checksummed; <strong>GPU and CPU-only variants</strong> both on the media (Q5)</li><li>vLLM serving the 32B + 8B locally — first time off cloud inference</li><li>CI grep: no model SDK outside the inference module; no CDN or external asset in the console</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Sealed SSD → running system in ≤ 20 minutes on a machine with Wi-Fi off and cable out, Log4Shell demo runs</li><li>CPU-only profile benchmarked: a known number, not a hope</li></ul></div>
@@ -355,7 +355,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 5</span><h4>Console screens 1, 3, 5 — and the Scorecard goes live</h4></div>
+      <div class="phase-h"><span class="n">PHASE 5</span><h4>Console screens 1, 3, 5 — and the Scorecard goes live</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>Mission Board, Finding Detail with split-screen replay and the five ticks, Scorecard reading the metrics module</li><li>Findings stream as they are born; the console opens in a working state on a pre-warmed target</li><li>Own stack, self-contained assets, no fonts fetched</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Beats 2–5 of the demo arc run on screens alone, with no narration needed</li><li><strong>NETWORK INTERFACES: 0 · CLOUD CALLS: 0</strong> badges are live and true</li></ul></div>
@@ -364,16 +364,16 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 6</span><h4>Breadth — C and Python slices, three languages on one screen</h4></div>
+      <div class="phase-h"><span class="n">PHASE 6</span><h4>Breadth — C and Python slices, three languages on one screen</h4><span class="st done">done</span></div>
       <div class="phase-b">
-        <div><span class="k">Build</span><ul><li>C: an ARVO target with a hand-written harness (synthesis is a stretch goal, not a dependency); ASan → template or LLM fix → gate</li><li>Python: Atheris + PySecSan with our shell/SQL/pickle sinks on a small app</li><li>All three run concurrently on the Mission Board</li></ul></div>
+        <div><span class="k">Build</span><ul><li>C: a target with <em>no</em> harness — RAKSHA synthesizes one (two-check quality gate), ASan → template or model fix → gate; a hand-written harness drops into the same gate if ever needed</li><li>Python: Atheris + PySecSan with our shell/SQL/pickle sinks on a small app</li><li>All three run concurrently on the Mission Board</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>One C, one Java and one Python bug fixed in parallel by the same core, visible on one screen</li></ul></div>
         <div><span class="k kill">Kill-switch</span><ul><li>C patching stalls → C is shown reaching <strong>REPORT_ONLY</strong> with a real reproducer. A proven report is a scored, honest outcome and demonstrates the fallback live</li></ul></div>
       </div>
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 7</span><h4>Three WOW beats, in order of impact per effort</h4></div>
+      <div class="phase-h"><span class="n">PHASE 7</span><h4>Three WOW beats, in order of impact per effort</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li><strong>Bad-patch rejection:</strong> an "inject overfitting patch" button; the gate refuses it on screen 3</li><li><strong>ROE slider:</strong> asset registry with tiers; flip the demo service to "critical"; the same fix now waits for two signatures; OPA policy, cosign keys for two demo officers</li><li><strong>Vaccine sweep:</strong> a <em>bundled fleet</em> of four or five small codebases that share the JNDI pattern must exist first; rule extracted from the fix, three checks, sweep, hits on the Board — <em>only if Phases 1–6 are untouched</em></li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Beats 6, 8 and (if built) 7 run clean, ten times each</li></ul></div>
@@ -382,7 +382,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 8</span><h4>Screens 2, 4, 6 and the Commander's Brief</h4></div>
+      <div class="phase-h"><span class="n">PHASE 8</span><h4>Screens 2, 4, 6 and the Commander's Brief</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>Evidence Vault with live signature verification — a judge can do it</li><li>Commander's Brief: plain English from the bundle's facts, JSSD layout, Hindi as a stretch</li><li>Live Pipeline view</li><li>Ranked risk register, rollback script, regression test committed into the target's suite</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Beat 9 prints a staff paper; a stranger verifies a bundle signature unaided</li></ul></div>
@@ -391,7 +391,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 9</span><h4>Our own numbers</h4></div>
+      <div class="phase-h"><span class="n">PHASE 9</span><h4>Our own numbers</h4><span class="st done">done</span></div>
       <div class="phase-b">
         <div><span class="k">Build</span><ul><li>Benchmark rig over a slice of ARVO and AutoPatchBench; the pipeline runs unattended; the scorecard records</li><li>Benchmark report: methodology, wins and <strong>losses shown next to wins</strong></li><li><strong>Self-score</strong> on the five criteria from this run; the weakest one gets the remaining prep time</li><li>The evaluation-summary <em>template</em>, so H18–24 at the finale is fill-in, not design</li><li><span class="mono">THIRD_PARTY.md</span> licence register</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Every number we will say in the room traces to this run. Nothing borrowed</li></ul></div>
@@ -400,7 +400,7 @@
     </div>
 
     <div class="phase">
-      <div class="phase-h"><span class="n">PHASE 10</span><h4>Rehearsal — twice, full length — and the recording</h4></div>
+      <div class="phase-h"><span class="n">PHASE 10</span><h4>Rehearsal — twice, full length — and the recording</h4><span class="st done">scaffolding done · 36h run pending</span></div>
       <div class="phase-b">
         <div><span class="k">Do</span><ul><li>Two complete 36-hour runs on a fresh target, from sealed SSD, nobody touching it overnight</li><li>Watch for: leaks, disk filling with corpus, stuck subprocesses, model server dying at hour 20</li><li>The 7-minute arc rehearsed twenty times; the install five times; Q&amp;A mocked with a mentor playing a hostile judge</li><li><strong>Record the full arc</strong> at a safe point; copy it to two devices</li></ul></div>
         <div><span class="k exit">Exit gate</span><ul><li>Second 36-hour run finishes with no manual intervention and the console still responsive</li></ul></div>
@@ -557,7 +557,7 @@
           <tr><td class="idx">02</td><td class="mech">The live demo died</td><td>Rehearsed twenty times; recording on two devices; narrate over it (Phase 10)</td><td class="ok">covered</td></tr>
           <tr><td class="idx">03</td><td class="mech">A judge asked "did you build this?" and we fumbled</td><td>Provenance marks on every component; the six BUILD items named; the answer rehearsed</td><td class="ok">covered</td></tr>
           <tr><td class="idx">04</td><td class="mech">A number was challenged and it was borrowed</td><td>Phase 9: every number from our own run; losses beside wins</td><td class="ok">covered</td></tr>
-          <tr><td class="idx">05</td><td class="mech">We over-claimed and a technical judge caught it</td><td>The honesty panel, memorised; "React is not a fuzzing target"; QLoRA not claimed; harness synthesis not a headline</td><td class="ok">covered</td></tr>
+          <tr><td class="idx">05</td><td class="mech">We over-claimed and a technical judge caught it</td><td>The honesty panel, memorised; "React is not a fuzzing target"; QLoRA not claimed; harness synthesis stated exactly as built (template wrapper + quality gate, four languages)</td><td class="ok">covered</td></tr>
           <tr><td class="idx">06</td><td class="mech">No GPU at the venue</td><td>Own machine brought regardless; CPU-only profile benchmarked in Phase 4; template-only still runs</td><td class="ok">covered</td></tr>
           <tr><td class="idx">07</td><td class="mech">Model server died at hour 20 and nobody noticed</td><td>Watchdog restart, visible on the board; dress rehearsals ran 36 hours twice</td><td class="ok">covered</td></tr>
           <tr><td class="idx">08</td><td class="mech">Disk filled with corpus; everything stalled</td><td>Quotas, corpus minimisation, health panel — found in rehearsal, not at the finale</td><td class="ok">covered</td></tr>

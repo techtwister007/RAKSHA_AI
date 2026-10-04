@@ -17,6 +17,7 @@ real. Nothing unproven ever ships.
 | Path | What it is |
 |---|---|
 | `RAKSHA_AI_Dossier/` | The settled brief — competition decode, architecture, tool map, models, honest gaps. Read `README.md` there first. |
+| **`HANDOVER.md`** | **Start here on a new machine:** current state, how to resume, prioritised remaining work, honest limits. |
 | `BUILD_PLAN.md` | The execution plan: finale answers, settled decisions, phases, and the scoring ledger. |
 | `docs/` | The architecture sheet, campaign plan and plan map (HTML; also published as artifacts — links in `BUILD_PLAN.md`). **`docs/laptop-setup.md`: run the whole system on your own machine.** |
 | `raksha/` | The product. |
@@ -28,9 +29,11 @@ real. Nothing unproven ever ships.
 fixes and proves vulnerabilities across C, Java, Python and Go through one gate — including
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
-The only thing a build container cannot do is the 36-hour dress rehearsal on finale GPU
-hardware — the harness and runbook for it are built (`raksha/rehearse.py`,
-`docs/rehearsal-runbook.md`).
+Last verified run: **371 tests pass**, lint and air-gap guard clean, all slices `VERIFIED`.
+What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5: the
+36-hour rehearsal and the real-Docker sandbox need the finale hardware; the model lane has run
+only against a mock endpoint; JS/TS and Rust are build-free only; fix templates are few and the
+model generalises beyond them.
 
 ```
 raksha/
@@ -60,7 +63,7 @@ raksha/
 
 ```sh
 pip install -e '.[dev]'
-pytest                       # the full invariant, gate, lane and hardening suite
+pytest                       # 371 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
 
 python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
 python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)

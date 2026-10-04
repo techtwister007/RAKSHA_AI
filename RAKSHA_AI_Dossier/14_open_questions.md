@@ -3,6 +3,13 @@
 Kept separate and honest so no one mistakes a plan for a proven fact. None of these block
 starting; all should be resolved by evidence, early.
 
+> **Status (2026-10-04).** Resolved by evidence: **1** (keystone proven: four languages, one record,
+> one gate, 371 tests), **2** (pre-flight + canonicaliser tested on noisy, error-path and
+> `go test` output), **3** (harness synthesis built and verified for C, Python and Go — Java
+> uses its replay driver). Still open: **4** (endurance — harness built, 36 h run pending, `HANDOVER.md`
+> P0-1), **5–8** (decisions; 5 settled as Java + C + Python + Go deep), **9–10** (external).
+> The organisers' answers that shaped the plan are recorded at the top of `../BUILD_PLAN.md`.
+
 ## Unproven assumptions (validate first)
 
 1. **The unified finding record is the keystone and is only asserted.** Build the thinnest

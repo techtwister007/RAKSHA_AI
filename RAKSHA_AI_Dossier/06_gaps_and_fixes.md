@@ -3,6 +3,12 @@
 This is the most important file for not fooling ourselves. Read it before believing any
 of the others.
 
+> **Status (2026-10-04).** The fixes this file calls for are built: the build agent degrades to the
+> build-free lanes; the determinism pre-flight and canonicaliser are tested against noisy and
+> error-path output; harness synthesis exists with its two-check quality gate (`raksha/harness/`),
+> so the C lane no longer depends on a hand-written harness; endurance machinery exists but the
+> 36-hour rehearsal itself has not been run. Current honest limits: `../HANDOVER.md` §5.
+
 ## The honest confidence number
 
 Nobody should claim >95% certainty. The realistic maths for the *flawless ideal* demo:

@@ -6,6 +6,23 @@ design — every runtime import is stdlib or a tool invoked as a subprocess. The
 the open-source tools and model weights the full deployment assembles; each is used under a
 permissive or open licence. Confirm the exact version's licence before shipping the bundle.
 
+## What the shipped code uses today
+
+The tables further down list the full deployment's assembly. The code in this repository, as
+committed, invokes only the following at runtime — everything else below is carried by the
+sealed bundle when the operator provisions it, or is a planned "take" lane (`HANDOVER.md` P2-3).
+
+| Component | Used by | Licence |
+|---|---|---|
+| Python 3.11+ standard library | everything (no third-party runtime package) | PSF |
+| gcc + AddressSanitizer, gcov | C lane, autofuzz C coverage | GPL (toolchain; no linkage into our code) |
+| JDK 17+, Apache Maven | Java lane | GPL+CE / Apache-2.0 |
+| Go toolchain (native fuzzing, cover profile) | Go lane | BSD-3-Clause |
+| git, `patch` | applying and reversing patches | GPL-2.0 (tools) |
+| Apache Log4j 2.14.1 / 2.17.1, JUnit 5, Jazzer API | the bundled Java demo target only | Apache-2.0 / EPL-2.0 / Apache-2.0 |
+| OASIS SARIF 2.1.0 schema (vendored in `schemas/`) | record format validation | OASIS, royalty-free |
+| pytest, jsonschema | development only (`[dev]` extra) | MIT |
+
 ## Model weights
 
 | Component | Role | Licence |

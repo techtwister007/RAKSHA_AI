@@ -24,8 +24,8 @@ manual intervention** — that is the exit gate for Phase 10.
 ## Running
 
 ```sh
-# short self-test first (seconds), to confirm the harness is wired:
-python3 -m raksha.rehearse 10
+# short self-tests first (seconds), to confirm the install and the harness are wired:
+python3 -m raksha.slice_autofuzz && python3 -m raksha.slice_three && python3 -m raksha.rehearse 10
 
 # the full run (seconds = 36h = 129600), on the finale node:
 python3 -c "from pathlib import Path; from raksha.rehearse import Rehearsal; \

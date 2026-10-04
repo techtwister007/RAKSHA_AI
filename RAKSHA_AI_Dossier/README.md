@@ -53,6 +53,16 @@ one is misled.
 
 ---
 
+## Status note (2026-10-04)
+
+This dossier is the **settled brief** and is kept as written. The build it describes is now
+complete through Phase 11 (automatic harness generation): see `../HANDOVER.md` for the verified
+state, the per-language matrix and the remaining work, and `../BUILD_PLAN.md` for the phase table
+and scoring ledger. Where this brief says "planned" or "unproven", those two files say what
+actually happened. The deck is still v1 (note above); its rebuild is `HANDOVER.md` P2-6.
+
+---
+
 ## The thirty-second version
 
 The competition wants an AI that, on its own and fully offline, **finds** a security

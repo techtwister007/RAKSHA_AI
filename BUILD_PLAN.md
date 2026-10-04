@@ -1,6 +1,8 @@
 # RAKSHA AI — Build Plan
 
 **The dossier (`RAKSHA_AI_Dossier/`) is the settled brief. This file is the execution plan.**
+**Resuming on a new machine? Read `HANDOVER.md` first** — current state, how to pick it up, and the
+prioritised remaining work.
 Three companion documents carry the detail; this file is the short, committed version of them:
 
 | Document | Source | Published |
@@ -25,9 +27,10 @@ language must be covered**; their code may stay on our machine.
 **"All languages" is a product requirement, met in two tiers.** Tier 1, every language: the
 language-agnostic lanes — dependency CVEs (OSV covers every ecosystem), secrets, config, SBOM, and
 Semgrep's generic rules across 30+ languages — run on any target and produce proven findings.
-Tier 2, deep (fuzz + fix): C/C++, Java/Kotlin, JS/TS, Python first; Go (native fuzzing) and Rust
-(cargo-fuzz) next because they are cheap to add behind the same oracle plugin API. No language
-ever yields nothing.
+Tier 2, deep (fuzz + fix): **built for C/C++, Java, Python and Go** — the first three with no
+hand-written harness (synthesized, Phase 11; Java via the shipped Jazzer replay driver). JS/TS
+(Jazzer.js) and Rust (cargo-fuzz) are the next adapters behind the same oracle plugin API
+(`HANDOVER.md` P1-2, P1-3). No language ever yields nothing: every one gets the Tier-1 lanes.
 
 ## Settled decisions
 
@@ -42,12 +45,16 @@ ever yields nothing.
 4. **Dependency bumps are patches.** Bump → rebuild → suite → gate. Zero inference. The confirming
    oracle is a deterministic version match (`osv-version-match`), named as such on the record and
    ranked below exploit-proven findings.
-5. **Precision is a data model, not a promise.** Already shipped (`raksha/finding.py`, 62 tests).
+5. **Precision is a data model, not a promise.** Shipped (`raksha/finding.py`): the invariant is
+   closed at construction as well as in the transition methods, and false positives are measured
+   separately against negative controls (`python -m raksha.benchmark`), not assumed.
 6. **The security advisor never vetoes the gate.** Disagreement with the coding model steps ROE
    down to R1; the five mechanical checks alone decide VERIFIED.
-7. **Six novelty mechanisms, not seven.** Harness synthesis is TAKE+WRAP with a two-check quality
-   gate (compiles, produces coverage) — an instance of "nothing is trusted until it proves itself",
-   not a headline. "Five-gate harness synthesis" was deck-v1 language and is retired.
+7. **Harness synthesis is built, and it is TAKE+WRAP with a two-check quality gate** (the
+   synthesized driver must compile/import and exercise the target on a benign input before it
+   is trusted) — the same "nothing is trusted until it proves itself" rule applied to our own
+   generated code. It is what lets the deep loop run on an unknown target with no human-written
+   harness (`raksha/harness/`). "Five-gate harness synthesis" was deck-v1 language and stays retired.
 8. **Lane cross-confirmation** promotes a static SUSPECTED finding when another lane's reproducer
    lands on the **same fix site with the same CWE**; the two records **merge** on the dedup key.
 9. **The model's regression test must fail on the vulnerable build and pass on the patched one**
@@ -57,8 +64,10 @@ ever yields nothing.
 11. **The asset registry** (every codebase, its source, its criticality tier) is a BUILD component;
     ROE and the vaccine both depend on it.
 12. **Recruit one teammate for the 36 hours**, even non-technical.
-13. **Cloud inference during development, behind one interface** (`RAKSHA_INFERENCE_BASE_URL`);
-    no model SDK anywhere else; CI grep enforces it. Local vLLM from Phase 4.
+13. **Every model call goes through one interface** (`raksha/inference.py`, `RAKSHA_INFERENCE_BASE_URL`):
+    cloud during development (`RAKSHA_SEALED=0`), local vLLM sealed at the finale; no model SDK
+    anywhere else — the air-gap guard parses every shipped Python file to prove it. With no
+    endpoint the pipeline is model-free (templates → retrieval → mitigation) and still verifies.
 
 ## The one rule
 
@@ -70,19 +79,23 @@ scoring interface. Every stage writes its metric as it runs; the console reads t
 
 ## Scoring ledger
 
+Every row below is emitted on the Scorecard (`raksha/metrics.py`, console Screen 5) and is
+measured per run from the records and live counters — never typed in. Key names are the
+`scorecard()` dict keys.
+
 | Component | Criterion | Metric emitted |
 |---|---|---|
-| Unified finding record — no reproducer, locked at SUSPECTED | **Precision** | % reports with a replaying reproducer (100% by construction); findings suppressed |
-| Status machine + transition timestamps | **Speed** | median time-to-PoV; median time-to-validated-patch; **time to first proven finding** |
-| Five-check gate, differential corpus + own tests | **Precision** | % candidate patches surviving; patches rejected; corpus inputs quarantined |
-| Lane cross-confirmation | **Precision** | static findings promoted by another lane's reproducer |
+| Unified finding record — no reproducer, locked at SUSPECTED | **Precision** | `reports_with_reproducer_pct` (100% by construction); `unproven_findings_suppressed`; false positives on negative controls (benchmark) |
+| Status machine + transition timestamps | **Speed** | `median_time_to_pov_seconds`; `median_time_to_validated_patch_seconds`; **`time_to_first_proven_finding_seconds`** (wall-clock from session start); `proven_findings_in_first_10min` |
+| Five-check gate, differential corpus + own tests | **Precision** | `patches_surviving_differential_pct`; `patches_rejected_by_gate`; `quarantined_corpus_inputs` |
+| Lane cross-confirmation | **Precision** | `static_findings_promoted` |
 | Build-free lanes + dependency-bump patches | **Performance · Speed** | findings in the first 10 minutes; findings produced while the build was failing |
-| Repair ladder + calibrated router + bandit reallocation | **Resource** | % fixes at zero inference; tokens per validated patch; live VRAM; inference attempts without a fix |
+| Repair ladder (template → retrieval → model → mitigation) | **Resource** | `zero_inference_fix_pct` (every lane but LLM); `tokens_per_validated_patch` (summed from real usage); `vram` (null off-GPU); `inference_attempts_without_a_fix` |
 | CPU-only degrade profile | **Resource** | the whole pipeline running with no model |
-| One adapter per language, oracle plugin API | **Scalability** | language coverage matrix; verified per language; targets in parallel |
+| One adapter per language, oracle plugin API; **automatic harness generation** | **Scalability** | `languages_covered` (lanes such as secrets/API excluded); `verified_per_language`; findings from synthesized harnesses in the benchmark |
 | ROE authority model | **Functionality** | authority in force per action; zero-human-input count |
-| Vaccine sweep over the asset registry | **Scalability** | variants found per verified fix |
-| Sandbox, no network interface | Trust | network interfaces: 0; cloud calls: 0 |
+| Vaccine sweep over the asset registry | **Scalability** | `vaccine_variants_found` (origin codebase excluded — no self-hits) |
+| Sandbox, no network interface | Trust | `network_interfaces` = 0 only if every target-code run went through the sandbox, else `unenforced`; `cloud_calls` = live egress counter |
 
 ## Phases
 
@@ -101,7 +114,7 @@ kill-switches are in the campaign plan, Part 2.
 | 6 | C and Python deep slices — three languages on one screen | C (gcc+ASan), Python (shell-injection) and Java each find→fix→prove through the one gate | **done** (`raksha/adapters/c_asan.py`, `python_sink.py`, `raksha/slice_three.py`) |
 | 7 | WOW: bad-patch rejection, ROE slider, vaccine | all three real & tested: gate rejects a planted overfit; ROE tiers + two-person rule; vaccine mines→proves→sweeps | **done** (`raksha/roe.py`, `raksha/vaccine.py`, `raksha/slice_wow.py`) |
 | 8 | Screens 2/4/6; signed evidence bundle; Commander's Brief (JSSD); rollback; risk register | bundle builds, signs, verifies & tamper-detects; brief + risk + pipeline live in console | **done** (`raksha/bundle.py`, `brief.py`, `risk.py`, `rollback.py`) |
-| 9 | Our own numbers on ARVO / AutoPatchBench; self-score; licence register | Every number we will say traces to this run | |
+| 9 | Our own numbers; negative controls; licence register | Every number we will say traces to this run | **done** (`raksha/benchmark.py`, `docs/benchmark-report.md`, `THIRD_PARTY.md`) · ARVO loader pending (`HANDOVER.md` P1-8) |
 | 10 | Rehearsal harness + health watchdog + runbook (execution needs finale hardware) | harness loops & survives caps; watchdog restarts visibly; runbook ready | **scaffolding done** (`raksha/health.py`, `raksha/rehearse.py`, `docs/rehearsal-runbook.md`) · 36h execution awaits finale GPU/Docker |
 | 11 | Automatic harness generation — find→fix→prove on a target with NO hand-written harness | discover entry point → synthesize harness → fuzz → confirm → repair ladder through the gate; C, Python (own mutation fuzzer + fork server) and Go (native `go test -fuzz`) | **done** (`raksha/harness/`, `raksha/autorepair.py`, `raksha/adapters/go_fuzz.py`, `raksha/slice_autofuzz.py`, `raksha/slice_go.py`) |
 

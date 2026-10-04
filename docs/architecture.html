@@ -220,7 +220,7 @@
         <dt>Covers</dt><dd>Core · wow · fallbacks · scoring</dd>
         <dt>Origin</dt><dd>EME School, Vadodara</dd>
         <dt>Entry</dt><dd>AI Kavach — Grand Finale</dd>
-        <dt>Status</dt><dd>Pre-build reference</dd>
+        <dt>Status</dt><dd>Built through Phase 11 (2026-10-04) — see HANDOVER.md</dd>
       </dl>
     </div>
     <p class="usp">Runs where classified code lives, and refuses to speak without proof.</p>
@@ -1118,7 +1118,7 @@
           <thead><tr><th>Where the model is called</th><th>Which</th><th>Bounded by</th><th>If it fails or is absent</th></tr></thead>
           <tbody>
             <tr><td class="mech">Build agent — unknown build error</td><td>32B</td><td>one targeted fix per retry, cap 5; remedy table and OSS-Fuzz recipe tried first</td><td>build-free mode</td></tr>
-            <tr><td class="mech">Harness synthesis (C)</td><td>32B via OSS-Fuzz-Gen</td><td>harness quality gate; checkpoint</td><td>Jazzer autofuzz on JVM; hand-written for the demo target</td></tr>
+            <tr><td class="mech">Harness synthesis (C, Python, Go)</td><td>template TAKE+WRAP; model refines the entry-point choice</td><td>two-check harness quality gate (compiles / imports; exercises the target); built — <code>raksha/harness/</code></td><td>Java uses its Jazzer replay driver; JS/TS and Rust pending</td></tr>
             <tr><td class="mech">Repair — LLM lane</td><td>32B</td><td>only after template and retrieval miss; best-of-N, gate picks; 3 rounds</td><td>mitigation floor, then REPORT_ONLY</td></tr>
             <tr><td class="mech">Regression test generation</td><td>32B</td><td>must fail-before / pass-after (Fig 5)</td><td>bundle ships without a new test, and says so</td></tr>
             <tr><td class="mech">Security judgement — CWE, exploitability, root cause</td><td>8B advisor</td><td>advisory; disagreement steps ROE down to R1, never blocks the gate</td><td>ROE conservatively capped at R2 for that patch</td></tr>
@@ -1378,7 +1378,7 @@
         <div class="rung"><span class="n">RUNG 1</span><span class="t"><b>Target will not build</b>
           → build-free lanes: static, dependencies, secrets, config. Still real findings.</span></div>
         <div class="rung"><span class="n">RUNG 2</span><span class="t"><b>No harness can be
-          synthesised</b> → hand-written harness for the demo target, and we say so openly.</span></div>
+          synthesised</b> → the gate still runs on any harness a human supplies; today the C, Python and Go demo targets ship none and are fuzzed through synthesized drivers.</span></div>
         <div class="rung"><span class="n">RUNG 3</span><span class="t"><b>Fuzzing finds nothing in
           time</b> → static and dependency findings carry the demo. They were running in parallel,
           not after.</span></div>
@@ -1411,7 +1411,7 @@
               <td>Real findings on a language we never adapted for. Likely, since the target is
                 unknown.</td></tr>
             <tr><td class="idx">03</td><td class="mech">No fuzz harness can be synthesised</td><td class="crit">High</td>
-              <td>Jazzer autofuzz needs none on the JVM; hand-written harness for the demo target.</td>
+              <td>Synthesized for C, Python and Go (entry-point discovery → template driver → two-check quality gate); the Java demo uses its shipped Jazzer replay driver.</td>
               <td>The crash-bug lane on at least one language.</td></tr>
             <tr><td class="idx">04</td><td class="mech">Fuzzing finds nothing in budget</td><td class="crit">Medium</td>
               <td>Static, supply-chain and service lanes ran concurrently.</td>
@@ -1474,9 +1474,9 @@
       <p class="lede">The same discipline the product claims for itself, applied to the team: know
         the limits of your own authority, and decide the aborts while calm. Hour 30 is not calm.</p>
       <div class="grid g2">
-        <div class="card s"><h4>Harness synthesis stalls</h4>
-          <p>No compiling, coverage-producing harness by the checkpoint → hand-write harnesses for
-            the demo target, and say so openly.</p></div>
+        <div class="card s"><h4>Harness synthesis stalls on their target</h4>
+          <p>No candidate driver passes the two-check quality gate → the build-free lanes still
+            report, and a human-written harness drops into the same gate; say so openly.</p></div>
         <div class="card s"><h4>LLM lane is not beating templates</h4>
           <p>By the checkpoint → demo templates as primary and the LLM as fallback. Still
             impressive, still honest, and it raises the zero-inference number.</p></div>
