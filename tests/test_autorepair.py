@@ -208,3 +208,13 @@ def test_a6_model_gets_the_verdicts_feedback_on_the_next_round(monkeypatch):
     assert out.verified and r.finding.status is Status.VERIFIED
     assert len(client.calls) >= 2                      # it came back for a second, informed attempt
     assert "REJECTED by the verifier" in client.calls[-1][-1]["content"]
+
+
+@pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
+def test_a3_deployment_twin_rechecks_on_an_optimised_build():
+    """A3: the C autofuzz target has a release (-O2, no sanitizer) build, so a proven patch is
+    re-checked on the build the system would actually deploy. The demo fix holds on both."""
+    r = autofuzz(C_TARGET, max_execs=60000, use_model=False)
+    out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                 corpus=[b"\x01\x04abcd", b"\x02zz", b"\x01\x02ab"], use_model=False)
+    assert out.verified and out.verdict is not None and out.verdict.twin_checked is True

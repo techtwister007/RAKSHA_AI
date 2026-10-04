@@ -98,6 +98,10 @@ class GateVerdict:
     #: A1: signatures of OTHER defects that were present on the vulnerable build and are not what
     #: this patch fixed. They are not failures of this patch; the campaign loop (B1) harvests them.
     sibling_signatures: list = field(default_factory=list)
+    #: A3: the deployment twin. True = the proven patch also held on a release-flavour (optimised,
+    #: no sanitizer) build; False = it diverged there; None = the target has no distinct release
+    #: build, so the twin was not run. A divergence fails the gate closed.
+    twin_checked: bool | None = None
     before: BuildResult | None = None
     after: BuildResult | None = None
     #: patched/baseline wall-time over the stable corpus; None when the baseline was too short to mean anything
@@ -148,6 +152,7 @@ def run_gate(
     perf_floor_seconds: float = PERF_FLOOR_SECONDS,
     previous_good: BuildResult | None = None,
     min_stable_inputs: int | None = None,
+    twin: bool = True,
 ) -> GateVerdict:
     """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict.
 
@@ -169,7 +174,7 @@ def run_gate(
                       coverage_tolerance=coverage_tolerance, regression_test=regression_test,
                       preflight_runs=preflight_runs, pov_variants=pov_variants,
                       perf_tolerance=perf_tolerance, perf_floor_seconds=perf_floor_seconds,
-                      previous_good=previous_good, min_stable_inputs=min_stable_inputs)
+                      previous_good=previous_good, min_stable_inputs=min_stable_inputs, twin=twin)
     finally:
         discard = getattr(target, "discard", None)
         if discard is not None:
@@ -182,7 +187,8 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
            corpus: list[bytes], refuzz_seconds: float, oracles: tuple, canon: Canonicaliser | None,
            coverage_tolerance: int, regression_test: str | None, preflight_runs: int,
            pov_variants: int, perf_tolerance: float, perf_floor_seconds: float,
-           previous_good: BuildResult | None, min_stable_inputs: int | None) -> GateVerdict:
+           previous_good: BuildResult | None, min_stable_inputs: int | None,
+           twin: bool) -> GateVerdict:
 
     # 1 ── COMPILES
     before = target.build(None)
@@ -328,6 +334,37 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
                         detail=f"{len(variants)} reproducer variants dead; fresh fuzzing pass on the "
                                f"patched build found nothing new ({len(crashes)} crash candidate(s) "
                                f"checked, budget {int(refuzz_seconds)}s){sib_note}")
+
+    # A3 — the deployment twin. The five checks ran on the sanitizer build; the system actually
+    # deploys an optimised, instrumentation-free build, where undefined behaviour can manifest
+    # differently. When the target has a distinct release build, re-run POV_DEAD and a quick
+    # differential on it; a divergence fails the gate closed. Targets with no release build (the
+    # default) record twin_checked = None — the seam is honest, not a silent pass.
+    if twin and getattr(target, "release_build_cmd", None):
+        rbefore = target.build(None, flavour="release")
+        rafter = target.build(finding.patch_diff, flavour="release")
+        if not (rbefore.ok and rafter.ok):
+            verdict.twin_checked = None
+        else:
+            rr = target.run(rafter, reproducer)
+            if oracle_fired(rr.text, oracles) or rr.timed_out:
+                try:
+                    target.discard(rbefore); target.discard(rafter)
+                except Exception:  # noqa: BLE001
+                    pass
+                return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
+                             "the reproducer fires on the release-flavour (deployment) build — the fix "
+                             "holds only under the sanitizer build")
+            tw = differential_timed(target, rbefore, rafter, corpus, pf.stable, canon=canon).mismatches
+            verdict.twin_checked = not tw
+            try:
+                target.discard(rbefore); target.discard(rafter)
+            except Exception:  # noqa: BLE001
+                pass
+            if tw:
+                return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
+                             f"{len(tw)} corpus input(s) behave differently on the release build — the "
+                             "patch changes behaviour under optimisation")
 
     # The model's test, if any: verified or discarded, never assumed.
     if regression_test is not None:

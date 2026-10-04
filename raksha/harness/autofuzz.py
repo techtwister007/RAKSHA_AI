@@ -159,6 +159,14 @@ def _c_build_cmd(work: Path, cc: str) -> str:
             f"-o raksha_harness {' '.join(srcs)}")
 
 
+def _c_release_build_cmd(work: Path, cc: str) -> str:
+    """The deployment twin's build (A3): optimised, no sanitizer — what the system actually ships."""
+    srcs = ["raksha_harness.c", *_c_sources(work)]
+    incdirs = sorted({str(Path(s).parent) for s in srcs if Path(s).parent != Path(".")})
+    inc = " ".join(f"-I{d}" for d in incdirs)
+    return f"{cc} -O2 -I. {inc} -o raksha_harness {' '.join(srcs)}"
+
+
 def _c_runner(work: Path, built: dict, oracle: Oracle):
     import subprocess
     binary = work / "raksha_harness"
@@ -203,6 +211,7 @@ def _c_target(work: Path, built: dict, ep: Entrypoint) -> CommandTarget:
         test_cmd="true",                          # a discovered target brings no suite of its own
         coverage_cmd=cov,
         refuzz_cmd=refuzz,
+        release_build_cmd=_c_release_build_cmd(work, cc),   # A3 deployment twin
         added_test_cmd="sh {test}",               # lets a verified regression test ride to the bundle
         added_test_path="raksha_regression.sh",
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
