@@ -29,14 +29,16 @@ real. Nothing unproven ever ships.
 fixes and proves vulnerabilities across C, Python, Go, Rust, JavaScript/TypeScript and Java through one gate — including
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
-Plan V2 Waves 0 and 1 are built (`PLAN_V2.md`, per-item status with evidence and caveats); Waves
-2–4 are next. Last verified run: **770 tests pass**, 0 fail, 11 skipped (opt-in; the deep and Java slices among them
-also pass when enabled), air-gap guard and pyflakes clean, all slices `VERIFIED`.
+Plan V2 Waves 0, 1 and 2 are built (`PLAN_V2.md`, per-item status with evidence and caveats);
+Waves 3–4 are next. Last verified run: **826 tests pass**, 0 fail, 2 skipped (the real multi-language benchmark and one
+slow mutation test), with every slow lane, the deep and Java slices and the z3 proofs enabled;
+air-gap guard and pyflakes clean; all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5 and
 `docs/threat-model.md` (residual risks): the 36-hour rehearsal and the real-Docker sandbox need
-the finale hardware; the model lane has run only against a mock endpoint; no SMT solver is bundled
-yet, so bound proofs read `unavailable`; fix templates are few and the model generalises beyond
-them.
+the finale hardware; the model lane has run only against a mock endpoint; the SMT solver is an
+optional extra baked into the sealed image (absent, proofs read `unavailable`); no code-embedding
+model is bundled, so cross-language retrieval uses a stated structural vector; fix templates are
+few and the model generalises beyond them.
 
 ```
 raksha/
@@ -72,7 +74,7 @@ raksha/
 
 ```sh
 pip install -e '.[dev]'
-pytest                       # 770 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
+pytest                       # 826 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
 
 python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
 python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)

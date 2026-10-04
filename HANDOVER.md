@@ -23,15 +23,22 @@ regenerated from the repository as the last step.
 
 Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24):
 
-- **770 tests pass**, 0 fail, 11 skipped, with the slow Go/Rust/JS lanes enabled; the opt-in deep and
-  Java slices (20 tests) pass when enabled; still unrun here: the 5 z3 proofs (no solver bundled), the
-  multi-language benchmark and the slow mutation-factory test. Air-gap guard and pyflakes clean.
+- **826 tests pass**, 0 fail, 2 skipped, with every slow lane (Go/Rust/JS), the deep and Java slices
+  and the z3 proofs enabled; still unrun here: the multi-language benchmark and one slow
+  mutation-factory test. Air-gap guard and pyflakes clean.
 - **Plan V2 Wave 0 + Wave 1 built** (`PLAN_V2.md` carries per-item status, proof and caveats): multi-bug
   gate semantics, evidence floor, release twin, rollback proof, three more oracle families, campaign
   loop, minimisation, real Python/Node coverage, **Java with no harness** (VERIFIED), contract
   demotion, per-run anti-analysis names, **binary lane** (real log4j jar matched), **LD_PRELOAD sink
   interposition** and a **behavioural baseline** for defects no crash oracle sees, supply-chain v2,
   signed journal, PQ/in-toto bundles, signed self-update, crash-resume, budgets, persistent learning.
+- **Plan V2 Wave 2 built** (intelligence, each a proposer/annotator — the gate still decides): SMT
+  reachability evidence on fixes (before: reachable with the solver's witness; after: unreachable),
+  guided-decoding repair output with strict parsing, cross-language retrieval of a proven fix's idea
+  (C clamp → Go slice), a three-role parliament incl. the attacker, the scientific-method cycles on every
+  record, **fusion reliabilities measured on a labelled corpus** (`python -m raksha.calibrate --deep`,
+  table in `raksha/data/calibration.json`), KEV/EPSS-priced attack steps, and derived CVSS 3.1 scores /
+  4.0 vectors with ATT&CK / D3FEND mapping on every finding.
 - **Every spawn of target code goes through one sandbox door** — including the fuzzing hot loops,
   which previously bypassed it (found and fixed in the Wave 1 close-out; enforced by an AST test).
   RAKSHA's own threat model: `docs/threat-model.md`.

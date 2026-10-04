@@ -1,7 +1,7 @@
 # RAKSHA AI — Plan V2: close every gap, add every feature
 
-**Status:** Wave 0 and Wave 1 built (2026-10-04); Waves 2–4 not started. Per-item status, with the
-evidence and the honest caveats, is in the *Wave 1 — status* block below.
+**Status:** Waves 0, 1 and 2 built (2026-10-04); Waves 3–4 not started. Per-item status, with
+the evidence and the honest caveats, is in the *Wave 1 — status* and *Wave 2 — status* blocks.
 **Scope rule:** every item from the two review passes is included — nothing dropped for cost.
 Breadth first; optimisation after. This document is the contract we execute from and tick off.
 
@@ -192,6 +192,22 @@ test (`tests/test_sandbox_door.py`).
 ---
 
 ## Wave 2 — Intelligence and reasoning upgrades
+
+### Wave 2 — status (built; each line names its proof)
+
+- **G1** ✔ `raksha/reachproof.py`: the guards at the fix-site access are read before and after the patch and z3 asked whether the index can leave bounds. The Java no-harness fix records before = reachable (with the solver's own witness) and after = unreachable; an off-by-one "fix" is seen through. Evidence only; premises (no overflow modelling) on the record — `tests/test_reachproof.py`. z3 is now a declared `[reasoning]` extra baked into the sealed image.
+- **G2** ✔ `RAKSHA_GUIDED_DECODING=json_schema|vllm|off`: a fixed `{diff, regression_test}` schema rides the request; replies are parsed strictly and well-formedness checked; off, the tolerant parser runs; both counted on the scorecard. Caveat: tested end-to-end against a loopback stub — request shape and parsing are proven, a real constrained decoder is not exercised here — `tests/test_guided.py`.
+- **G3** ✔ cross-language retrieval of a proven fix's *idea*: the C CWE-121 clamp is retrieved for the Go CWE-125 slice finding (similarity 0.58) and realised as a correct Go diff; provenance on the record, worked example to the model lane. Caveat: no embedding model is bundled — the default vector is a stated structural (non-learned) one; a served `/v1/embeddings` model is used when configured — `tests/test_crosslang_retrieval.py`.
+- **G4** ✔ specialist, second opinion and attacker each vote independently; disagreement measured per axis and per pair; roles on one model flagged as not independent; offline stays unmeasured — `tests/test_parliament.py`.
+- **G5** ✔ every finding's record carries its hypothesis → experiment → observation → conclusion cycles (detection, each repair round, proofs, red team), drawn only from recorded events; the brief carries a Method line — `tests/test_method.py`.
+- **G6** ✔ `python -m raksha.calibrate --deep` measures each fusion channel on a labelled corpus (`raksha/data/groundtruth.json` + negative controls) and the kernel uses the posterior; the table (prior, n, TP/FP, Wilson 95%, calibrated, bands) is committed in `raksha/data/calibration.json` and on the scorecard. Parliament has no data and stays at its prior, marked uncalibrated; structural is flagged in-sample. Dependency attack steps are priced by KEV/EPSS; reachability costs stay stated priors. Caveat: small curated corpus — a measured baseline, said so in the table — `tests/test_calibration.py` (also a standing zero-false-positive guard over the corpus).
+- **G7** ✔ derived, labelled CVSS 4.0 vector (score not computed: FIRST's MacroVector table is not bundled), CVSS 3.1 vector with its exact base score (checked against FIRST reference vectors), ATT&CK technique IDs and the D3FEND tactic of the fix; in the proof block, SARIF `security-severity`, the brief and the scorecard — `tests/test_cvss.py`.
+
+**Found and fixed during Wave 2 (not in the plan):** labelling the calibration corpus exposed three
+false-positive sources — the git-history lane walking the *enclosing* repository when the target is a
+subdirectory, the C taint match reading string literals (a tainted `n` matched `"\n"`), and copies
+into a buffer allocated for exactly that length. All fixed with regression tests.
+
 
 Built after the gate is trustworthy, because each only proposes or ranks.
 
