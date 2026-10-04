@@ -67,6 +67,11 @@ class Scorecard:
         }
 
 
+def _guided_counts() -> dict:
+    from .guided import counters
+    return counters()
+
+
 def live_counters() -> dict[str, int]:
     """Process-wide inference and execution counters, for a session to snapshot at its start."""
     return {**inference.counters(), **sandbox.execution_counts()}
@@ -245,6 +250,8 @@ def scorecard(
             round(tokens_total / verified_via_model, 1) if verified_via_model else None
         ),
         "inference_calls": run["inference_calls"],
+        # G2: model replies that yielded no usable diff, split by whether decoding was guided
+        "model_output_parse": _guided_counts(),
         # Live VRAM, or None off-GPU — honestly absent rather than a faked zero.
         "vram": vram_reading.as_dict() if vram_reading else None,
         # D4: measured CPU per verified fix (getrusage deltas incl. child processes), and the

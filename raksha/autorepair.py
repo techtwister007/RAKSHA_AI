@@ -37,7 +37,7 @@ from .gate.runner import MAX_REPAIR_ROUNDS, GateVerdict, decide, run_gate
 from .gate.target import Target
 from .inference import REPAIR, InferenceError, get_client
 from . import hygiene
-from .repair import Candidate, split_diff_and_test
+from .repair import Candidate
 from .repair_templates import _read_fix_site, generic_templates, template_regression_test
 from .replay import one_line
 from .retrieval import FixMemory, default_memory
@@ -147,14 +147,26 @@ def _llm_candidates(finding: Finding, root: Path, client, n: int = 3,
          + (f"\n\nYour previous attempt was REJECTED by the verifier. {feedback}\nFix that and "
             "try again — do not repeat the rejected approach." if feedback else "")},
     ]
+    from . import guided as _guided
+    gstyle = getattr(client.config, "guided", "off")
+    kwargs = {}
+    if gstyle != "off":
+        # G2: the endpoint constrains the reply to {"diff": ..., "regression_test": ...}
+        prompt[0] = {"role": "system", "content": prompt[0]["content"].replace(
+            "Output a unified diff", "Reply with ONE JSON object {\"diff\": <unified diff>, "
+            "\"regression_test\": <test source or null>}. The diff is a unified diff").replace(
+            "Then, OPTIONALLY, on a line by itself write `=== REGRESSION TEST ===` and after it a",
+            "The regression_test, when given, is a")}
+        kwargs["extra"] = _guided.request_fields(gstyle)
     try:
-        completions = client.complete(prompt, role=REPAIR, n=(1 if feedback else n), temperature=0.3)
+        completions = client.complete(prompt, role=REPAIR, n=(1 if feedback else n), temperature=0.3,
+                                      **kwargs)
     except InferenceError:
         return []
     model = client.config.model_for(REPAIR)
     out = []
     for textc in completions:
-        diff, test = split_diff_and_test(textc)
+        diff, test = _guided.parse(textc, gstyle)
         if diff:
             out.append(Candidate(diff, RepairLane.LLM, model_version=model,
                                  prompt_version=PROMPT_VERSION, regression_test=test))

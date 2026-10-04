@@ -123,6 +123,8 @@ class InferenceConfig:
     #: Per-role model overrides for the extra roles (triage / red / judge). Unset roles fall back:
     #: triage → advisor (small, fast); red → repair (it must write inputs); judge → advisor.
     role_models: tuple[tuple[str, str], ...] = ()
+    #: G2: guided-decoding request style the endpoint supports: json_schema | vllm | off.
+    guided: str = "off"
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> "InferenceConfig":
@@ -137,6 +139,7 @@ class InferenceConfig:
             allowlist=tuple(h.strip() for h in env.get("RAKSHA_INFERENCE_ALLOWLIST", "").split(",") if h.strip()),
             role_models=tuple((r, env[v]) for r, v in _ROLE_ENV.items()
                               if r not in (REPAIR, ADVISOR) and env.get(v)),
+            guided=_guided_style(env),
         )
 
     def model_for(self, role: str) -> str:
@@ -159,6 +162,11 @@ class InferenceConfig:
             )
 
 
+def _guided_style(env) -> str:
+    from .guided import style
+    return style(env)
+
+
 class InferenceClient:
     """Minimal OpenAI-compatible chat client over stdlib urllib."""
 
@@ -167,7 +175,8 @@ class InferenceClient:
         self.config = config
 
     def complete(self, messages: list[dict], *, role: str = REPAIR,
-                 temperature: float = 0.2, max_tokens: int = 1024, n: int = 1) -> list[str]:
+                 temperature: float = 0.2, max_tokens: int = 1024, n: int = 1,
+                 extra: dict | None = None) -> list[str]:
         """Return up to `n` candidate completions. Raises InferenceError on transport failure."""
         if not self.config.base_url:
             raise InferenceError("no inference endpoint configured")
@@ -177,6 +186,7 @@ class InferenceClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "n": n,
+            **(extra or {}),          # G2: guided-decoding fields, when the endpoint supports them
         }).encode()
         headers = {"Content-Type": "application/json"}
         if self.config.api_key:
