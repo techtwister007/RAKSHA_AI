@@ -1,6 +1,6 @@
 # RAKSHA AI — Plan V2: close every gap, add every feature
 
-**Status:** Waves 0, 1, 2, 3 and 4 built (2026-10-04); J3 reworded (see its line). Wave 5 planned, not started. Per-item status, with the
+**Status:** Waves 0, 1, 2, 3 and 4 built (2026-10-04); J3 reworded (see its line). Wave 5 built except K21, K24, K30 (to be built by the team — see the Wave 5 status block). Per-item status, with the
 evidence and the honest caveats, is in the *Wave 1 / 2 / 3 — status* blocks and the Wave 4 — status block below.
 **Scope rule:** every item from the two review passes is included — nothing dropped for cost.
 Breadth first; optimisation after. This document is the contract we execute from and tick off.
@@ -426,6 +426,28 @@ and reporting stays on the box; every number is measured or null; colour is neve
   **Done:** the statement's numbers match the run's egress counter and journal.
 - **K30 Drill mode.** Plant a known, harmless test weakness in a *copy* of a project to check the team's process (review, CI, response) catches it — a training exercise, copies only.
   **Done:** a drill never touches the original tree; its outcome is recorded against the team's process, not the code.
+
+
+### Wave 5 — status (2026-10-04)
+
+- **K1 ✓** `raksha/projects.py` — identity by name + structure fingerprint; on-box store (`RAKSHA_HOME`).
+- **K2 ✓ K3 ✓ K4 ✓** `raksha/reports.py`, `raksha/signdoc.py` — signed reports chained to the previous
+  version; the colour + icon + word diff (a crash not re-found is shown, never counted fixed); the
+  needs-a-human list with reasons and checklists; marked-done items re-checked on the next run.
+- **K5 ✓** console *Projects* screen (owner's page, versions, role views, summaries, certificate).
+- **K6 ✓** one-page EN/HI summary, phone and print friendly.
+- **K7 ✓ K8 ✓ K9 ✓ K10 ✓ K11 ✓** `raksha/learning.py` + console *Learning* screen — analytics and
+  regressions; draft guidelines needing a named approver; lessons on probation, promoted only on
+  gate-verified cases from 2+ projects, demoted on a false positive with the source quarantined;
+  rollback restores prior behaviour (tested).
+- **K12 ✓ K14 ✓ K22 ✓ K23 ✓ K25 ✓ K26 ✓ K27 ✓** `raksha/views.py`.
+- **K13 ✓ K15 ✓ K16 ✓ K17 ✓ K18 ✓ K19 ✓ K29 ✓** in the reports.
+- **K20 ✓** `raksha/premerge.py`. **K28 ✓** `raksha/compliance.py` (verifies with the standalone verifier).
+- **K21, K24, K30 — to be built by the team.** Generating these was stopped by an automated safety
+  classifier during this build, and the build assistant may not reproduce that content. The specs
+  and Done lines above stand; the seams they plug into exist (`raksha/reports.py` rows and
+  `raksha/views.py` for K21/K24, the project store for K30).
+- Tests: `tests/test_wave5.py` (17).
 
 ### Suggested order
 

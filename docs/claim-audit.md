@@ -64,6 +64,19 @@ unit-tested here, but the full execution needs the finale hardware (named in the
 | Tamper-evident audit trail | BUILT | hash-chained session journal (`raksha/journal.py`); `verify()` fails on any altered or dropped line |
 | Air-gap: 0 cloud calls | BUILT + MEASURED | the egress counter (J6) + the inference client counting any non-local call; the two agree by construction |
 
+## Wave 5 claims
+
+| claim | status | behind it |
+|-------|--------|-----------|
+| Every project gets a unique ID that survives paths and patches | BUILT | `raksha/projects.py`; test `test_same_project_same_id_across_paths_different_project_new_id` |
+| Each run is a signed, versioned report; history cannot be edited | BUILT | `raksha/reports.py` + `raksha/signdoc.py`; chain verification fails on a dropped finding (tested) |
+| Colour-coded "what changed" with fixed / new / still open / needs a human | BUILT | the diff; "fixed" only when the absence is a proof; a crash not re-found is shown separately |
+| A clear list of what the human must do | BUILT | needs-a-human reasons + checklists; marked-done items re-checked |
+| The system learns recurring faults and proposes guidelines for ACG | BUILT | `raksha/learning.py`; drafts need a named approver; nothing changes behaviour until approved |
+| Adapts to new frameworks | BUILT, scoped | lessons on probation, promoted only on gate-verified cases from 2+ projects; rollback |
+| Readiness certificate, compliance pack | BUILT | issued only when the record supports it; the pack verifies on the standalone verifier |
+| Attacker-path explainer (K21), ask-about-my-project (K24), process drill (K30) | NOT BUILT | to be built by the team; not claimed |
+
 ## Standing honest gaps (unchanged from the threat model)
 
 - The 36-hour endurance run, vLLM serving, and the long sandboxed container run require the finale
