@@ -25,14 +25,21 @@ import urllib.request
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-# Two roles, one transport. Defaults match the dossier's two-model split; override via env.
+# Roles, one transport. The dossier's two-model split (repair + advisor) is the floor; the other
+# roles default to one of those two models and are overridden per role via env, so a deployment
+# with a third weight (a small fast decision model, an independent attacker) plugs it in by name.
 REPAIR = "repair"      # the 32B coding agent that writes patches and tests
 ADVISOR = "advisor"    # the 8B security specialist that judges CWE / exploitability / depth
+TRIAGE = "triage"      # fast structured decisions: is this site worth deeper work? (score only)
+RED = "red"            # the independent attacker that tries to defeat a verified patch
+JUDGE = "judge"        # a second opinion for the parliament; never decides, only votes
 
 _DEFAULT_MODELS = {
     REPAIR: "qwen3-coder-next-32b",
     ADVISOR: "foundation-sec-8b-reasoning",
 }
+_ROLE_ENV = {REPAIR: "RAKSHA_REPAIR_MODEL", ADVISOR: "RAKSHA_ADVISOR_MODEL",
+             TRIAGE: "RAKSHA_TRIAGE_MODEL", RED: "RAKSHA_RED_MODEL", JUDGE: "RAKSHA_JUDGE_MODEL"}
 
 
 class InferenceError(RuntimeError):
@@ -113,6 +120,9 @@ class InferenceConfig:
     timeout: float = 120.0
     sealed: bool = True  # at the finale: refuse any non-local endpoint
     allowlist: tuple[str, ...] = ()  # named internal model hosts (RAKSHA_INFERENCE_ALLOWLIST)
+    #: Per-role model overrides for the extra roles (triage / red / judge). Unset roles fall back:
+    #: triage → advisor (small, fast); red → repair (it must write inputs); judge → advisor.
+    role_models: tuple[tuple[str, str], ...] = ()
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> "InferenceConfig":
@@ -125,10 +135,17 @@ class InferenceConfig:
             timeout=float(env.get("RAKSHA_INFERENCE_TIMEOUT", "120")),
             sealed=env.get("RAKSHA_SEALED", "1") != "0",
             allowlist=tuple(h.strip() for h in env.get("RAKSHA_INFERENCE_ALLOWLIST", "").split(",") if h.strip()),
+            role_models=tuple((r, env[v]) for r, v in _ROLE_ENV.items()
+                              if r not in (REPAIR, ADVISOR) and env.get(v)),
         )
 
     def model_for(self, role: str) -> str:
-        return self.repair_model if role == REPAIR else self.advisor_model
+        over = dict(self.role_models)
+        if role in over:
+            return over[role]
+        if role in (REPAIR, RED):
+            return self.repair_model
+        return self.advisor_model
 
     def validate(self) -> None:
         if not self.base_url:

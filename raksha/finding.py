@@ -326,6 +326,25 @@ class Finding:
     #: Candidate diffs refused by patch hygiene before any gate run, with the reason. Kept so
     #: inference spent on a candidate we would not even apply stays visible.
     rejected_candidates: list[str] = field(default_factory=list)
+    # ---- assurance layers (each written by its own stage; None/empty = that stage did not run) ----
+    #: Structural evidence from the code-property-graph lane: the source→sink path it found.
+    structure: dict | None = None
+    #: Fused confidence over independent evidence channels (exploit, structural, votes, ...).
+    evidence_score: dict | None = None
+    #: Votes from the model parliament on this finding, and the measured disagreement.
+    parliament: dict | None = None
+    #: The independent red-team round(s) run against the VERIFIED patch, and their outcome.
+    red_team: dict | None = None
+    #: Every candidate that cleared the gate, with its cost axes; the chosen one is `patch_diff`.
+    frontier: list[dict] = field(default_factory=list)
+    #: Patched-vs-baseline wall-time ratio over the differential corpus (1.0 = unchanged).
+    perf_delta: float | None = None
+    #: Compensating controls proposed when (or in addition to) a code patch: isolate, restrict, ...
+    remediation: list[dict] = field(default_factory=list)
+    #: Attack chains (ids) this finding is a link of.
+    chain_ids: list[str] = field(default_factory=list)
+    #: Mission-impact tier of the asset this finding sits on, from the asset registry.
+    mission_impact: str | None = None
     #: For a dependency match: whether the codebase imports the vulnerable package —
     #: "imported" / "not-imported" / "unknown" (no source for that language was seen). Proven
     #: present is not proven reached; the risk register ranks accordingly.
@@ -672,6 +691,17 @@ class Finding:
                 "rejected_before_gate": list(self.rejected_candidates),
             },
             "reachability": self.reachability,
+            "assurance": {
+                "structure": self.structure,
+                "evidence_score": self.evidence_score,
+                "parliament": self.parliament,
+                "red_team": self.red_team,
+                "frontier": list(self.frontier),
+                "perf_delta": self.perf_delta,
+                "remediation": list(self.remediation),
+                "chain_ids": list(self.chain_ids),
+                "mission_impact": self.mission_impact,
+            },
             "gate": {
                 c.value: (
                     {
