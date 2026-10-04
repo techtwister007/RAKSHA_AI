@@ -102,7 +102,7 @@ kill-switches are in the campaign plan, Part 2.
 | 7 | WOW: bad-patch rejection, ROE slider, vaccine | all three real & tested: gate rejects a planted overfit; ROE tiers + two-person rule; vaccine mines→proves→sweeps | **done** (`raksha/roe.py`, `raksha/vaccine.py`, `raksha/slice_wow.py`) |
 | 8 | Screens 2/4/6; signed evidence bundle; Commander's Brief (JSSD); rollback; risk register | bundle builds, signs, verifies & tamper-detects; brief + risk + pipeline live in console | **done** (`raksha/bundle.py`, `brief.py`, `risk.py`, `rollback.py`) |
 | 9 | Our own numbers on ARVO / AutoPatchBench; self-score; licence register | Every number we will say traces to this run | |
-| 10 | Two full 36-hour rehearsals; record the demo | Second run finishes with no manual intervention | next (needs real GPU/Docker hardware) |
+| 10 | Rehearsal harness + health watchdog + runbook (execution needs finale hardware) | harness loops & survives caps; watchdog restarts visibly; runbook ready | **scaffolding done** (`raksha/health.py`, `raksha/rehearse.py`, `docs/rehearsal-runbook.md`) · 36h execution awaits finale GPU/Docker |
 
 ## Standing constraints
 
