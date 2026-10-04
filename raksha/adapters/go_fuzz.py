@@ -100,7 +100,7 @@ class GoFuzzTarget:
     def _pkg(self, root: Path) -> Path:
         return root / self.pkg_dir
 
-    def build(self, patch_diff: str | None) -> BuildResult:
+    def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
         label = "patched" if patch_diff else "vulnerable"
         root = Path(tempfile.mkdtemp(prefix=f"raksha-go-{label}-"))
         shutil.copytree(self.source_root, root, dirs_exist_ok=True)

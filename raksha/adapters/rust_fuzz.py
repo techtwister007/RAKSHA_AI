@@ -208,7 +208,7 @@ class RustFuzzTarget:
 
     # -- Target protocol ---------------------------------------------------
 
-    def build(self, patch_diff: str | None) -> BuildResult:
+    def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
         label = "patched" if patch_diff else "vulnerable"
         root = Path(tempfile.mkdtemp(prefix=f"raksha-rust-{label}-"))
         shutil.copytree(self.source_root, root, dirs_exist_ok=True)

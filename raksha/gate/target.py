@@ -57,8 +57,15 @@ class TestResult:
 class Target(Protocol):
     """What the gate needs from a language adapter."""
 
-    def build(self, patch_diff: str | None) -> BuildResult:
-        """Build the target, with the patch applied if given. Never raises; reports ok=False."""
+    def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
+        """Build the target, with the patch applied if given. Never raises; reports ok=False.
+
+        `flavour` selects the instrumentation: "sanitizer" is the find/prove build (ASan etc.);
+        "release" is the optimised, instrumentation-free build the target would actually deploy.
+        The deployment twin (A3) re-checks a proven patch on the release flavour, and the
+        reproducible-build check (C7) builds release twice. An adapter with no distinct release
+        build treats "release" as "sanitizer" — the seam exists everywhere, the behaviour only
+        differs where a release command is provided."""
 
     def run(self, build: BuildResult, data: bytes) -> RunResult:
         """Run one input against a build (the harness / entry point)."""
@@ -99,6 +106,9 @@ class CommandTarget:
     coverage_cmd: str | None = None
     refuzz_cmd: str | None = None
     apply_patch_cmd: str = "git apply --whitespace=nowarn {patch}"
+    #: Optional optimised, instrumentation-free build command for the "release" flavour (A3/C7).
+    #: None → the "release" flavour reuses build_cmd, so the seam is a no-op by default.
+    release_build_cmd: str | None = None
     timeout: float = 120.0
     env: dict[str, str] = field(default_factory=dict)
 
@@ -124,9 +134,9 @@ class CommandTarget:
         """Remove a build's scratch copy. A 36-hour run builds thousands of them."""
         _discard(build)
 
-    def build(self, patch_diff: str | None) -> BuildResult:
-        label = "patched" if patch_diff else "vulnerable"
-        root = Path(tempfile.mkdtemp(prefix=f"raksha-{label}-"))
+    def build(self, patch_diff: str | None, *, flavour: str = "sanitizer") -> BuildResult:
+        label = ("patched" if patch_diff else "vulnerable") + (":release" if flavour == "release" else "")
+        root = Path(tempfile.mkdtemp(prefix=f"raksha-{label.replace(':', '-')}-"))
         copy = self._sh(f"cp -a {shlex.quote(str(self.source_root))}/. {shlex.quote(str(root))}/", root,
                         untrusted=False)
         if copy.exit_code != 0:
@@ -138,7 +148,8 @@ class CommandTarget:
                                untrusted=False)
             if applied.exit_code != 0:
                 return BuildResult(False, label, "patch did not apply:\n" + applied.text)
-        built = self._sh(self.build_cmd.format(root=shlex.quote(str(root))), root)
+        cmd = self.release_build_cmd if (flavour == "release" and self.release_build_cmd) else self.build_cmd
+        built = self._sh(cmd.format(root=shlex.quote(str(root))), root)
         return BuildResult(built.exit_code == 0, label, built.text, root)
 
     def run(self, build: BuildResult, data: bytes) -> RunResult:

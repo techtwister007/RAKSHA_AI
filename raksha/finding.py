@@ -27,6 +27,7 @@ computable). A criterion you cannot measure is a criterion you cannot score.
 from __future__ import annotations
 
 import hashlib
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -244,12 +245,20 @@ class Signature:
 
 @dataclass(frozen=True)
 class Transition:
-    """One status change, timestamped. This is the Speed criterion's raw data."""
+    """One status change, timestamped. This is the Speed criterion's raw data.
+
+    `at` is wall-clock, for display and the record. `mono` is a monotonic-clock reading taken at the
+    same instant, used for *durations*: an air-gapped node's real-time clock can step backwards
+    (no NTP), which would make a wall-clock delta negative. The monotonic delta cannot. `mono` is
+    None for a transition reconstructed from a serialised history (no monotonic value was stored),
+    and the duration helpers then fall back to a wall-clock delta clamped at zero.
+    """
 
     from_status: Status | None
     to_status: Status
     at: datetime
     reason: str | None = None
+    mono: float | None = None
 
 
 # Legal status transitions. Everything absent here is forbidden.
@@ -352,6 +361,9 @@ class Finding:
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
+    #: Monotonic-clock reading at construction, paired with created_at, so durations are immune to
+    #: real-time-clock steps. Not serialised; a reconstructed finding falls back to wall-clock.
+    created_mono: float = field(default_factory=time.monotonic, repr=False, compare=False)
     history: list[Transition] = field(default_factory=list)
     _status: Status = Status.SUSPECTED
 
@@ -372,7 +384,7 @@ class Finding:
                 "which enforce the precision invariant."
             )
         self.history.append(
-            Transition(None, Status.SUSPECTED, self.created_at, "created")
+            Transition(None, Status.SUSPECTED, self.created_at, "created", mono=self.created_mono)
         )
 
     def _check_reconstructed(self) -> None:
@@ -412,7 +424,7 @@ class Finding:
                 f"(finding {self.id})"
             )
         at = utcnow()
-        self.history.append(Transition(self._status, to, at, reason))
+        self.history.append(Transition(self._status, to, at, reason, mono=time.monotonic()))
         self._status = to
 
     # ------------------------------------------------------------- evidence
@@ -609,17 +621,32 @@ class Finding:
                 return t.at
         return None
 
+    def _transition_obj(self, status: Status) -> "Transition | None":
+        for t in self.history:
+            if t.to_status is status:
+                return t
+        return None
+
+    def _elapsed_to(self, status: Status) -> float | None:
+        """Seconds from creation to a transition, measured on the monotonic clock when both ends
+        carry a monotonic reading; otherwise a wall-clock delta clamped at zero (a clock step must
+        never produce a negative duration)."""
+        t = self._transition_obj(status)
+        if t is None:
+            return None
+        if t.mono is not None and self.created_mono is not None:
+            return max(0.0, t.mono - self.created_mono)
+        return max(0.0, (t.at - self.created_at).total_seconds())
+
     @property
     def time_to_pov_seconds(self) -> float | None:
-        """Created -> CONFIRMED. The Speed criterion's first metric."""
-        at = self._transition_at(Status.CONFIRMED)
-        return (at - self.created_at).total_seconds() if at else None
+        """Created -> CONFIRMED. The Speed criterion's first metric (monotonic)."""
+        return self._elapsed_to(Status.CONFIRMED)
 
     @property
     def time_to_patch_seconds(self) -> float | None:
-        """Created -> VERIFIED. The Speed criterion's second metric."""
-        at = self._transition_at(Status.VERIFIED)
-        return (at - self.created_at).total_seconds() if at else None
+        """Created -> VERIFIED. The Speed criterion's second metric (monotonic)."""
+        return self._elapsed_to(Status.VERIFIED)
 
     # ---------------------------------------------------------------- SARIF
 

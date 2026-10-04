@@ -21,6 +21,7 @@ from .finding import Finding, RoeLevel, Status, utcnow
 from .lanes import scan_target
 from .metrics import live_counters, scorecard
 from . import assets as _assets
+from . import journal as _journal
 from .gate.crossconfirm import cross_confirm
 from .lanes import structure as _structure
 
@@ -78,10 +79,70 @@ class Session:
     #: own wall-clock, model calls, tokens and executions — not the whole process's.
     started_at: datetime = field(default_factory=utcnow)
     counter_baseline: dict = field(default_factory=live_counters)
+    #: The append-only, hash-chained session journal (W0-1). None keeps the session journal-free
+    #: (tests, the demo); set it via open_journal() or the journal_path argument to record and resume.
+    journal: "_journal.Journal | None" = None
+
+    def open_journal(self, path: str | Path) -> None:
+        """Begin (or continue) journalling pipeline events to `path`."""
+        self.journal = _journal.Journal(path)
+        self.emit("session_open", targets=len(self.targets), findings=len(self.findings))
+
+    def emit(self, kind: str, **fields) -> None:
+        """Append one event to the journal if one is open; a no-op otherwise. Never raises."""
+        if self.journal is None:
+            return
+        try:
+            self.journal.emit(kind, **fields)
+        except Exception:  # noqa: BLE001 — journalling must never take the run down
+            pass
+
+    def _journal_finding(self, f: Finding, event: str) -> None:
+        self.emit(event, finding=f.id, status=f.status.value, bug_class=f.bug_class,
+                  language=f.language, target=f.target, snapshot=_journal.snapshot_finding(f))
+
+    def checkpoint(self) -> None:
+        """Emit a full board+findings snapshot, so resume() can restore this exact state. Cheap
+        enough to call after every ingest; the per-event records remain for the live log."""
+        self.emit("checkpoint",
+                  targets=[{"name": t.name, "languages": list(t.languages),
+                            "build_status": t.build_status, "roe_level": t.roe_level.value,
+                            "finding_ids": list(t.finding_ids), "note": t.note} for t in self.targets],
+                  findings=[_journal.snapshot_finding(f) for f in self.findings.values()],
+                  crypto_uses=len(self.crypto_uses))
+
+    @classmethod
+    def resume(cls, path: str | Path) -> "Session":
+        """Rebuild a session from its journal's latest checkpoint and continue appending to it.
+
+        The hash chain is verified first; a broken chain raises. Findings are reconstructed through
+        the same record-validation path a deserialised finding uses, so a tampered snapshot is
+        refused exactly as a forged record would be."""
+        ok, problems = _journal.verify(path)
+        if not ok:
+            raise ValueError("journal failed verification: " + "; ".join(problems[:3]))
+        last = None
+        for rec in _journal.read(path):
+            if rec.get("kind") == "checkpoint":
+                last = rec
+        s = cls()
+        if last is not None:
+            for d in last["findings"]:
+                f = _journal.finding_from_snapshot(d)
+                s.findings[f.id] = f
+            for td in last["targets"]:
+                s.targets.append(Target(name=td["name"], languages=list(td["languages"]),
+                                        build_status=td["build_status"],
+                                        roe_level=RoeLevel(td["roe_level"]),
+                                        finding_ids=list(td["finding_ids"]), note=td["note"]))
+        s.journal = _journal.Journal(path)       # continue the same chain
+        s.emit("session_resumed", targets=len(s.targets), findings=len(s.findings))
+        return s
 
     # -- ingest -------------------------------------------------------------------------------
     def add_finding(self, f: Finding) -> None:
         self.findings[f.id] = f
+        self._journal_finding(f, "finding_added")
 
     def ingest_build_free(self, root: str | Path, *, name: str | None = None,
                           roe: RoeLevel = RoeLevel.R1, note: str | None = None) -> Target:
@@ -119,6 +180,7 @@ class Session:
             t.finding_ids.append(f.id)
         self.targets.append(t)
         self._annotate_evidence()
+        self.checkpoint()
         return t
 
     def ingest(self, root: str | Path, runner=None, *, name: str | None = None,
@@ -201,6 +263,7 @@ class Session:
             t.finding_ids.append(f.id)
         self.targets.append(t)
         self._annotate_evidence()
+        self.checkpoint()
         return t
 
     # -- snapshots for the console ------------------------------------------------------------
