@@ -375,6 +375,119 @@ def _apply_inserts(rec: FixRecord, lines: list[str], first_idx: int | None) -> N
 _DEFAULT_MEMORY = FixMemory()
 
 
+# ---- G3: cross-language retrieval of the fix IDEA ---------------------------------------------
+# A learned line rewrite is a regex over one language's syntax, so it can never apply to another
+# language. What transfers is the idea: "clamp the length to the container's size", "stop going
+# through a shell". The memory finds the nearest proven fix in the same CWE family in ANY language
+# (by code vector, `raksha.embed`), names its idea, and realises that idea with the target
+# language's own realiser. The result is still only a candidate for the gate.
+
+def _realisers() -> dict[str, dict[str, object]]:
+    from .repair_templates import c_bound_copy, go_bound_slice, py_shell_safe
+
+    def _rust(f, r):
+        from .adapters.rust_fuzz import rust_bound_index
+        return rust_bound_index(f, Path(r))
+
+    def _java(f, r):
+        from .adapters.java_driver import java_bound_index
+        return java_bound_index(f, r)
+
+    def _js(f, r):
+        from .adapters.js_sink import js_shell_safe
+        return js_shell_safe(f, r)
+
+    return {
+        "bound-clamp": {"c/c++": lambda f, r: c_bound_copy(f, Path(r)),
+                        "go": lambda f, r: go_bound_slice(f, Path(r)), "rust": _rust, "java": _java},
+        "no-shell-argv": {"python": lambda f, r: py_shell_safe(f, Path(r)), "javascript": _js},
+    }
+
+
+def _diff_sides(diff: str) -> tuple[str, str]:
+    removed = [l[1:] for l in diff.splitlines() if l.startswith("-") and not l.startswith("---")]
+    added = [l[1:] for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
+    return "\n".join(removed), "\n".join(added)
+
+
+def fix_concept(diff: str) -> str | None:
+    """The language-neutral idea a verified diff implements, or None when it is not one we name."""
+    from .embed import concepts
+    before, after = _diff_sides(diff)
+    cb, ca = concepts(before), concepts(after)
+    if ("CLAMP" in ca and ca.count("CLAMP") > cb.count("CLAMP")) or \
+            (ca.count("SIZE") > cb.count("SIZE") and "CMP" in ca):
+        return "bound-clamp"
+    low_b, low_a = before.lower(), after.lower()
+    if ("shell=true" in low_b and "shell=false" in low_a) or ("execfile" in low_a and "execfile" not in low_b) \
+            or ("exec(" in low_b and "execfile" in low_a):
+        return "no-shell-argv"
+    return None
+
+
+def _site_context(finding: Finding, root) -> str | None:
+    got = _read_new_source(finding, root)
+    if got is None or not finding.fix_site_set or not finding.fix_site_set[0].start_line:
+        return None
+    lines = got[1].splitlines()
+    i = finding.fix_site_set[0].start_line - 1
+    return "\n".join(lines[max(0, i - 2): i + 3])
+
+
+def _nearest(memory: "FixMemory", finding: Finding, root=None, *, embedder=None, k: int = 3,
+             min_similarity: float = 0.5) -> list[tuple[FixRecord, float, str]]:
+    """(record, similarity, backend) for proven fixes in OTHER languages, same CWE family, nearest
+    first. Only records whose idea we can name are considered."""
+    from .cwe import same_family
+    from .embed import cosine, default_embedder
+    ctx = _site_context(finding, root)
+    if ctx is None:
+        return []
+    emb = embedder or default_embedder()
+    from .cwe import family as _family
+    fam = _family(finding.bug_class)
+    q = emb.vector(ctx, family=fam)
+    scored = []
+    for rec in memory.records:
+        if rec.language == finding.language or not same_family(rec.bug_class, finding.bug_class):
+            continue
+        if fix_concept(rec.patch_diff) is None:
+            continue
+        before, _ = _diff_sides(rec.patch_diff)
+        sim = cosine(q, emb.vector(before, family=_family(rec.bug_class)))
+        if sim >= min_similarity:
+            scored.append((rec, round(sim, 3), emb.backend))
+    scored.sort(key=lambda t: -t[1])
+    return scored[:k]
+
+
+def cross_language(memory: "FixMemory", finding: Finding, root=None, *, embedder=None
+                   ) -> list[tuple[str, dict]]:
+    """(diff, provenance) for each nearest proven fix whose idea has a realiser in this language."""
+    out: list[tuple[str, dict]] = []
+    seen: set[str] = set()
+    realisers = _realisers()
+    for rec, sim, backend in _nearest(memory, finding, root, embedder=embedder):
+        idea = fix_concept(rec.patch_diff)
+        realise = realisers.get(idea, {}).get(finding.language)
+        prov = {"from_finding": rec.origin_finding, "from_language": rec.language,
+                "from_bug_class": rec.bug_class, "idea": idea, "similarity": sim,
+                "vector_backend": backend}
+        diff = None
+        if realise is not None:
+            try:
+                diff = realise(finding, root if root is not None else ".")
+            except Exception:  # noqa: BLE001 — a realiser that cannot apply yields nothing
+                diff = None
+        prov["realised"] = bool(diff)
+        if diff and diff not in seen:
+            seen.add(diff)
+            out.append((diff, prov))
+        elif not diff:
+            out.append(("", prov))      # a match with no realiser: still useful as a model exemplar
+    return out
+
+
 def default_memory() -> FixMemory:
     """The shared process memory used by `autorepair.repair` when no memory is passed in."""
     return _DEFAULT_MEMORY

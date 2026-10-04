@@ -213,6 +213,28 @@ class InferenceClient:
         return [c["message"]["content"] for c in data.get("choices", [])]
 
 
+    def embed(self, texts: list[str], *, model: str) -> list[list[float]]:
+        """G3: vectors from a local embedding model (`/embeddings`). Raises InferenceError."""
+        if not self.config.base_url:
+            raise InferenceError("no inference endpoint configured")
+        global _INFERENCE_CALLS, _EGRESS_CALLS
+        host = urlparse(self.config.base_url).hostname or ""
+        _INFERENCE_CALLS += 1
+        if not _is_local(host, self.config.allowlist):
+            _EGRESS_CALLS += 1
+        headers = {"Content-Type": "application/json"}
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        req = urllib.request.Request(self.config.base_url.rstrip("/") + "/embeddings",
+                                     data=json.dumps({"model": model, "input": texts}).encode(),
+                                     headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.config.timeout) as resp:  # noqa: S310
+                data = json.loads(resp.read())
+        except Exception as e:  # noqa: BLE001
+            raise InferenceError(f"embedding call failed: {e}") from e
+        return [d["embedding"] for d in sorted(data.get("data", []), key=lambda d: d.get("index", 0))]
+
 def model_server_alive(config: InferenceConfig | None = None, timeout: float = 3.0) -> bool | None:
     """Liveness of the configured model server (GET /models), or None when none is configured —
     a model-free run has no server to be dead. Lives here because this is the only module allowed

@@ -25,3 +25,11 @@ def _isolated_tempdir(tmp_path_factory):
     tempfile.tempdir = str(tmp_path_factory.mktemp("scratch-tmp"))
     yield
     tempfile.tempdir = previous
+
+
+@pytest.fixture(autouse=True)
+def _fresh_fix_memory(monkeypatch):
+    """Each test starts with an empty process-wide fix memory: a fix verified by one test must not
+    become a retrieval (or cross-language) candidate in another and change what that test measures."""
+    from raksha import retrieval
+    monkeypatch.setattr(retrieval, "_DEFAULT_MEMORY", retrieval.FixMemory())

@@ -115,7 +115,7 @@ def _verdict_feedback(verdict) -> str:
 
 
 def _llm_candidates(finding: Finding, root: Path, client, n: int = 3,
-                    feedback: str | None = None) -> list[Candidate]:
+                    feedback: str | None = None, exemplar=None) -> list[Candidate]:
     """Model-proposed patches, with the fix-site source in the prompt. [] when no endpoint.
 
     `feedback` (A6): when a previous candidate failed the gate, its check, the one-line reason and a
@@ -144,6 +144,9 @@ def _llm_candidates(finding: Finding, root: Path, client, n: int = 3,
          f"Vulnerable site: {rel}:{line}\nFinding: {one_line(finding.message, 400)}\n\n"
          f"<<<UNTRUSTED SOURCE {rel} (line-numbered)\n{numbered}\n>>>END UNTRUSTED SOURCE\n\n"
          f"Produce the minimal unified diff for {rel}, then optionally the regression test."
+         + (f"\n\nA VERIFIED fix of an analogous {exemplar.bug_class} bug in {exemplar.language} "
+            f"(proven by the gate; same idea, different language):\n{exemplar.patch_diff}"
+            if exemplar is not None else "")
          + (f"\n\nYour previous attempt was REJECTED by the verifier. {feedback}\nFix that and "
             "try again — do not repeat the rejected approach." if feedback else "")},
     ]
@@ -200,10 +203,22 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
     template = [Candidate(d, RepairLane.TEMPLATE) for d in
                 (fn() for fn in generic_templates(finding, root)) if d]
     retrieval = [Candidate(d, RepairLane.RETRIEVAL) for d in mem.candidates(finding, root=root)]
+    # G3: no same-language memory? the nearest proven fix in another language, its idea realised here
+    exemplar = None
+    try:
+        from .retrieval import cross_language
+        xl = cross_language(mem, finding, root) if not retrieval else []
+    except Exception:  # noqa: BLE001 — retrieval is a proposer; failing it costs nothing
+        xl = []
+    if xl:
+        finding.retrieved_from = xl[0][1]
+        exemplar = next((rec for rec in mem.records
+                         if rec.origin_finding == xl[0][1]["from_finding"]), None)
+        retrieval += [Candidate(d, RepairLane.RETRIEVAL) for d, _ in xl if d]
     # Cheapest first: template -> retrieval -> model. A retrieved candidate whose net change a
     # template already proposed is not gated twice (templates are cheaper, so they stay).
     retrieval = _dedupe(retrieval, template)
-    candidates = [*template, *retrieval, *_llm_candidates(finding, root, client)]
+    candidates = [*template, *retrieval, *_llm_candidates(finding, root, client, exemplar=exemplar)]
     # keep the mitigation floor as a last resort: the template bound, retried as MITIGATION, so a
     # verified-but-blunt fix is still labelled as the floor it is
     candidates = candidates[:MAX_REPAIR_ROUNDS]

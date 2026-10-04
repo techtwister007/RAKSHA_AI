@@ -395,6 +395,9 @@ class Finding:
     #: G1: solver evidence, before and after the patch, on whether the bad index stays reachable.
     #: Evidence only — never changes status.
     reach_proof: dict | None = None
+    #: G3: the proven fix in another language this finding's repair drew on (similarity, idea,
+    #: which vector backend ranked it), or None.
+    retrieved_from: dict | None = None
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
@@ -769,6 +772,7 @@ class Finding:
             "bound_proof": self.bound_proof,
             "rollback_proof": self.rollback_proof,
             "reach_proof": self.reach_proof,
+            "retrieved_from": self.retrieved_from,
             "assurance": {
                 "structure": self.structure,
                 "evidence_score": self.evidence_score,
