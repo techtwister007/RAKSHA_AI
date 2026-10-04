@@ -218,7 +218,8 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
     # Cheapest first: template -> retrieval -> model. A retrieved candidate whose net change a
     # template already proposed is not gated twice (templates are cheaper, so they stay).
     retrieval = _dedupe(retrieval, template)
-    candidates = [*template, *retrieval, *_llm_candidates(finding, root, client, exemplar=exemplar)]
+    llm_kw = {"exemplar": exemplar} if exemplar is not None else {}
+    candidates = [*template, *retrieval, *_llm_candidates(finding, root, client, **llm_kw)]
     # keep the mitigation floor as a last resort: the template bound, retried as MITIGATION, so a
     # verified-but-blunt fix is still labelled as the floor it is
     candidates = candidates[:MAX_REPAIR_ROUNDS]
