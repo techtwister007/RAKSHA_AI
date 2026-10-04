@@ -110,14 +110,37 @@ def py_shell_safe(finding: Finding, root: Path) -> str | None:
     for i in range(max(0, idx - 2), min(len(lines), idx + 3)):
         m = _PY_SHELL.search(lines[i])
         if m:
-            repl = f"{m.group('pre')}__import__('shlex').split({m.group('cmd').strip()})"
+            repl = f"{m.group('pre')}shlex.split({m.group('cmd').strip()})"
             after[i] = lines[i][:m.start()] + repl + lines[i][m.end():]
             changed = True
             break
     if not changed:
         return None
+    if not re.search(r"^\s*import shlex\b", text, re.M):
+        after.insert(_import_insertion_point(after), "import shlex\n")
     body = "".join(after)
     return _diff(text, body, rel)
+
+
+def _import_insertion_point(lines: list[str]) -> int:
+    """After the last top-level import (or the module docstring / shebang when there is none)."""
+    last = -1
+    for i, ln in enumerate(lines):
+        if re.match(r"^(import|from)\s+\w", ln):
+            last = i
+    if last >= 0:
+        return last + 1
+    i = 0
+    if lines and lines[0].startswith("#!"):
+        i = 1
+    if i < len(lines) and lines[i].lstrip().startswith(('"""', "\'\'\'")):
+        q = lines[i].lstrip()[:3]
+        if lines[i].rstrip().endswith(q) and len(lines[i].strip()) > 3:
+            return i + 1
+        for j in range(i + 1, len(lines)):
+            if q in lines[j]:
+                return j + 1
+    return i
 
 
 # ---- Go: bound a slice / index to the backing length --------------------------------------------

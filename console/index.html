@@ -122,6 +122,9 @@
   .kpi .l{font-size:11px;color:var(--dim);margin-top:3px}
   .kpi.hl{border-color:var(--green)} .kpi.hl .n{color:var(--green)}
   .kpi.vi{border-color:var(--violet)}
+  .boundary{margin-top:16px;border-left:3px solid var(--amber);padding:8px 12px;color:var(--dim)}
+  .boundary h3{margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+  .boundary p{margin:0;font-size:13px;line-height:1.5}
   .zero{display:grid;gap:12px;grid-template-columns:1fr 1fr;margin-top:14px}
   @media (max-width:520px){.zero{grid-template-columns:1fr}}
   .zerobadge{border:1.5px solid var(--green);border-radius:5px;padding:16px;text-align:center;
@@ -409,6 +412,12 @@ function renderScore(){
   z(s.posture.network_interfaces,'network interfaces');
   z(s.posture.cloud_calls,'cloud calls');
   body.appendChild(zero);
+
+  // the boundary of the claim, next to the claim: what this run did NOT establish
+  const b = el('div','boundary');
+  b.appendChild(el('h3',null,'Assurance boundary — what this run does not claim'));
+  b.appendChild(el('p',null,s.boundary && s.boundary.statement ? s.boundary.statement : '—'));
+  body.appendChild(b);
 }
 
 refresh();

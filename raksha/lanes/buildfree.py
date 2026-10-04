@@ -62,6 +62,7 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
     started = time.monotonic()
     deps: list[supply.Dependency] = []
     findings: list[Finding] = []
+    imports = supply.ImportIndex()
     files = manifests = 0
 
     for path in _walk(root):
@@ -75,12 +76,15 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
         if name in supply._PARSERS:
             manifests += 1
             deps.extend(supply.parse_manifest(name, text, rel))
+        imports.add(path, text)
         if secrets_on and (path.suffix in _SECRET_EXT or name in _SECRET_NAMES):
             findings.extend(secrets.scan_text(text, rel))
         if _looks_like_openapi(name, text):
             findings.extend(service.scan_openapi(text, rel))
 
-    findings.extend(supply.scan_dependencies(deps, db))
+    dep_findings = supply.scan_dependencies(deps, db)
+    supply.annotate_reachability(dep_findings, imports)   # present is not reached; say which
+    findings.extend(dep_findings)
     findings = dedup(findings)
     return BuildFreeResult(findings=findings, files_scanned=files, manifests_found=manifests,
                            seconds=round(time.monotonic() - started, 3))

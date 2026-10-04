@@ -289,3 +289,43 @@ def test_aws_documentation_example_key_is_not_reported():
 def test_secrets_in_test_fixtures_rank_low():
     (f,) = secrets.scan_text('password = "Xk9mQ2vL7pZ"', "tests/fixtures/x.py")
     assert f.severity == "low" and f.is_reportable
+
+
+# ---- reachability: proven present is not proven reached -----------------------------------------
+
+def test_dependency_findings_say_whether_the_code_imports_the_package():
+    from raksha.lanes.buildfree import scan_target
+    r = scan_target(pathlib.Path(__file__).parents[1] / "demo-targets" / "mixed-estate")
+    reach = {f.frames[0].symbol: f.reachability for f in r.findings if f.oracle == "osv:version-match"}
+    assert reach["minimist"] == "imported" and reach["requests"] == "imported"
+    assert reach["lodash"] == "not-imported" and reach["pyyaml"] == "not-imported"
+    assert reach["github.com/gin-gonic/gin"] == "unknown"        # no Go source in the tree at all
+    # a secret or an API exposure carries no reachability field — it is not a dependency match
+    assert all(f.reachability is None for f in r.findings if f.oracle != "osv:version-match")
+
+
+def test_reachability_ranks_an_unreached_critical_below_a_reached_medium():
+    from raksha.lanes.buildfree import scan_target
+    from raksha.risk import register
+    rows = register(scan_target(pathlib.Path(__file__).parents[1] / "demo-targets" / "mixed-estate").findings)
+    score = {r.finding.frames[0].symbol: r.score for r in rows if r.finding.frames}
+    assert score["requests"] > score["pyyaml"]       # medium+imported outranks critical+not-imported
+    assert score["minimist"] > score["lodash"]
+    assert all(r.as_dict()["reachability"] in ("imported", "not-imported", "unknown", None) for r in rows)
+
+
+def test_import_index_handles_each_ecosystem_shape():
+    from raksha.lanes.supply import ImportIndex
+    ix = ImportIndex()
+    ix.add("a.py", "from yaml import safe_load\nimport requests.adapters\n")
+    ix.add("b.ts", "import express from 'express';\nconst m = require(\"minimist\");\n")
+    ix.add("c.go", 'package x\nimport (\n\t"fmt"\n\t"github.com/gin-gonic/gin"\n)\n')
+    ix.add("D.java", "import org.apache.logging.log4j.LogManager;\nimport com.fasterxml.jackson.databind.ObjectMapper;\n")
+    assert ix.reaches("PyPI", "PyYAML") == "imported" and ix.reaches("PyPI", "requests") == "imported"
+    assert ix.reaches("PyPI", "flask") == "not-imported"
+    assert ix.reaches("npm", "express") == "imported" and ix.reaches("npm", "lodash") == "not-imported"
+    assert ix.reaches("Go", "github.com/gin-gonic/gin") == "imported"
+    assert ix.reaches("Maven", "org.apache.logging.log4j:log4j-core") == "imported"
+    assert ix.reaches("Maven", "com.fasterxml.jackson.core:jackson-databind") == "imported"
+    assert ix.reaches("Maven", "org.springframework:spring-core") == "not-imported"
+    assert ImportIndex().reaches("PyPI", "requests") == "unknown"

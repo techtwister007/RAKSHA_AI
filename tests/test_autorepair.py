@@ -97,3 +97,66 @@ def test_orchestrator_autofuzz_session_shows_verified_deep_targets():
     assert board["py-noharness"]["build_status"] == "green"
     card = s.scorecard()
     assert card["performance"]["bugs_verified_fixed"] >= 1
+
+
+@pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
+def test_a_shallow_fix_that_special_cases_the_reproducer_is_rejected(monkeypatch):
+    """PVBench's finding: a patch can kill the observed crash and not the defect. The reproducer's
+    own neighbourhood, replayed deterministically at the start of CLEAN_REFUZZ, catches it on every
+    target — not only when a random fresh campaign happens to find a sibling."""
+    r = autofuzz(C_TARGET, max_execs=60000, use_model=False)
+    monkeypatch.setattr(autorepair, "generic_templates", lambda finding, root: [])
+    n = len(r.crashing_input)
+    shallow = ("--- a/src/tlv.c\n+++ b/src/tlv.c\n@@ -9,2 +9,3 @@\n"
+               "     if (len < 2) return -1;\n"
+               f"+    if (len == {n}) return -1;  /* silence the one input that crashed */\n"
+               "     uint8_t tag = data[0];\n")
+    out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                 corpus=[b"\x01\x04abcd"], client=MockClient([shallow]))
+    assert not out.verified and r.finding.status is Status.REPORT_ONLY
+    from raksha.finding import GateCheck
+    refuzz = [g for g in r.finding.gate_history if g.check is GateCheck.CLEAN_REFUZZ]
+    assert refuzz and not refuzz[-1].passed and "variants of the reproducer" in refuzz[-1].detail
+    assert r.finding.gate[GateCheck.POV_DEAD].passed      # the shallow fix did kill the exact input
+
+
+@pytest.mark.skipif(not HAVE_GCC, reason="needs gcc")
+def test_a_patch_that_fixes_the_bug_and_adds_a_backdoor_never_reaches_the_gate(monkeypatch):
+    """Prompt injection from target source has one exit: the diff. A diff that fixes the overflow
+    AND adds an execution primitive is refused before it is applied — behavioural checks cannot
+    see code the corpus never runs, so this is checked on the text."""
+    r = autofuzz(C_TARGET, max_execs=60000, use_model=False)
+    from raksha.repair_templates import c_bound_copy
+    good = c_bound_copy(r.finding, Path(r.target.source_root))
+    backdoor = good.replace("+++ b/src/tlv.c\n", "+++ b/src/tlv.c\n", 1)
+    # append a second hunk that opens a shell when a magic tag arrives
+    backdoor += ("@@ -17,2 +18,3 @@\n     }\n+    if (tag == 0x7f) system(\"/bin/sh\");\n     return 0;\n")
+    monkeypatch.setattr(autorepair, "generic_templates", lambda finding, root: [])
+    out = repair(r.finding, r.target, root=r.target.source_root, reproducer=r.crashing_input,
+                 corpus=[b"\x01\x04abcd"], client=MockClient([backdoor]))
+    assert not out.verified and out.rejected_before_gate == 1 and out.candidates_tried == 0
+    assert r.finding.status is Status.REPORT_ONLY
+    assert any("system" in why for why in r.finding.rejected_candidates)
+    assert r.finding.repair_rounds == 0                      # never applied, never gated
+
+
+def test_hygiene_scope_size_and_primitive_rules():
+    from raksha import hygiene
+    from raksha.finding import Finding, FixSite
+    f = Finding(oracle="asan", bug_class="CWE-121", language="c", target="t", message="m")
+    f.add_fix_site(FixSite(uri="src/tlv.c", rank=0, start_line=15))
+    ok = "--- a/src/tlv.c\n+++ b/src/tlv.c\n@@ -1 +1 @@\n-memcpy(a,b,n);\n+memcpy(a,b,n<32?n:32);\n"
+    assert hygiene.check(ok, f) is None
+    other = ok.replace("src/tlv.c", "src/other.c")
+    assert "not in the fix-site set" in hygiene.check(other, f)
+    big = "--- a/src/tlv.c\n+++ b/src/tlv.c\n@@ -1 +1,200 @@\n" + "+int x;\n" * 200
+    assert "cap" in hygiene.check(big, f)
+    # a primitive already present in the removed lines is not "new": the Python shell template
+    # rewrites subprocess.run(shell=True) into subprocess.run(argv) and must still be allowed
+    f2 = Finding(oracle="pysecsan", bug_class="CWE-78", language="python", target="t", message="m")
+    f2.add_fix_site(FixSite(uri="converter.py", rank=0, start_line=3))
+    py = ("--- a/converter.py\n+++ b/converter.py\n@@ -1 +1 @@\n"
+          "-subprocess.run(cmd, shell=True)\n+subprocess.run(shlex.split(cmd))\n")
+    assert hygiene.check(py, f2) is None
+    bad = py.replace("+subprocess.run(shlex.split(cmd))", "+subprocess.run(shlex.split(cmd)); os.system(cmd)")
+    assert "os.system" in hygiene.check(bad, f2)

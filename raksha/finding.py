@@ -323,6 +323,13 @@ class Finding:
 
     model_version: str | None = None
     prompt_version: str | None = None
+    #: Candidate diffs refused by patch hygiene before any gate run, with the reason. Kept so
+    #: inference spent on a candidate we would not even apply stays visible.
+    rejected_candidates: list[str] = field(default_factory=list)
+    #: For a dependency match: whether the codebase imports the vulnerable package —
+    #: "imported" / "not-imported" / "unknown" (no source for that language was seen). Proven
+    #: present is not proven reached; the risk register ranks accordingly.
+    reachability: str | None = None
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
@@ -662,7 +669,9 @@ class Finding:
                 "zero_inference": self.zero_inference,
                 "model_version": self.model_version,
                 "prompt_version": self.prompt_version,
+                "rejected_before_gate": list(self.rejected_candidates),
             },
+            "reachability": self.reachability,
             "gate": {
                 c.value: (
                     {

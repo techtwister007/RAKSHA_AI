@@ -10,7 +10,14 @@ Order and cost:
     2 POV_DEAD              one run
     3 DIFFERENTIAL_CORPUS   N inputs × 2 builds (+ pre-flight) and the project's own tests
     4 COVERAGE_HELD         one coverage run over the corpus
-    5 CLEAN_REFUZZ          a bounded fresh campaign — the expensive one, so it is last
+    5 CLEAN_REFUZZ          the reproducer's own neighbourhood, then a bounded fresh campaign —
+                            the expensive one, so it is last
+
+Check 5 opens with a deterministic neighbourhood of the reproducer (bit flips, length changes,
+boundary integers — the moves a fuzzer would make first) replayed on the patched build. A patch
+that special-cases the exact crashing input — the "shallow fix" that kills the observed crash and
+not the defect — dies here on every target, instead of only when a random fresh campaign happens
+to stumble on a sibling. The fresh campaign then runs as before.
 """
 
 from __future__ import annotations
@@ -24,6 +31,30 @@ from .differential import Canonicaliser, Mismatch, Quarantined, differential, pr
 from .target import BuildResult, RunResult, Target, TestResult
 
 MAX_REPAIR_ROUNDS = 3
+
+#: Deterministic reproducer variants replayed at the start of CLEAN_REFUZZ.
+POV_VARIANTS = 24
+
+
+def pov_neighbourhood(reproducer: bytes, n: int = POV_VARIANTS, seed: int = 0x5A4B) -> list[bytes]:
+    """`n` distinct deterministic mutants of the reproducer: the inputs a shallow fix forgets.
+
+    Same reproducer, same list — so the record is reproducible and a judge can replay it.
+    """
+    import random
+    from ..harness.mutator import _mutate
+    rng = random.Random(seed)
+    seen = {reproducer}
+    out: list[bytes] = []
+    tries = 0
+    while len(out) < n and tries < n * 20:
+        tries += 1
+        base = reproducer if rng.random() < 0.7 or not out else rng.choice(out)
+        m = _mutate(rng, base)
+        if m and m not in seen:
+            seen.add(m)
+            out.append(m)
+    return out
 
 
 def oracle_fired(raw: str, oracles: Iterable[Oracle] = KEYSTONE_ORACLES) -> bool:
@@ -81,6 +112,7 @@ def run_gate(
     coverage_tolerance: int = 3,
     regression_test: str | None = None,
     preflight_runs: int = 3,
+    pov_variants: int = POV_VARIANTS,
 ) -> GateVerdict:
     """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict.
 
@@ -94,7 +126,7 @@ def run_gate(
         return _judge(finding, target, verdict, reproducer=reproducer, corpus=corpus,
                       refuzz_seconds=refuzz_seconds, oracles=tuple(oracles), canon=canon,
                       coverage_tolerance=coverage_tolerance, regression_test=regression_test,
-                      preflight_runs=preflight_runs)
+                      preflight_runs=preflight_runs, pov_variants=pov_variants)
     finally:
         discard = getattr(target, "discard", None)
         if discard is not None:
@@ -105,7 +137,8 @@ def run_gate(
 
 def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer: bytes,
            corpus: list[bytes], refuzz_seconds: float, oracles: tuple, canon: Canonicaliser | None,
-           coverage_tolerance: int, regression_test: str | None, preflight_runs: int) -> GateVerdict:
+           coverage_tolerance: int, regression_test: str | None, preflight_runs: int,
+           pov_variants: int) -> GateVerdict:
 
     # 1 ── COMPILES
     before = target.build(None)
@@ -168,6 +201,19 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
         return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
                      "target provides no fresh-fuzz campaign; CLEAN_REFUZZ cannot be certified — "
                      "reported, not verified")
+    # 5a — the reproducer's neighbourhood, deterministic, on the patched build
+    variants = pov_neighbourhood(reproducer, pov_variants) if pov_variants else []
+    still = 0
+    for v in variants:
+        r = target.run(after, v)
+        if oracle_fired(r.text, oracles) or r.timed_out:
+            still += 1
+    verdict.refuzz_findings = still
+    if still:
+        return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
+                     f"{still} of {len(variants)} variants of the reproducer still fire the oracle on "
+                     f"the patched build — the patch silences the input, not the defect")
+    # 5b — the fresh campaign
     verdict.refuzz_ran = True
     crashes = target.refuzz(after, refuzz_seconds)
     new = [c for c in crashes if oracle_fired(c, oracles)]
@@ -176,8 +222,9 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
         return _fail(finding, verdict, GateCheck.CLEAN_REFUZZ,
                      f"fresh campaign found {len(new)} abort(s) on the patched build")
     finding.record_gate(GateCheck.CLEAN_REFUZZ, True,
-                        detail=f"fresh fuzzing pass on the patched build found nothing new "
-                               f"({len(crashes)} crash candidate(s) checked, budget {int(refuzz_seconds)}s)")
+                        detail=f"{len(variants)} reproducer variants dead; fresh fuzzing pass on the "
+                               f"patched build found nothing new ({len(crashes)} crash candidate(s) "
+                               f"checked, budget {int(refuzz_seconds)}s)")
 
     # The model's test, if any: verified or discarded, never assumed.
     if regression_test is not None:

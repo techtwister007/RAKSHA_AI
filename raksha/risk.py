@@ -5,8 +5,9 @@ ranks reportable findings by severity x reachability x exploitability, each fact
 record rather than guessed:
 
   severity       — the oracle's own rating (critical/high/medium/low)
-  reachability   — a finding with a replaying reproducer is reachable (1.0); a static-only SUSPECTED
-                   finding is only possibly reachable (0.4)
+  reachability   — an exploit that replays is reachable (1.0); a dependency match is ranked by
+                   whether the codebase imports the package (0.9 imported / 0.6 unknown / 0.3 not
+                   imported); a static-only SUSPECTED finding is only possibly reachable (0.4)
   exploitability — an exploit that replays (1.0) outranks a deterministic match such as a dependency
                    CVE or a secret (0.7), which outranks a spec-only API exposure (0.6)
 
@@ -27,8 +28,15 @@ from .finding import DETERMINISTIC_MATCH, EXPLOIT_REPLAY, Finding, Status, repor
 _SEVERITY = {"critical": 4.0, "high": 3.0, "medium": 2.0, "low": 1.0, "info": 0.5}
 
 
+_DEP_REACH = {"imported": 0.9, "unknown": 0.6, "not-imported": 0.3}
+
+
 def _reachability(f: Finding) -> float:
     if f.reproducer is not None and f.replay_before is not None and f.replay_before.oracle_fired:
+        if f.reproducer.kind == DETERMINISTIC_MATCH and f.reachability in _DEP_REACH:
+            # a dependency match replays, but that proves the version is present, not that the
+            # code reaches it; the import scan says which, and the ranking follows the evidence
+            return _DEP_REACH[f.reachability]
         return 1.0
     return 0.4  # static-only / unproven: possibly reachable
 
@@ -64,6 +72,7 @@ class RiskRow:
             "target": f.target, "status": f.status.value, "score": round(self.score, 2),
             "has_fix": f.status is Status.VERIFIED, "message": f.message[:120],
             "evidence": f.reproducer.kind if f.reproducer else None,
+            "reachability": f.reachability,
         }
 
 

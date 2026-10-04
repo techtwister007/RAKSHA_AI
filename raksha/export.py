@@ -62,10 +62,15 @@ def export(findings: list[Finding], out_dir: str | Path, *, tool_version: str = 
             "fix_site": f.fix_site_set[0].uri if f.fix_site_set else None,
         })
 
+    from .metrics import scorecard
+    card = scorecard(findings)
     (out / "summary.json").write_text(json.dumps({
         "tool": "RAKSHA AI", "version": tool_version,
         "counts": _counts(reports), "findings": summary,
+        # the boundary of the claim travels with the claim
+        "assurance_boundary": card.boundary,
     }, indent=2))
+    (out / "ASSURANCE_BOUNDARY.txt").write_text(card.boundary["statement"] + "\n")
     return out
 
 

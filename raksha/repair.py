@@ -27,6 +27,7 @@ class Candidate:
     diff: str
     lane: RepairLane
     model_version: str | None = None
+    prompt_version: str | None = None
 
 
 #: A template: given a finding, return a patch diff or None. Zero inference.

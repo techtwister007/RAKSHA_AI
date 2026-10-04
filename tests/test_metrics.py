@@ -182,3 +182,22 @@ def test_lane_history_rides_along_in_the_proof_block():
     f.gate_failed("coverage dropped")
     _fix(f, RepairLane.LLM)
     assert f.proof_block()["repair"]["lane_history"] == ["RETRIEVAL", "LLM"]
+
+
+def test_scorecard_carries_the_boundary_of_its_own_claim():
+    """A proof of presence is never a proof of absence: the scoresheet says what was not analysed."""
+    f = _prove(_finding("c", "CWE-121", "parse"))
+    g = _finding("python", "CWE-78", "convert")        # suspected, never proven
+    card = scorecard([f, g], targets_degraded=1, targets_total=3)
+    b = card.boundary
+    assert b["unresolved_suspected"] == 1 and b["targets_degraded_to_build_free"] == 1
+    assert "c" in b["languages_exercised_by_exploit"]
+    assert "not absence" in b["statement"] and "1 of 3 target(s)" in b["statement"]
+    assert "secure" not in b["statement"].lower()      # the word the system never says
+    assert "boundary" in card.as_dict()
+
+
+def test_hygiene_rejections_are_counted_on_the_scorecard():
+    f = _prove(_finding("c", "CWE-121", "parse"))
+    f.rejected_candidates.append("llm: introduces an execution/network primitive absent from the original: system")
+    assert scorecard([f]).precision["candidate_patches_rejected_before_gate"] == 1

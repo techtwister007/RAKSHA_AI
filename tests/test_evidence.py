@@ -172,3 +172,11 @@ def test_two_person_rule_needs_two_people_not_two_keys():
 def test_replay_cli_exit_codes(args, code):
     r = subprocess.run([sys.executable, "-m", "raksha", *args], capture_output=True, env=ENV)
     assert r.returncode == code
+
+
+def test_bundle_manifest_names_the_environment_the_proof_was_made_in(tmp_path):
+    import json
+    out = build_bundle(_verified(), tmp_path / "b")
+    env = json.loads((out / "bundle.json").read_text())["environment"]
+    assert env["python"] and env["platform"] and isinstance(env["toolchains"], dict)
+    assert verify_bundle(out).ok

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 from dataclasses import dataclass
 
 from ..finding import DETERMINISTIC_MATCH, Finding, Frame, Reproducer, ReplayResult, utcnow
@@ -311,3 +312,85 @@ def _finding(dep: Dependency, adv: dict, fixed: str | None) -> Finding:
 
 
 _LANG = {"Maven": "java", "npm": "javascript", "PyPI": "python", "Go": "go"}
+
+
+# ---- Reachability: proven present is not proven reached ----------------------------------------
+
+#: Source extensions per ecosystem, and the import statement shapes that name a package.
+_IMPORT_EXT = {
+    "PyPI": {".py"},
+    "npm": {".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx"},
+    "Go": {".go"},
+    "Maven": {".java", ".kt", ".scala", ".groovy"},
+}
+_IMPORT_RE = {
+    "PyPI": re.compile(r"^\s*(?:import\s+([\w.]+)|from\s+([\w.]+)\s+import)", re.M),
+    "npm": re.compile(r"""(?:require\s*\(\s*|import\s*\(\s*|\bfrom\s+|^\s*import\s+)['"]([^'"]+)['"]""", re.M),
+    "Go": re.compile(r'"([A-Za-z0-9_.\-/~]+)"'),
+    "Maven": re.compile(r"^\s*import\s+(?:static\s+)?([\w.]+)", re.M),
+}
+#: PyPI distributions whose import name differs from the distribution name.
+_PY_MODULE = {"pyyaml": "yaml", "pillow": "PIL", "beautifulsoup4": "bs4", "scikit-learn": "sklearn",
+              "python-dateutil": "dateutil", "pycryptodome": "Crypto", "msgpack-python": "msgpack",
+              "opencv-python": "cv2", "attrs": "attr", "pyjwt": "jwt", "python-jose": "jose"}
+
+REACH_IMPORTED, REACH_NOT_IMPORTED, REACH_UNKNOWN = "imported", "not-imported", "unknown"
+
+
+class ImportIndex:
+    """Import statements seen while walking a target, per ecosystem. Built in the same pass as the
+    secrets scan, so reachability costs one regex per source file and no second walk."""
+
+    def __init__(self) -> None:
+        self.names: dict[str, set[str]] = {eco: set() for eco in _IMPORT_EXT}
+        self.files: dict[str, int] = {eco: 0 for eco in _IMPORT_EXT}
+
+    def add(self, path: Path | str, text: str) -> None:
+        suffix = Path(path).suffix
+        for eco, exts in _IMPORT_EXT.items():
+            if suffix not in exts:
+                continue
+            self.files[eco] += 1
+            if eco == "Go":                        # only the import block / import lines
+                body = "\n".join(l for l in text.splitlines() if l.lstrip().startswith(("import", '"', "_ ")))
+                self.names[eco].update(_IMPORT_RE[eco].findall(body))
+                continue
+            for m in _IMPORT_RE[eco].finditer(text):
+                self.names[eco].add(next(g for g in m.groups() if g))
+
+    def reaches(self, ecosystem: str, package: str) -> str:
+        if ecosystem not in self.names:
+            return REACH_UNKNOWN
+        if self.files[ecosystem] == 0:
+            return REACH_UNKNOWN                   # no source in that language was seen at all
+        return REACH_IMPORTED if any(_names_package(ecosystem, package, n) for n in self.names[ecosystem]) \
+            else REACH_NOT_IMPORTED
+
+
+def _names_package(ecosystem: str, package: str, imported: str) -> bool:
+    if ecosystem == "PyPI":
+        mod = _PY_MODULE.get(_norm_pypi(package), _norm_pypi(package).replace("-", "_"))
+        return imported == mod or imported.startswith(mod + ".")
+    if ecosystem == "npm":
+        return imported == package or imported.startswith(package + "/")
+    if ecosystem == "Go":
+        return imported == package or imported.startswith(package + "/")
+    if ecosystem == "Maven":
+        group = package.split(":", 1)[0]
+        prefixes = {group, ".".join(group.split(".")[:3])}
+        return any(imported == p or imported.startswith(p + ".") for p in prefixes if p)
+    return False
+
+
+def annotate_reachability(findings: list[Finding], index: ImportIndex) -> None:
+    """Stamp each dependency-match finding with whether the codebase imports the package."""
+    for f in findings:
+        if f.oracle != "osv:version-match" or not f.frames:
+            continue
+        eco = _ECO_BY_LANG.get(f.language)
+        if eco is None:
+            continue
+        f.reachability = index.reaches(eco, f.frames[0].symbol)
+
+
+_ECO_BY_LANG = {v: k for k, v in _LANG.items()}

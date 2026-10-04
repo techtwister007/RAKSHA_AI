@@ -95,7 +95,7 @@
 
   <div class="block">
     <h1>RAKSHA AI — the plan, on one page</h1>
-    <p style="margin:6px 0 0;font-size:13px;color:var(--verified)"><b>Status 2026-10-04:</b> Built through Phase 11 — four deep languages, automatic harness generation, 371 tests. Current state and remaining work: HANDOVER.md in the repository.</p>
+    <p style="margin:6px 0 0;font-size:13px;color:var(--verified)"><b>Status 2026-10-04:</b> Built through Phase 11 — four deep languages, automatic harness generation, 380 tests. Current state and remaining work: HANDOVER.md in the repository.</p>
     <p class="sub">A map for vetting · each block is one decision, one picture, and the question to answer</p>
     <p class="how">Read top to bottom. Every block ends with a <b>Vet this</b> line — the thing you
       should agree or disagree with before anything gets built. The two long documents (the
@@ -277,7 +277,7 @@
       <div class="canvas"><svg viewBox="0 0 1000 420" role="img" aria-label="Twelve build phases as a ladder from phase 0 through phase 11, all built (phase 10's 36-hour run awaits the finale hardware). Each has a one-line exit gate. Phases 0 to 4 are core, 5 to 6 are the console and breadth, 7 is the wow beats, 8 to 10 are polish, measurement and rehearsal.">
         <defs><marker id="a5" viewBox="0 0 9 7" refX="8" refY="3.5" markerWidth="8" markerHeight="7" orient="auto"><path class="mk" d="M0,0 L9,3.5 L0,7z"/></marker></defs>
         <text class="m" x="30" y="22">CORE — without these nothing works</text>
-        <g><rect class="bx-ok" x="30" y="32" width="455" height="34" rx="3"/><text class="t ok" x="44" y="54">0 · Keystone — one record, one gate, three languages</text><text class="s" x="476" y="54" text-anchor="end">✓ DONE · 371 tests</text></g>
+        <g><rect class="bx-ok" x="30" y="32" width="455" height="34" rx="3"/><text class="t ok" x="44" y="54">0 · Keystone — one record, one gate, three languages</text><text class="s" x="476" y="54" text-anchor="end">✓ DONE · 380 tests</text></g>
         <g><rect class="bx" x="30" y="72" width="455" height="34" rx="3"/><text class="t" x="44" y="94">1 · The inspector, for real</text><text class="s" x="476" y="94" text-anchor="end">gate: rejects a planted bad patch</text></g>
         <g><rect class="bx" x="30" y="112" width="455" height="34" rx="3"/><text class="t" x="44" y="134">2 · Java end to end + Log4Shell demo target</text><text class="s" x="476" y="134" text-anchor="end">gate: 10 clean runs, zero human input</text></g>
         <g><rect class="bx" x="30" y="152" width="455" height="34" rx="3"/><text class="t" x="44" y="174">3 · Build agent, offline mirror, no-build lanes, dep-bump patches</text><text class="s" x="476" y="174" text-anchor="end">gate: unbuildable target → findings in 10 min</text></g>
@@ -407,7 +407,7 @@
     <div class="map-h"><span class="n">10</span><h2>Where things stand today</h2></div>
     <div class="map-b">
       <div class="grid">
-        <div class="card ok"><b>Done</b><span>Phases 0–11: the keystone record and both invariants; the five-check gate for real; build-free lanes on every language with negative-control precision; four deep languages (C, Java, Python, Go) through one gate; <b>automatic harness generation</b> — no hand-written driver; the six-screen offline console; signed evidence bundles with runnable replays; ROE, vaccine, bad-patch rejection; the endurance harness. 371 tests. On the remote branch.</span></div>
+        <div class="card ok"><b>Done</b><span>Phases 0–11: the keystone record and both invariants; the five-check gate for real; build-free lanes on every language with negative-control precision; four deep languages (C, Java, Python, Go) through one gate; <b>automatic harness generation</b> — no hand-written driver; the six-screen offline console; signed evidence bundles with runnable replays; ROE, vaccine, bad-patch rejection; the endurance harness. 380 tests. On the remote branch.</span></div>
         <div class="card ok"><b>Settled decisions</b><span>Two tracks · Java first · dep-bumps are patches · the security advisor can reduce authority but never veto the inspector · six novelty mechanisms, not seven · cross-confirmation requires same site and same bug class.</span></div>
         <div class="card todo"><b>Next to build</b><span>Needs the finale hardware: two 36-hour rehearsals, the sandbox under real Docker, local vLLM with the model lane live, the bundle on media. Buildable now: Rust and JS/TS deep lanes, a full OSV mirror, the first real model-lane run. Ordered list: HANDOVER.md §4.</span></div>
         <div class="card todo"><b>Not yet done</b><span>The model lane has run only against a mock endpoint; fix templates are few (C bound-copy, Python shell→argv, Go slice bound) and the model generalises beyond them; the Go differential observes panics only; the submission deck is still v1.</span></div>

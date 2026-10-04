@@ -12,21 +12,21 @@ Every number below is measured by running the actual pipeline over the target se
 
 | Target | Lang | Bug | Status | Fixed | Evidence | Lane | end-to-end (s) | confirm (s) | patch (s) |
 |--------|------|-----|--------|-------|----------|------|----------------|-------------|-----------|
-| c-overflow | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 0.96 | 0.001311 | 0.761274 |
-| py-cmdinject | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.52 | 0.001121 | 1.450596 |
-| java-log4shell | java | CWE-917 | VERIFIED | yes | exploit-replay | TEMPLATE | 47.6 | 0.005152 | 41.377815 |
-| autofuzz:c-nolibfuzzer | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.51 | 3.9e-05 | 0.47582 |
-| autofuzz:py-noharness | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 0.96 | 3.1e-05 | 0.706318 |
-| estate:generic-password-assign@config/app.properties:2 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.002 | 5.7e-05 | — |
-| estate:aws-secret-access-key@config/app.properties:3 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.4e-05 | — |
-| estate:missing-authz@gateway-go/openapi.json:DELETE /users/{id} | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.002 | 2.5e-05 | — |
-| estate:missing-authz@gateway-go/openapi.json:POST /admin/flush | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.1e-05 | — |
-| estate:debug-endpoint@gateway-go/openapi.json:POST /admin/flush | api | CWE-489 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.1e-05 | — |
-| estate:version-match@gateway-go/go.mod:6 | go | CWE-444 | CONFIRMED | — | deterministic-match | — | 0.002 | 4.6e-05 | — |
-| estate:version-match@service-js/package-lock.json:lodash | javascript | CWE-94 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.6e-05 | — |
-| estate:version-match@service-js/package-lock.json:minimist | javascript | CWE-1321 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.4e-05 | — |
-| estate:version-match@tool-py/requirements.txt:2 | python | CWE-20 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.8e-05 | — |
-| estate:version-match@tool-py/requirements.txt:3 | python | CWE-200 | CONFIRMED | — | deterministic-match | — | 0.002 | 1.3e-05 | — |
+| c-overflow | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.24 | 0.001066 | 1.009854 |
+| py-cmdinject | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.32 | 0.001125 | 2.239331 |
+| java-log4shell | java | CWE-917 | VERIFIED | yes | exploit-replay | TEMPLATE | 61.9 | 0.005947 | 56.248835 |
+| autofuzz:c-nolibfuzzer | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.81 | 3.5e-05 | 0.746078 |
+| autofuzz:py-noharness | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.04 | 3.3e-05 | 1.751975 |
+| estate:generic-password-assign@config/app.properties:2 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.003 | 5.6e-05 | — |
+| estate:aws-secret-access-key@config/app.properties:3 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.5e-05 | — |
+| estate:missing-authz@gateway-go/openapi.json:DELETE /users/{id} | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.003 | 3.2e-05 | — |
+| estate:missing-authz@gateway-go/openapi.json:POST /admin/flush | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.2e-05 | — |
+| estate:debug-endpoint@gateway-go/openapi.json:POST /admin/flush | api | CWE-489 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.1e-05 | — |
+| estate:version-match@gateway-go/go.mod:6 | go | CWE-444 | CONFIRMED | — | deterministic-match | — | 0.003 | 3.8e-05 | — |
+| estate:version-match@service-js/package-lock.json:lodash | javascript | CWE-94 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.6e-05 | — |
+| estate:version-match@service-js/package-lock.json:minimist | javascript | CWE-1321 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.6e-05 | — |
+| estate:version-match@tool-py/requirements.txt:2 | python | CWE-20 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.3e-05 | — |
+| estate:version-match@tool-py/requirements.txt:3 | python | CWE-200 | CONFIRMED | — | deterministic-match | — | 0.003 | 1.4e-05 | — |
 
 ## Aggregates (on this set)
 
@@ -37,8 +37,8 @@ Every number below is measured by running the actual pipeline over the target se
 - Zero-inference fixes: **100.0%**
 - Languages covered: **5** (c/c++, go, java, javascript, python)
 - Evidence: 5 exploit-proven, 10 match-proven
-- Deep cases, median end-to-end (build → hunt → fix → five-check gate): **1.51s**
-- Build-free estate scan, all 10 match-proven findings: **0.002s**
+- Deep cases, median end-to-end (build → hunt → fix → five-check gate): **2.04s**
+- Build-free estate scan, all 10 match-proven findings: **0.003s**
 
 ## Losses, shown beside the wins
 
@@ -63,4 +63,4 @@ Every number below is measured by running the actual pipeline over the target se
 
 ---
 
-_Generated by `python -m raksha.benchmark` at commit fcca8fc on 2026-10-04 10:26 UTC. Re-run it to reproduce every number._
+_Generated by `python -m raksha.benchmark` at commit 713d65b on 2026-10-04 11:32 UTC. Re-run it to reproduce every number._

@@ -3,8 +3,8 @@
 Every VERIFIED finding produces one sealed, signed bundle: the reproducer reference and how to
 replay it, before/after oracle output, the five gate results, the diff and its plain-English
 explanation, the regression test, the rollback script, the ROE level and approver signatures, and
-the model/prompt version. We are not asking anyone to trust the AI — we are handing them the
-receipts.
+the model/prompt version, and the environment (interpreter, platform, toolchain versions) the
+proof was produced in. We are not asking anyone to trust the AI — we are handing them the receipts.
 
 Signing: each artifact is content-addressed (sha256), and the manifest of those hashes is signed so
 the whole bundle is tamper-evident. Here the signature is an HMAC-SHA256 over the sorted hashes with
@@ -44,6 +44,39 @@ def signing_key() -> tuple[bytes, str]:
         key = Path(path).read_bytes().strip()
         return key, "deploy:" + hashlib.sha256(key).hexdigest()[:12]
     return _DEMO_KEY, "demo"
+
+
+_ENV_CACHE: dict | None = None
+
+
+def environment() -> dict:
+    """The environment a replay must match: interpreter, platform and the toolchains the lanes
+    drive. Probed once per process. A finding reproduced here and not there is a finding about
+    the environment, and the record should let a reader tell the two apart."""
+    global _ENV_CACHE
+    if _ENV_CACHE is not None:
+        return _ENV_CACHE
+    import platform
+    import shutil
+    import subprocess
+    tools = {}
+    for name, argv in (("gcc", ["gcc", "--version"]), ("go", ["go", "version"]),
+                       ("java", ["java", "-version"]), ("mvn", ["mvn", "-v"])):
+        if shutil.which(argv[0]) is None:
+            continue
+        try:
+            r = subprocess.run(argv, capture_output=True, text=True, timeout=20)
+            first = (r.stdout or r.stderr).strip().splitlines()
+            tools[name] = first[0][:120] if first else "present"
+        except (OSError, subprocess.SubprocessError):
+            tools[name] = "present (version probe failed)"
+    _ENV_CACHE = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "toolchains": tools,
+    }
+    return _ENV_CACHE
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -87,6 +120,7 @@ def build_bundle(finding: Finding, out_dir: str | Path, *, key: bytes | None = N
         "finding_id": finding.id, "bug_class": finding.bug_class, "status": finding.status.value,
         "target": finding.target, "roe_level": finding.roe_level.value,
         "approver_signatures": [{"signer": s.signer, "key_id": s.key_id} for s in finding.signatures],
+        "environment": environment(),
         "artifacts": hashes,
     }
     manifest_bytes = json.dumps(manifest, indent=2, sort_keys=True).encode()

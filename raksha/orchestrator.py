@@ -171,7 +171,9 @@ class Session:
         return [t.card(self.findings) for t in self.targets]
 
     def scorecard(self) -> dict:
+        degraded = len([t for t in self.targets if t.build_status in ("amber", "red")])
         return scorecard(self.findings.values(), vaccine_variants=self.vaccine_variants,
+                         targets_degraded=degraded, targets_total=len(self.targets),
                          started_at=self.started_at, counter_baseline=self.counter_baseline).as_dict()
 
     def run_vaccine_sweep(self, codebases: dict[str, Path]) -> int:

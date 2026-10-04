@@ -69,6 +69,22 @@ hand-written harness (synthesized, Phase 11; Java via the shipped Jazzer replay 
     anywhere else — the air-gap guard parses every shipped Python file to prove it. With no
     endpoint the pipeline is model-free (templates → retrieval → mitigation) and still verifies.
 
+14. **Shallow fixes die in the gate, deterministically.** CLEAN_REFUZZ opens with 24 fixed-seed
+    variants of the reproducer on the patched build before the fresh campaign; a patch that
+    silences the one crashing input fails on every target, not only when a random campaign finds a
+    sibling (`gate/runner.py::pov_neighbourhood`; `docs/external-review-vetting.md` §2).
+15. **The target's source is untrusted input to the model, and the diff is its only exit.** The
+    prompt says so; patch hygiene refuses, before any gate run, a candidate that touches a file
+    outside the fix-site set, adds more than 150 lines, or introduces an execution / network /
+    dynamic-load primitive the removed lines did not have (`raksha/hygiene.py`). Templates get no
+    exemption. Rejections are counted on the Scorecard.
+16. **Presence is never absence.** Every Scorecard, export and console carries an assurance
+    boundary — languages exercised by exploit vs build-free only, targets that did not build,
+    suspected-and-unreported, dependencies the code does not import — and a statement that never
+    contains the word "secure". A dependency match is ranked by import-level reachability
+    (imported / not-imported / unknown), because a proven-present CVE in an unused library is not
+    an exploit.
+
 ## The one rule
 
 > **A criterion you cannot measure is a criterion you cannot score.**
@@ -95,6 +111,9 @@ measured per run from the records and live counters — never typed in. Key name
 | One adapter per language, oracle plugin API; **automatic harness generation** | **Scalability** | `languages_covered` (lanes such as secrets/API excluded); `verified_per_language`; findings from synthesized harnesses in the benchmark |
 | ROE authority model | **Functionality** | authority in force per action; zero-human-input count |
 | Vaccine sweep over the asset registry | **Scalability** | `vaccine_variants_found` (origin codebase excluded — no self-hits) |
+| Patch hygiene (scope · size · primitives) before the gate | **Precision** | `candidate_patches_rejected_before_gate` |
+| Dependency reachability (import index in the build-free walk) | **Precision** | `dependency_reachability` {imported, not-imported, unknown}; risk register weights 0.9 / 0.3 / 0.6 |
+| Assurance boundary | Trust · **Precision** | `boundary.*` and `boundary.statement` on Screen 5, `summary.json`, `ASSURANCE_BOUNDARY.txt` |
 | Sandbox, no network interface | Trust | `network_interfaces` = 0 only if every target-code run went through the sandbox, else `unenforced`; `cloud_calls` = live egress counter |
 
 ## Phases
@@ -126,6 +145,9 @@ generic templates (zero inference), the model lane through the one inference int
 `RAKSHA_INFERENCE_BASE_URL` is set, and a mitigation floor — gating each candidate. Rust remains the
 one deep language still on the build-free tier (cargo-fuzz adapter is the next addition behind the
 same oracle API).
+
+**Vetted against an external critical review on 2026-10-04** — point-by-point verdict, the five
+changes it caused, and what was deliberately rejected: `docs/external-review-vetting.md`.
 
 ## Standing constraints
 

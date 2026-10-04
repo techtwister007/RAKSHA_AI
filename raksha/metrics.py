@@ -19,7 +19,7 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
 
-from .finding import INFERENCE_LANES, Finding, GateCheck, Status, reportable
+from .finding import EXPLOIT_REPLAY, INFERENCE_LANES, Finding, GateCheck, Status, reportable
 from .gpu import VramReading, vram
 from . import inference, sandbox
 
@@ -46,6 +46,9 @@ class Scorecard:
     scalability: dict[str, Any] = field(default_factory=dict)
     resource: dict[str, Any] = field(default_factory=dict)
     posture: dict[str, Any] = field(default_factory=dict)
+    #: What this run did NOT establish. A proof of presence is never a proof of absence, so the
+    #: scoresheet carries the boundary of the claim next to the claim.
+    boundary: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -56,6 +59,7 @@ class Scorecard:
             "scalability": self.scalability,
             "resource": self.resource,
             "posture": self.posture,
+            "boundary": self.boundary,
         }
 
 
@@ -71,6 +75,8 @@ def scorecard(
     gpu_probe: Callable[[], VramReading | None] = vram,
     started_at=None,
     counter_baseline: dict[str, int] | None = None,
+    targets_degraded: int | None = None,
+    targets_total: int | None = None,
 ) -> Scorecard:
     """Compute the full scorecard for a set of findings.
 
@@ -166,6 +172,12 @@ def scorecard(
         # record on the survivor, so the precision ledger row is a measurement.
         "static_findings_promoted": sum(len(f.merged_from) for f in findings),
         "unproven_findings_suppressed": len(by_status[Status.SUSPECTED]),
+        # Candidates patch hygiene refused before any gate run (out-of-scope file, oversized, or a
+        # new execution/network primitive). Never applied, so never in the gated count above.
+        "candidate_patches_rejected_before_gate": sum(len(f.rejected_candidates) for f in findings),
+        # A dependency match proves the version is present; the import scan says whether the
+        # code reaches it. Shown so a CVE in an unused library is never dressed as an exploit.
+        "dependency_reachability": _count(f.reachability for f in findings if f.reachability),
     }
 
     # ---- Functionality: did the loop run unattended ----------------------
@@ -236,8 +248,26 @@ def scorecard(
         "unsandboxed_runs": run["unsandboxed_runs"],
     }
 
+    # ---- Boundary: what this run did not establish --------------------------
+    exploit_langs = {f.language for f in findings
+                     if f.reproducer is not None and f.reproducer.kind == EXPLOIT_REPLAY} - NOT_A_LANGUAGE
+    boundary = {
+        "claim": "presence of the findings above, each with a replaying reproducer; never absence",
+        "unresolved_suspected": len(by_status[Status.SUSPECTED]),
+        "proven_but_unfixed": len(by_status[Status.REPORT_ONLY]),
+        "languages_exercised_by_exploit": sorted(exploit_langs),
+        "languages_build_free_only": sorted(set(languages) - exploit_langs),
+        "targets_degraded_to_build_free": targets_degraded,
+        "targets_total": targets_total,
+        "dependencies_not_imported": len([f for f in findings if f.reachability == "not-imported"]),
+        "dependencies_reachability_unknown": len([f for f in findings if f.reachability == "unknown"]),
+        "statement": None,
+    }
+    boundary["statement"] = assurance_statement(boundary, performance)
+
     return Scorecard(
         performance=performance,
+        boundary=boundary,
         speed=speed,
         precision=precision,
         functionality=functionality,
@@ -245,6 +275,31 @@ def scorecard(
         resource=resource,
         posture=posture,
     )
+
+
+def assurance_statement(boundary: dict[str, Any], performance: dict[str, Any]) -> str:
+    """The sentence a commander reads instead of "SECURE". It states what was proven and names what
+    was not analysed, so the decision-maker knows what the machine knows and what it does not."""
+    parts = [f"{performance['findings_reported']} finding(s) proven present, "
+             f"{performance['bugs_verified_fixed']} fixed and proven; "
+             f"{boundary['proven_but_unfixed']} proven and referred unfixed."]
+    if boundary["languages_exercised_by_exploit"]:
+        parts.append("Exploit-level analysis covered: " + ", ".join(boundary["languages_exercised_by_exploit"]) + ".")
+    if boundary["languages_build_free_only"]:
+        parts.append("Build-free analysis only (no exploit attempted): "
+                     + ", ".join(boundary["languages_build_free_only"]) + ".")
+    if boundary["targets_degraded_to_build_free"]:
+        parts.append(f"{boundary['targets_degraded_to_build_free']} of {boundary['targets_total']} target(s) "
+                     f"did not build and were analysed build-free only.")
+    if boundary["unresolved_suspected"]:
+        parts.append(f"{boundary['unresolved_suspected']} suspected finding(s) remain unproven and unreported.")
+    if boundary["dependencies_not_imported"] or boundary["dependencies_reachability_unknown"]:
+        parts.append(f"Of the dependency findings, {boundary['dependencies_not_imported']} are in packages the "
+                     f"code does not import and {boundary['dependencies_reachability_unknown']} could not be "
+                     f"checked for reachability.")
+    parts.append("This run establishes presence, not absence: unexercised code paths, bug classes without an "
+                 "oracle here, and the environment around the code are outside the claim.")
+    return " ".join(parts)
 
 
 def _window():
