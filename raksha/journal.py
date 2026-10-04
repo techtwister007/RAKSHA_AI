@@ -69,6 +69,21 @@ class Journal:
         return rec
 
 
+def sign(path: str | Path, key: bytes | None = None) -> dict:
+    """D5: sign the journal so the run's audit trail is tamper-evident on its own, not only via the
+    per-line chain. Signs the final chain hash and the record count with pqsign (PQ when available,
+    HMAC otherwise). The signed object is what ships alongside the journal in the evidence bundle."""
+    from . import pqsign
+    from .bundle import signing_key
+    recs = read(path)
+    final = recs[-1]["hash"] if recs else _ZERO
+    material = f"{len(recs)}:{final}".encode()
+    k, key_id = (key, "caller") if key is not None else signing_key()
+    sig = pqsign.sign(material, k)
+    sig.update({"key_id": key_id, "records": len(recs), "final_hash": final})
+    return sig
+
+
 def read(path: str | Path) -> list[dict]:
     """Every record in order. Skips blank lines; a truncated final line (a kill mid-write) is dropped."""
     out: list[dict] = []

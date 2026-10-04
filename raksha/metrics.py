@@ -83,6 +83,8 @@ def scorecard(
     targets_total: int | None = None,
     attack_graph: dict | None = None,
     pqc: dict | None = None,
+    fleet: list | None = None,
+    unpinned_deps: list | None = None,
 ) -> Scorecard:
     """Compute the full scorecard for a set of findings.
 
@@ -276,6 +278,9 @@ def scorecard(
         "targets_total": targets_total,
         "dependencies_not_imported": len([f for f in findings if f.reachability == "not-imported"]),
         "dependencies_reachability_unknown": len([f for f in findings if f.reachability == "unknown"]),
+        # C2: open-range dependencies — not flagged vulnerable (a resolver may install a fixed
+        # version) but surfaced here as exposure of unknown status rather than left invisible.
+        "dependencies_unpinned": len(unpinned_deps) if unpinned_deps is not None else None,
         "statement": None,
     }
     boundary["statement"] = assurance_statement(boundary, performance)
@@ -319,6 +324,8 @@ def scorecard(
         # C8/C3: config/IaC and git-history findings now in the build-free floor.
         "iac_findings": len([f for f in reported if f.oracle.startswith("iac:")]),
         "git_history_findings": len([f for f in reported if f.oracle.startswith("githistory:")]),
+        # C5: defects that recur across two or more targets (one defect, many locations).
+        "fleet_wide_defects": len(fleet) if fleet is not None else None,
     }
 
     return Scorecard(

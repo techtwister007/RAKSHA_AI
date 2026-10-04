@@ -73,6 +73,8 @@ class Session:
     registry: _assets.Registry = field(default_factory=_assets.load)
     #: Cryptographic primitives seen across the estate, for the post-quantum migration report.
     crypto_uses: list = field(default_factory=list)
+    #: C2: open-range dependencies seen across the estate (exposure of unknown status), for the boundary.
+    unpinned_deps: list = field(default_factory=list)
     #: Per-target structural graph summaries (nodes/edges/sinks) for the console.
     structure_summaries: dict = field(default_factory=dict)
     #: Where sealed evidence bundles are kept (one directory per finding); created on first use.
@@ -158,6 +160,7 @@ class Session:
             self.targets.append(t)
             return t
         self.crypto_uses.extend(result.crypto_uses)
+        self.unpinned_deps.extend(getattr(result, "unpinned", []))
         found = list(result.findings)
         # Structural (CPG) hypotheses: SUSPECTED source->sink paths that exist to be cross-confirmed
         # by a lane that lands a reproducer on the same site+CWE, and otherwise to feed triage. They
@@ -351,6 +354,7 @@ class Session:
         return scorecard(self.findings.values(), vaccine_variants=self.vaccine_variants,
                          targets_degraded=degraded, targets_total=len(self.targets),
                          attack_graph=self.attack_graph(), pqc=self.pqc_report(),
+                         fleet=self.fleet_rollup(), unpinned_deps=self.unpinned_deps,
                          started_at=self.started_at, counter_baseline=self.counter_baseline).as_dict()
 
     def run_vaccine_sweep(self, codebases: dict[str, Path]) -> int:
@@ -501,6 +505,41 @@ class Session:
                     f.parliament = {**(f.parliament or {}), "epistemic_conflict": ec}
         evidence.fuse_all(self.findings.values())
 
+    def fleet_rollup(self) -> list[dict]:
+        """C5: defects that span two or more targets, folded into one row each."""
+        from . import fleet
+        return fleet.rollup(self.findings.values())
+
+    def mark_finding_wrong(self, finding_id: str) -> int:
+        """E7: an operator says a shipped fix was wrong. Demote its learned shape from the fix
+        memory so it is never re-offered, and record it on the journal."""
+        from .retrieval import default_memory
+        f = self.findings.get(finding_id)
+        if f is None:
+            return 0
+        n = default_memory().demote(f)
+        self.emit("finding_marked_wrong", finding=finding_id, demoted=n)
+        return n
+
+    def save_memory(self, path=None):
+        """E5: persist the fix memory so a learned fix survives a reboot."""
+        from .retrieval import default_memory
+        p = Path(path) if path else (self.evidence_root or Path(".")) / "fix_memory.json"
+        default_memory().save(p)
+        return p
+
+    def load_memory(self, path=None) -> int:
+        from .retrieval import default_memory
+        p = Path(path) if path else (self.evidence_root or Path(".")) / "fix_memory.json"
+        return default_memory().load(p)
+
+    def sign_journal(self) -> dict | None:
+        """D5: sign the run's audit trail. None when no journal is open."""
+        if self.journal is None:
+            return None
+        from . import journal as _j
+        return _j.sign(self.journal.path)
+
     def attack_graph(self) -> dict:
         """Chains of individually-moderate findings into a path to impact, scored by attack
         economics. Built over the whole estate at snapshot time."""
@@ -531,7 +570,8 @@ class Session:
         return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
                 "risk": self.risk_register(), "pipeline": self.pipeline_stages(),
                 "attack_graph": self.attack_graph(), "pqc": self.pqc_report(),
-                "triage": self.triage(), "structure": self.structure_summaries}
+                "triage": self.triage(), "structure": self.structure_summaries,
+                "fleet": self.fleet_rollup()}
 
 
 def _dispatch_autofuzz(root: Path):

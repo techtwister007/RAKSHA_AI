@@ -200,6 +200,7 @@ class FixMemory:
 
     def __init__(self) -> None:
         self._records: list[FixRecord] = []
+        self._banned: set[str] = set()   # E7: shapes an operator marked wrong; never re-offered
 
     def __len__(self) -> int:
         return len(self._records)
@@ -207,6 +208,61 @@ class FixMemory:
     @property
     def records(self) -> list[FixRecord]:
         return list(self._records)
+
+    @staticmethod
+    def _shape_key(bug_class: str, language: str, rewrites) -> str:
+        return "|".join([bug_class, language, *sorted(r.pattern for r in rewrites)])
+
+    def save(self, path) -> None:
+        """E5: persist the memory so a learned fix survives a reboot (Stage 9 must not reset)."""
+        import json
+        from dataclasses import asdict
+        from pathlib import Path as _P
+        data = {"records": [asdict(r) for r in self._records], "banned": sorted(self._banned)}
+        p = _P(path); p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(data, indent=2))
+
+    def load(self, path) -> int:
+        """Merge persisted records from disk (idempotent on origin_finding). Returns how many added."""
+        import json
+        from pathlib import Path as _P
+        p = _P(path)
+        if not p.is_file():
+            return 0
+        try:
+            data = json.loads(p.read_text())
+        except (OSError, ValueError):
+            return 0
+        self._banned |= set(data.get("banned", []))
+        have = {r.origin_finding for r in self._records}
+        n = 0
+        for d in data.get("records", []):
+            if d.get("origin_finding") in have:
+                continue
+            rewrites = tuple(LineRewrite(pattern=w["pattern"], ids=tuple(w["ids"]),
+                                         segs=tuple(tuple(x) for x in w["segs"])) for w in d["rewrites"])
+            self._records.append(FixRecord(
+                bug_class=d["bug_class"], language=d["language"], origin_finding=d["origin_finding"],
+                origin_uri=d["origin_uri"], origin_line=d.get("origin_line"), rewrites=rewrites,
+                inserts=tuple(d.get("inserts", ())), patch_diff=d["patch_diff"], rule_id=d.get("rule_id")))
+            n += 1
+        return n
+
+    def demote(self, finding: Finding) -> int:
+        """E7: an operator marked this fix wrong in the field. Drop every record learned from it and
+        ban its shape so it is never relearned or re-offered. Returns how many records were removed."""
+        key = None
+        if finding.patch_diff:
+            rewrites, _ = _learn_from_diff(finding.patch_diff, finding.language)
+            if rewrites:
+                key = self._shape_key(finding.bug_class, finding.language, rewrites)
+        before = len(self._records)
+        self._records = [r for r in self._records
+                         if r.origin_finding != finding.id
+                         and (key is None or self._shape_key(r.bug_class, r.language, r.rewrites) != key)]
+        if key:
+            self._banned.add(key)
+        return before - len(self._records)
 
     def remember(self, finding: Finding) -> FixRecord | None:
         """Store a reusable record from a VERIFIED finding. No-op (returns None) for anything else,
@@ -216,6 +272,8 @@ class FixMemory:
         rewrites, inserts = _learn_from_diff(finding.patch_diff, finding.language)
         if not rewrites and not inserts:
             return None
+        if self._shape_key(finding.bug_class, finding.language, rewrites) in self._banned:
+            return None   # E7: this shape was marked wrong by a human; do not relearn it
         site = finding.fix_site_set[0] if finding.fix_site_set else None
         rule = vaccine.extract_rule(finding)   # may be None; used only as a provenance tag here
         rec = FixRecord(

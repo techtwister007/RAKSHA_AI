@@ -394,3 +394,56 @@ def annotate_reachability(findings: list[Finding], index: ImportIndex) -> None:
 
 
 _ECO_BY_LANG = {v: k for k, v in _LANG.items()}
+
+
+# ---- C2: dependencies that are NOT exact-pinned ------------------------------------------------
+# An open range ("^4.17.20", ">=2.25.1", "*", "latest") is deliberately NOT flagged as vulnerable —
+# a resolver may install a fixed version, and matching the lower bound would be a false positive.
+# But "not flagged" must not mean "invisible": an unpinned dependency is an exposure of UNKNOWN
+# status, and the assurance boundary reports it as such rather than letting it vanish.
+
+def unpinned_in_manifest(name: str, text: str, path: str) -> list[dict]:
+    """Dependencies in this manifest whose version is an open range, not an exact pin. Each entry:
+    {package, spec, manifest}. A lockfile pins exactly, so a target WITH a lockfile reports none."""
+    fn = _PARSERS.get(name)
+    if fn is None:
+        return []
+    out: list[dict] = []
+    seen: set[str] = set()
+    # Re-parse the manifest leniently: the normal parsers drop non-exact specs, so we read the raw
+    # (package, spec) pairs the same way each parser's regex does, and keep the ones exact_pin rejects.
+    for pkg, spec in _raw_specs(name, text):
+        if not pkg or pkg in seen:
+            continue
+        seen.add(pkg)
+        if exact_pin(spec) is None and spec is not None and str(spec).strip() not in ("", "*"):
+            out.append({"package": pkg, "spec": str(spec).strip(), "manifest": path})
+        elif str(spec).strip() in ("", "*", "latest"):
+            out.append({"package": pkg, "spec": str(spec).strip() or "*", "manifest": path})
+    return out
+
+
+def _raw_specs(name: str, text: str):
+    """(package, spec) pairs straight from a manifest, pins and ranges alike. Best-effort per
+    ecosystem; only the pairs the exact-pin parsers discard matter for the unpinned view."""
+    import json as _json
+    import re as _re
+    if name == "package.json":
+        try:
+            d = _json.loads(text)
+        except ValueError:
+            return
+        for sect in ("dependencies", "devDependencies", "optionalDependencies"):
+            for pkg, spec in (d.get(sect) or {}).items():
+                yield pkg, spec
+    elif name == "requirements.txt":
+        for line in text.splitlines():
+            line = line.split("#", 1)[0].strip()
+            if not line or line.startswith("-"):
+                continue
+            m = _re.match(r"([A-Za-z0-9._-]+)\s*(.*)$", line)
+            if m:
+                yield _norm_pypi(m.group(1)), (m.group(2).strip() or None)
+    elif name == "go.mod":
+        for m in _re.finditer(r"^\s*([A-Za-z0-9._/~-]+)\s+(v\S+)", text, _re.M):
+            yield m.group(1), m.group(2)

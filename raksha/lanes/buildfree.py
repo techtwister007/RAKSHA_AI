@@ -49,6 +49,7 @@ class BuildFreeResult:
     seconds: float = 0.0
     #: Cryptographic primitives in use (not findings) for the post-quantum migration plan.
     crypto_uses: list = field(default_factory=list)
+    unpinned: list = field(default_factory=list)   # C2: open-range deps (exposure of unknown status)
 
     def by_lane(self) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -66,6 +67,7 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
     deps: list[supply.Dependency] = []
     findings: list[Finding] = []
     crypto_uses: list = []
+    unpinned: list = []
     imports = supply.ImportIndex()
     files = manifests = 0
 
@@ -80,6 +82,7 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
         if name in supply._PARSERS:
             manifests += 1
             deps.extend(supply.parse_manifest(name, text, rel))
+            unpinned.extend(supply.unpinned_in_manifest(name, text, rel))
         imports.add(path, text)
         if secrets_on and (path.suffix in _SECRET_EXT or name in _SECRET_NAMES):
             findings.extend(secrets.scan_text(text, rel))
@@ -112,9 +115,12 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
         findings.extend(githistory.scan_git_history(root))
     except Exception:  # noqa: BLE001
         pass
+    pinned_pkgs = {d.package for d in deps}
+    unpinned = [u for u in unpinned if u["package"] not in pinned_pkgs]
     findings = dedup(findings)
     return BuildFreeResult(findings=findings, files_scanned=files, manifests_found=manifests,
-                           seconds=round(time.monotonic() - started, 3), crypto_uses=crypto_uses)
+                           seconds=round(time.monotonic() - started, 3), crypto_uses=crypto_uses,
+                           unpinned=unpinned)
 
 
 def _looks_like_openapi(name: str, text: str) -> bool:
