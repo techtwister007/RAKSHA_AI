@@ -187,6 +187,12 @@ def generic_templates(finding: Finding, root: Path):
         out.append(lambda: py_shell_safe(finding, root))
     if finding.language == "go" and cwe in ("CWE-125", "CWE-787", "CWE-129"):
         out.append(lambda: go_bound_slice(finding, root))
+    if finding.language == "rust" and cwe in ("CWE-125", "CWE-787", "CWE-129", "CWE-190"):
+        from .adapters.rust_fuzz import rust_bound_index
+        out.append(lambda: rust_bound_index(finding, root))
+    if finding.language == "javascript" and cwe in ("CWE-78", "CWE-77", "CWE-94"):
+        from .adapters.js_sink import js_shell_safe
+        out.append(lambda: js_shell_safe(finding, root))
     return out
 
 

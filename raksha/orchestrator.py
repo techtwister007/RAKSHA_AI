@@ -102,7 +102,12 @@ class Session:
         try:
             sres = _structure.scan_structure(root)
             self.structure_summaries[name] = sres.graph_summary
-            found = cross_confirm([*found, *_structure.to_findings(sres)])
+            extra = list(_structure.to_findings(sres))
+            # "Take" lanes (Semgrep/Gitleaks/OSV-Scanner) only when a binary is present AND its flag
+            # is set — on a bare box this is a no-op; when enabled, their findings cross-confirm ours.
+            from .lanes.take import run_take_lanes
+            extra += run_take_lanes(str(root))
+            found = cross_confirm([*found, *extra])
         except Exception:  # noqa: BLE001 — a tree we cannot parse structurally is not a crash
             pass
         _assets.annotate(found, self.registry, target=name)
@@ -156,10 +161,9 @@ class Session:
         default) drive the repair ladder through the gate. This is the find→fix→prove loop on an
         unknown target with no human writing a driver."""
         from .autorepair import repair as _repair
-        from .harness import autofuzz
         root = Path(root)
         name = name or root.name
-        r = autofuzz(root)
+        r = _dispatch_autofuzz(root)
         if not r.found:
             t = Target(name=name, build_status="amber", roe_level=roe,
                        note=f"autofuzz found no crash: {r.note}")
@@ -372,6 +376,31 @@ class Session:
                 "risk": self.risk_register(), "pipeline": self.pipeline_stages(),
                 "attack_graph": self.attack_graph(), "pqc": self.pqc_report(),
                 "triage": self.triage(), "structure": self.structure_summaries}
+
+
+def _dispatch_autofuzz(root: Path):
+    """Pick the deep lane by what the target ships, so one ingest covers every language with a
+    synthesized-harness lane. Each lane returns a result exposing .found/.finding/.crashing_input/
+    .target; we normalise the two Go/Rust/JS shapes to the C/Python AutofuzzResult surface the
+    caller already handles. C/Python is the fallback (ASan/sink via the stdlib engine)."""
+    import shutil
+    from .harness.autofuzz import autofuzz as _c_py_autofuzz
+    has = lambda *names: any((root / n).exists() for n in names)
+    globx = lambda pat: any(root.rglob(pat))
+    # Rust
+    if has("Cargo.toml") and shutil.which("cargo"):
+        from .adapters.rust_fuzz import rust_autofuzz
+        return rust_autofuzz(root)
+    # Go
+    if has("go.mod") and shutil.which("go"):
+        from .adapters.go_fuzz import go_autofuzz
+        return go_autofuzz(root)
+    # JavaScript / TypeScript
+    if (has("package.json") or globx("*.js")) and shutil.which("node"):
+        from .adapters.js_sink import js_autofuzz
+        return js_autofuzz(root)
+    # C / Python (stdlib engine, always available)
+    return _c_py_autofuzz(root)
 
 
 def demo_session(repo_root: Path | None = None) -> Session:

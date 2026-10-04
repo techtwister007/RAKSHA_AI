@@ -203,6 +203,8 @@ def _c_target(work: Path, built: dict, ep: Entrypoint) -> CommandTarget:
         test_cmd="true",                          # a discovered target brings no suite of its own
         coverage_cmd=cov,
         refuzz_cmd=refuzz,
+        added_test_cmd="sh {test}",               # lets a verified regression test ride to the bundle
+        added_test_path="raksha_regression.sh",
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
         timeout=120.0,
     )
@@ -233,6 +235,8 @@ def _py_target(work: Path, ep: Entrypoint) -> CommandTarget:
         refuzz_cmd=("i=0; for p in 'A; id' 'B | cat /etc/hostname' 'C && echo x' 'D `whoami`'; do "
                     "i=$((i+1)); printf '%s' \"$p\" > rf_$i; python3 raksha_harness.py rf_$i > err_$i 2>&1; "
                     "if [ $? -ne 0 ]; then cp err_$i {out}/crash_$i; fi; done"),
+        added_test_cmd="python3 {test}",          # lets a verified regression test ride to the bundle
+        added_test_path="raksha_regression.py",
         apply_patch_cmd="git apply -p1 {patch} 2>/dev/null || patch -p1 < {patch}",
         timeout=120.0,
     )

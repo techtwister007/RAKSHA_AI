@@ -12,30 +12,30 @@ Every number below is measured by running the actual pipeline over the target se
 
 | Target | Lang | Bug | Status | Fixed | Evidence | Lane | end-to-end (s) | confirm (s) | patch (s) |
 |--------|------|-----|--------|-------|----------|------|----------------|-------------|-----------|
-| c-overflow | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.32 | 0.0012 | 1.0656 |
-| py-cmdinject | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.55 | 0.001184 | 2.48584 |
-| java-log4shell | java | CWE-917 | VERIFIED | yes | exploit-replay | TEMPLATE | 66.66 | 0.008956 | 59.372312 |
-| autofuzz:c-nolibfuzzer | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.83 | 3.9e-05 | 0.795638 |
-| autofuzz:py-noharness | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.08 | 3.4e-05 | 1.803571 |
-| estate:generic-password-assign@config/app.properties:2 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.011 | 7e-05 | — |
-| estate:aws-secret-access-key@config/app.properties:3 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.011 | 2e-05 | — |
-| estate:weak-hash-security-context@crypto-svc/signer.py:19 | python | CWE-328 | CONFIRMED | — | deterministic-match | — | 0.011 | 3.1e-05 | — |
-| estate:static-iv@crypto-svc/signer.py:24 | python | CWE-329 | CONFIRMED | — | deterministic-match | — | 0.011 | 2e-05 | — |
-| estate:weak-rsa-keysize@crypto-svc/signer.py:30 | python | CWE-326 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.3e-05 | — |
-| estate:legacy-tls-protocol@crypto-svc/signer.py:34 | python | CWE-757 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.1e-05 | — |
-| estate:no-cert-verification@crypto-svc/signer.py:35 | python | CWE-295 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.9e-05 | — |
-| estate:no-cert-verification@crypto-svc/signer.py:36 | python | CWE-295 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.1e-05 | — |
-| estate:missing-authz@gateway-go/openapi.json:DELETE /users/{id} | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.011 | 4.1e-05 | — |
-| estate:missing-authz@gateway-go/openapi.json:POST /admin/flush | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.1e-05 | — |
-| estate:debug-endpoint@gateway-go/openapi.json:POST /admin/flush | api | CWE-489 | CONFIRMED | — | deterministic-match | — | 0.011 | 9e-06 | — |
-| estate:version-match@audit-java/pom.xml:9 | java | CWE-917 | CONFIRMED | — | deterministic-match | — | 0.011 | 5.5e-05 | — |
-| estate:version-match@audit-java/pom.xml:9 | java | CWE-917 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.6e-05 | — |
-| estate:version-match@audit-java/pom.xml:9 | java | CWE-74 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.4e-05 | — |
-| estate:version-match@gateway-go/go.mod:6 | go | CWE-444 | CONFIRMED | — | deterministic-match | — | 0.011 | 2.3e-05 | — |
-| estate:version-match@service-js/package-lock.json:lodash | javascript | CWE-94 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.2e-05 | — |
-| estate:version-match@service-js/package-lock.json:minimist | javascript | CWE-1321 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.3e-05 | — |
-| estate:version-match@tool-py/requirements.txt:2 | python | CWE-20 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.2e-05 | — |
-| estate:version-match@tool-py/requirements.txt:3 | python | CWE-200 | CONFIRMED | — | deterministic-match | — | 0.011 | 1.3e-05 | — |
+| c-overflow | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 1.15 | 0.00108 | 0.942845 |
+| py-cmdinject | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.16 | 0.001023 | 2.10093 |
+| java-log4shell | java | CWE-917 | VERIFIED | yes | exploit-replay | TEMPLATE | 64.83 | 0.006065 | 58.210545 |
+| autofuzz:c-nolibfuzzer | c/c++ | CWE-121 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.05 | 3.6e-05 | 0.898843 |
+| autofuzz:py-noharness | python | CWE-78 | VERIFIED | yes | exploit-replay | TEMPLATE | 2.01 | 4e-05 | 1.721959 |
+| estate:generic-password-assign@config/app.properties:2 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.009 | 6.1e-05 | — |
+| estate:aws-secret-access-key@config/app.properties:3 | any | CWE-798 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.4e-05 | — |
+| estate:weak-hash-security-context@crypto-svc/signer.py:19 | python | CWE-328 | CONFIRMED | — | deterministic-match | — | 0.009 | 2.7e-05 | — |
+| estate:static-iv@crypto-svc/signer.py:24 | python | CWE-329 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.3e-05 | — |
+| estate:weak-rsa-keysize@crypto-svc/signer.py:30 | python | CWE-326 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.2e-05 | — |
+| estate:legacy-tls-protocol@crypto-svc/signer.py:34 | python | CWE-757 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.3e-05 | — |
+| estate:no-cert-verification@crypto-svc/signer.py:35 | python | CWE-295 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.2e-05 | — |
+| estate:no-cert-verification@crypto-svc/signer.py:36 | python | CWE-295 | CONFIRMED | — | deterministic-match | — | 0.009 | 1e-05 | — |
+| estate:missing-authz@gateway-go/openapi.json:DELETE /users/{id} | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.009 | 3.1e-05 | — |
+| estate:missing-authz@gateway-go/openapi.json:POST /admin/flush | api | CWE-862 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.1e-05 | — |
+| estate:debug-endpoint@gateway-go/openapi.json:POST /admin/flush | api | CWE-489 | CONFIRMED | — | deterministic-match | — | 0.009 | 9e-06 | — |
+| estate:version-match@audit-java/pom.xml:9 | java | CWE-917 | CONFIRMED | — | deterministic-match | — | 0.009 | 3.6e-05 | — |
+| estate:version-match@audit-java/pom.xml:9 | java | CWE-917 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.6e-05 | — |
+| estate:version-match@audit-java/pom.xml:9 | java | CWE-74 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.5e-05 | — |
+| estate:version-match@gateway-go/go.mod:6 | go | CWE-444 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.2e-05 | — |
+| estate:version-match@service-js/package-lock.json:lodash | javascript | CWE-94 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.2e-05 | — |
+| estate:version-match@service-js/package-lock.json:minimist | javascript | CWE-1321 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.3e-05 | — |
+| estate:version-match@tool-py/requirements.txt:2 | python | CWE-20 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.3e-05 | — |
+| estate:version-match@tool-py/requirements.txt:3 | python | CWE-200 | CONFIRMED | — | deterministic-match | — | 0.009 | 1.4e-05 | — |
 
 ## Aggregates (on this set)
 
@@ -46,8 +46,8 @@ Every number below is measured by running the actual pipeline over the target se
 - Zero-inference fixes: **100.0%**
 - Languages covered: **5** (c/c++, go, java, javascript, python)
 - Evidence: 5 exploit-proven, 19 match-proven
-- Deep cases, median end-to-end (build → hunt → fix → five-check gate): **2.08s**
-- Build-free estate scan, all 19 match-proven findings: **0.011s**
+- Deep cases, median end-to-end (build → hunt → fix → five-check gate): **2.05s**
+- Build-free estate scan, all 19 match-proven findings: **0.009s**
 
 ## Losses, shown beside the wins
 
@@ -81,4 +81,4 @@ Every number below is measured by running the actual pipeline over the target se
 
 ---
 
-_Generated by `python -m raksha.benchmark` at commit 4b04894 on 2026-10-04 12:25 UTC. Re-run it to reproduce every number._
+_Generated by `python -m raksha.benchmark` at commit 376fc75 on 2026-10-04 13:10 UTC. Re-run it to reproduce every number. ARVO: no ARVO manifest at .: offline mode, 0 ARVO cases. The full ARVO / AutoPatchBench baseline is assembled on a networked prep machine, which writes this manifest; this box ships without it by design.._
