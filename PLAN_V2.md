@@ -1,6 +1,7 @@
 # RAKSHA AI — Plan V2: close every gap, add every feature
 
-**Status:** draft for approval, 2026-10-04. Nothing here is built yet.
+**Status:** Wave 0 and Wave 1 built (2026-10-04); Waves 2–4 not started. Per-item status, with the
+evidence and the honest caveats, is in the *Wave 1 — status* block below.
 **Scope rule:** every item from the two review passes is included — nothing dropped for cost.
 Breadth first; optimisation after. This document is the contract we execute from and tick off.
 
@@ -44,6 +45,36 @@ Cross-cutting pieces most later items depend on. Built first and alone so parall
 ## Wave 1 — Correctness and accuracy
 
 Five workstreams, parallel. This is where the system becomes trustworthy on real code.
+
+### Wave 1 — status (built; each line names its proof)
+
+All items built. Where an item is weaker than its Done line implies, the caveat is written here.
+
+- **A1–A4, A6** ✔ gate semantics: multi-bug signatures, evidence floor, release-flavour twin, family cross-confirm, verdict feedback — `tests/test_gate.py`, `tests/test_autorepair.py`.
+- **A5** ✔ rollback proven by tree hash; `rollback.sh` fails on a non-identical revert — `tests/test_rollback_proof.py`.
+- **A7–A9** ✔ UBSan/LSan, hang, metamorphic oracles with demos — `tests/test_new_oracles.py`.
+- **A10** ✔ with caveat: the bound claim is now read from the patch's own added lines (C ternary/strncpy, Go slice `min`, Rust `usize::min`); other shapes record `not-modelled`. z3 is not bundled on this box, so every proof here reads `unavailable` — no "proved" is claimed without a solver — `tests/test_proofcheck.py`.
+- **B1–B3, B6** ✔ campaign loop, ddmin, benign-corpus harvest, harness attribution + agreement — `tests/test_campaign.py`, `tests/test_minimise.py`, `tests/test_autofuzz.py`.
+- **B4** ✔ Python (`sys.settrace`) and Node (V8 block coverage) measure executed lines; Rust and Java remain a stated method-span heuristic — `tests/test_coverage_b4.py`.
+- **B5** ✔ Java with no harness: discovered entry point, synthesized driver, batch fuzzing in one JVM, in-JVM refuzz, `java_bound_index` template; the demo reaches VERIFIED through all five checks — `tests/test_java_driver.py`.
+- **B7** ✔ a direct-call crash is held SUSPECTED only when the function states a precondition *and* no input-facing caller reaches it; an exported API with no callers is still reported — `tests/test_contract.py`.
+- **B8** ✔ every name in the target's tree is per run; helper files ship as code only; build paths mapped out of debug info — `tests/test_anti_analysis.py`.
+- **B9** ✔ coverage-targeted red-team pass — `tests/test_redteam.py`.
+- **B10** ✔ binary lane: Go build-info and jar `pom.properties` versions matched to advisories (verified on the real log4j-core 2.14.1 jar), native banners SBOM-only, MD5/SHA-1/DES/RC2 implementation presence at `info` — `tests/test_binary_lane.py`.
+- **B11** ✔ LD_PRELOAD interposition blocks `system`/`exec*`/`popen` before they run — `tests/test_interpose.py`.
+- **B12** ✔ with caveat: behavioural baseline via an LD_PRELOAD observe shim (no ptrace); flags a traversal and an exec, zero findings on the fixed build and on Python interpreter noise. A static binary or raw syscalls bypass it — `tests/test_behaviour.py`.
+- **C1–C8** ✔ transitive deps, unpinned boundary, git-history secrets, VEX, fleet roll-up, KEV/EPSS, reproducible build, IaC floor — `tests/test_supplychain_v2.py`, `tests/test_wave1_core2.py`.
+- **D1–D7, D9–D11** ✔ authority cap, deploy grade, large reproducers, resource metrics, signed journal, purge, model card, SBOM, PQ signature (HMAC fallback), in-toto attestation — `tests/test_phase8.py`, `tests/test_evidence.py`, `tests/test_trust.py`, `tests/test_journal.py`.
+- **D8** ✔ `docs/threat-model.md`: sixteen surfaces, each mapped to a built control and its test, plus residual risks.
+- **E1** ✔ campaigns checkpoint every round; a run killed mid-campaign resumes with its proven findings — `tests/test_campaign.py`.
+- **E2, E4–E7** ✔ parallel ingest, change report, persistent memory, signed update path, feedback demotion — `tests/test_campaign.py`, `tests/test_wave1_core2.py`, `tests/test_trust.py`.
+- **E3** ✔ the per-target budget ends a campaign with an honest note and keeps what it found — `tests/test_campaign.py`.
+- **E8** ✔ scaffolding only, as specified: curates (context, diff) pairs from VERIFIED, gate-passed findings and refuses the rest; trains nothing; never called by the pipeline — `tests/test_training.py`.
+
+**Found and fixed during close-out (not in the plan):** the fuzzing hot loops spawned target code
+outside the sandbox door — in the deployed layout, inside the container that holds the
+container-runtime socket. Every spawn of target code now goes through one door, enforced by an AST
+test (`tests/test_sandbox_door.py`).
 
 ### Workstream A — Gate semantics that survive a real codebase
 

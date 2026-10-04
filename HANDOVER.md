@@ -23,7 +23,16 @@ regenerated from the repository as the last step.
 
 Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24):
 
-- **594 tests pass**, 9 skipped (opt-in slow/hardware tests), `pyflakes` clean, air-gap guard clean.
+- **full suite passes** (count recorded after the final run), air-gap guard clean.
+- **Plan V2 Wave 0 + Wave 1 built** (`PLAN_V2.md` carries per-item status, proof and caveats): multi-bug
+  gate semantics, evidence floor, release twin, rollback proof, three more oracle families, campaign
+  loop, minimisation, real Python/Node coverage, **Java with no harness** (VERIFIED), contract
+  demotion, per-run anti-analysis names, **binary lane** (real log4j jar matched), **LD_PRELOAD sink
+  interposition** and a **behavioural baseline** for defects no crash oracle sees, supply-chain v2,
+  signed journal, PQ/in-toto bundles, signed self-update, crash-resume, budgets, persistent learning.
+- **Every spawn of target code goes through one sandbox door** — including the fuzzing hot loops,
+  which previously bypassed it (found and fixed in the Wave 1 close-out; enforced by an AST test).
+  RAKSHA's own threat model: `docs/threat-model.md`.
 - **Four deep languages through one five-check gate**, each find → fix → prove to `VERIFIED` live:
   C (gcc+ASan), Java (Jazzer/Maven, real Log4Shell), Python (sink sanitizer), Go (native `go test -fuzz`).
 - **Automatic harness generation** (`raksha/harness/`): on a target that ships **no fuzz harness**,
@@ -100,7 +109,7 @@ Tick items off here as they land. Effort is a solo-builder estimate.
 **Progress mark 2026-10-04:** Phases 0–11 built; the external-review course correction landed
 (first pass 380 tests), then the breadth pass built the deferred capabilities behind the gate
 (crypto/PQC, CPG, attack graph, assets, triage, parliament, evidence fusion, TSan, patch frontier,
-perf check, red team) — now **594 tests**, and the remaining-work pass added two more deep
+perf check, red team) — then 594 tests, and the remaining-work pass added two more deep
 languages (Rust, JS/TS), the retrieval lane, model-written regression tests, the mutation factory, the
 OSV loader + a 28-advisory DB, the ARVO loader, the take-lane seams, the fuzzer plateau/engine seam,
 a second differential baseline, console polish and deck v2. Nothing in P0 has started; every P0 item needs the
