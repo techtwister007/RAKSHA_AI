@@ -1,0 +1,12 @@
+{
+  "_comment": "Offline snapshot of CISA Known Exploited Vulnerabilities (KEV), carried in the bundle. A small, hand-verified slice whose CVE ids match advisories in vulndb.json; the sneakernet kit refreshes it from the full CISA KEV feed (catalog JSON) on a networked prep machine, in this same shape. Membership means 'known exploited in the wild' as of snapshot_date — intelligence metadata on existing findings, never a finding on its own.",
+  "source": "CISA Known Exploited Vulnerabilities Catalog (offline snapshot)",
+  "snapshot_date": "2025-09-01",
+  "cves": [
+    "CVE-2021-44228",
+    "CVE-2021-45046",
+    "CVE-2022-22965",
+    "CVE-2022-42889",
+    "CVE-2024-21626"
+  ]
+}

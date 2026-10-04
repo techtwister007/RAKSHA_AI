@@ -1,0 +1,25 @@
+{
+  "_comment": "Offline snapshot of EPSS (Exploit Prediction Scoring System) probabilities, carried in the bundle. A small slice whose CVE ids match advisories in vulndb.json; the sneakernet kit refreshes it from the full FIRST.org EPSS feed (daily CSV) on a networked prep machine, in this same shape. Each value is the model's probability in [0,1] that the CVE is exploited in the 30 days after snapshot_date — a prediction, not an observation, and metadata on existing findings, never a finding on its own. CVEs absent here read as null (unknown), never 0.",
+  "source": "FIRST.org EPSS v4 (offline snapshot)",
+  "snapshot_date": "2025-09-01",
+  "scores": {
+    "CVE-2021-44228": 0.97456,
+    "CVE-2021-45046": 0.9434,
+    "CVE-2021-44832": 0.6215,
+    "CVE-2022-22965": 0.9751,
+    "CVE-2022-42889": 0.9388,
+    "CVE-2024-21626": 0.0421,
+    "CVE-2021-23337": 0.1032,
+    "CVE-2019-10744": 0.0088,
+    "CVE-2020-36518": 0.0174,
+    "CVE-2022-1471": 0.743,
+    "CVE-2022-25845": 0.3157,
+    "CVE-2020-14343": 0.0912,
+    "CVE-2023-32681": 0.0256,
+    "CVE-2022-28346": 0.5603,
+    "CVE-2024-22195": 0.0067,
+    "CVE-2022-32149": 0.4288,
+    "CVE-2022-21698": 0.0053,
+    "CVE-2021-33503": 0.0391
+  }
+}
