@@ -256,6 +256,8 @@ class Session:
             return None
         detail = f.proof_block()
         detail["patch_diff"] = f.patch_diff     # shown on the detail screen, rendered as text
+        detail["frontier"] = list(f.frontier)   # the candidates that passed, and which was chosen
+        detail["red_team"] = f.red_team
         return detail
 
     def risk_register(self) -> list[dict]:
@@ -267,7 +269,9 @@ class Session:
         f = self.findings.get(finding_id)
         if f is None or not f.is_reportable:
             return None
-        return {"id": f.id, "plain": plain_summary(f), "jssd": jssd_brief(f)}
+        from .brief import _HINDI
+        return {"id": f.id, "plain": plain_summary(f), "jssd": jssd_brief(f, hindi=True),
+                "hindi": _HINDI.get(f.status, "सुभेद्यता पाई गई।")}
 
     def bundle_dir(self, finding_id: str) -> Path | None:
         """The finding's sealed evidence bundle — built once, then kept, so it can be re-verified."""

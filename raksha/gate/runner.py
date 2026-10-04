@@ -30,7 +30,7 @@ from typing import Iterable
 from ..finding import Finding, FixSite, GateCheck, ReplayResult, Status, utcnow
 from ..oracles import KEYSTONE_ORACLES, Oracle
 from .differential import (PERF_FLOOR_SECONDS, Canonicaliser, Mismatch, Quarantined, differential_timed,
-                           preflight)
+                           preflight, regression_vs_previous)
 from .target import BuildResult, RunResult, Target, TestResult
 
 MAX_REPAIR_ROUNDS = 3
@@ -76,6 +76,9 @@ class GateVerdict:
     refuzz_findings: int = 0
     refuzz_ran: bool = False
     regression_test_verified: bool | None = None
+    #: Behaviour divergence between a previous known-good build and the current (pre-patch) build,
+    #: when a `previous_good` baseline was supplied — a regression that predates this patch.
+    regression_vs_previous: int | None = None
     before: BuildResult | None = None
     after: BuildResult | None = None
     #: patched/baseline wall-time over the stable corpus; None when the baseline was too short to mean anything
@@ -124,6 +127,7 @@ def run_gate(
     pov_variants: int = POV_VARIANTS,
     perf_tolerance: float = 5.0,
     perf_floor_seconds: float = PERF_FLOOR_SECONDS,
+    previous_good: BuildResult | None = None,
 ) -> GateVerdict:
     """Judge `finding.patch_diff`. Records each check on the finding; returns the verdict.
 
@@ -144,7 +148,8 @@ def run_gate(
                       refuzz_seconds=refuzz_seconds, oracles=tuple(oracles), canon=canon,
                       coverage_tolerance=coverage_tolerance, regression_test=regression_test,
                       preflight_runs=preflight_runs, pov_variants=pov_variants,
-                      perf_tolerance=perf_tolerance, perf_floor_seconds=perf_floor_seconds)
+                      perf_tolerance=perf_tolerance, perf_floor_seconds=perf_floor_seconds,
+                      previous_good=previous_good)
     finally:
         discard = getattr(target, "discard", None)
         if discard is not None:
@@ -156,7 +161,8 @@ def run_gate(
 def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer: bytes,
            corpus: list[bytes], refuzz_seconds: float, oracles: tuple, canon: Canonicaliser | None,
            coverage_tolerance: int, regression_test: str | None, preflight_runs: int,
-           pov_variants: int, perf_tolerance: float, perf_floor_seconds: float) -> GateVerdict:
+           pov_variants: int, perf_tolerance: float, perf_floor_seconds: float,
+           previous_good: BuildResult | None) -> GateVerdict:
 
     # 1 ── COMPILES
     before = target.build(None)
@@ -214,6 +220,12 @@ def _judge(finding: Finding, target: Target, verdict: GateVerdict, *, reproducer
                                f"{len(pf.quarantined)} quarantined · {len(pf.crashing)} crash on baseline · "
                                f"{perf_note}",
                         quarantined_inputs=len(pf.quarantined))
+
+    # Optional second baseline: a previous known-good build vs the current one. A divergence here is
+    # a pre-existing regression — reported, never a gate failure (the patch is judged against current).
+    if previous_good is not None and previous_good.ok:
+        verdict.regression_vs_previous = len(
+            regression_vs_previous(target, previous_good, before, corpus, pf.stable, canon=canon))
 
     # 4 ── COVERAGE_HELD
     covered = target.covered_lines(after, [corpus[i] for i in pf.stable] + [reproducer])

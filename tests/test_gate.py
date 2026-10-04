@@ -364,3 +364,19 @@ def test_perf_delta_is_none_below_the_timing_floor_and_never_fails():
     assert v.passed, v.detail
     assert v.perf_delta is None and f.perf_delta is None
     assert "n/a" in f.gate[GateCheck.DIFFERENTIAL_CORPUS].detail
+
+
+def test_previous_known_good_second_baseline_flags_a_pre_existing_regression():
+    """Multi-baseline (A<->B): a previous known-good build compared against the current one surfaces
+    a divergence that predates this patch. It is a reported signal, never a gate failure — the patch
+    still passes, judged against the current build."""
+    f = patched("real")
+    t = FakeTarget()
+    prev = t.build("break")   # a "previous" build whose normal-path output differs from current
+    v = run_gate(f, t, reproducer=REPRO, corpus=corpus(), refuzz_seconds=1, previous_good=prev)
+    assert v.passed                                   # the patch is sound against the current build
+    assert v.regression_vs_previous and v.regression_vs_previous > 0   # but behaviour already drifted
+    # and with no previous baseline the field stays None (unmeasured, not a false 0)
+    f2 = patched("real")
+    v2 = run_gate(f2, FakeTarget(), reproducer=REPRO, corpus=corpus(), refuzz_seconds=1)
+    assert v2.regression_vs_previous is None

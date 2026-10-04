@@ -203,3 +203,31 @@ def differential(
 ) -> list[Mismatch]:
     """For every stable input, canonical output before must equal canonical output after."""
     return differential_timed(target, before, after, corpus, stable, canon=canon).mismatches
+
+
+def regression_vs_previous(
+    target: Target,
+    previous_good: BuildResult,
+    current: BuildResult,
+    corpus: list[bytes],
+    stable: list[int],
+    *,
+    canon: Canonicaliser | None = None,
+) -> list[Mismatch]:
+    """Compare a previous known-good build against the CURRENT (pre-patch) build over the corpus.
+
+    This is the review's multi-baseline idea (A<->B as well as A<->C): where the gate's own
+    differential asks "did my patch change behaviour", this asks "did behaviour already change
+    between the last known-good release and the code as it stands now" — a regression that predates
+    our patch. It is a signal for the operator, never a gate failure: the finding and its fix are
+    judged against the current build, and a pre-existing divergence is reported, not blamed on us.
+    """
+    canon = canon or Canonicaliser()
+    out: list[Mismatch] = []
+    for i in stable:
+        a = target.run(previous_good, corpus[i])
+        b = target.run(current, corpus[i])
+        ca, cb = canon.canon(a.stdout), canon.canon(b.stdout)
+        if ca != cb or a.exit_code != b.exit_code:
+            out.append(Mismatch(i, ca, cb))
+    return out

@@ -46,6 +46,26 @@ class AutofuzzResult:
     def found(self) -> bool:
         return self.finding is not None
 
+    def cleanup(self) -> None:
+        """Delete the synthesized-harness scratch tree (`/tmp/raksha-harness-*`). The gate already
+        discards its own build copies; this removes the autofuzz work dir once repair is finished,
+        so a long estate run does not leave one scratch tree per target behind."""
+        import shutil
+        import tempfile
+        t = self.target
+        root = getattr(t, "source_root", None) if t is not None else None
+        if root is None:
+            return
+        # the scratch layout is <tmp>/raksha-harness-XXXX/<target-name>; remove the prefixed parent
+        parent = Path(root).parent
+        tmp = Path(tempfile.gettempdir()).resolve()
+        try:
+            rp = parent.resolve()
+        except OSError:
+            return
+        if rp.parent == tmp and rp.name.startswith("raksha-harness-"):
+            shutil.rmtree(rp, ignore_errors=True)
+
 
 def _oracle_for(language: str) -> Oracle:
     return AsanOracle() if language == "c/c++" else PySecSanOracle()

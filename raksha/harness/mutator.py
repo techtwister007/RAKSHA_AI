@@ -31,6 +31,7 @@ class FuzzResult:
     crashes: list[bytes] = field(default_factory=list)   # distinct inputs that fired the oracle
     executions: int = 0
     first_crash_execs: int | None = None                 # execs until the first crash (a speed signal)
+    stopped_early: bool = False                          # the plateau rule returned the budget early
 
     @property
     def found(self) -> bool:
@@ -77,23 +78,49 @@ class Fuzzer:
     max_execs: int = 20000
     max_crashes: int = 5
     seed: int = 1337
+    #: Stop early once this many consecutive executions add neither a crash nor a new corpus input.
+    #: This is the "marginal information" stopping rule: when fresh execs stop teaching the campaign
+    #: anything, the next ones are unlikely to either, so we return the budget to the orchestrator.
+    #: None disables it (run the full budget). It makes the stop principled rather than a fixed clock.
+    max_execs_without_progress: int | None = 4000
+    #: Optional external coverage-guided engine (AFL++/libFuzzer) when its runtime is present. A
+    #: callable (run_one, seed_corpus, max_execs, seed) -> FuzzResult. None uses this stdlib engine,
+    #: which always runs; a real engine plugs in here without changing any caller.
+    engine: Callable | None = None
 
     def run(self) -> FuzzResult:
+        if self.engine is not None:
+            # A real coverage-guided engine (AFL++/libFuzzer) when its runtime is carried. It owns
+            # the loop and the stopping; we just hand it the same contract and return its result.
+            return self.engine(self.run_one, list(self.seed_corpus), self.max_execs, self.seed)
         rng = random.Random(self.seed)
         corpus = list(self.seed_corpus) or [b"A", b""]
         result = FuzzResult()
         seen: set[bytes] = set()
+        since_progress = 0
         # First try the seed corpus and the dictionary verbatim — the cheapest wins come free.
         for data in [*corpus, *_DICTIONARY]:
             if self._check(data, result, seen):
                 corpus.append(data)
             if len(result.crashes) >= self.max_crashes:
                 return result
+        before = len(corpus)
         while result.executions < self.max_execs and len(result.crashes) < self.max_crashes:
             base = rng.choice(corpus)
             data = _mutate(rng, base)
-            if self._check(data, result, seen) and len(data) < 4096:
+            grew = self._check(data, result, seen) and len(data) < 4096
+            if grew:
                 corpus.append(data)                 # keep a crasher as a base for nearby bugs
+            # progress = a new crash or a new corpus input since we last checked
+            if len(corpus) > before or result.crashes:
+                since_progress = 0
+                before = len(corpus)
+            else:
+                since_progress += 1
+            if (self.max_execs_without_progress is not None
+                    and since_progress >= self.max_execs_without_progress and not result.crashes):
+                result.stopped_early = True
+                break
         return result
 
     def _check(self, data: bytes, result: FuzzResult, seen: set[bytes]) -> bool:
