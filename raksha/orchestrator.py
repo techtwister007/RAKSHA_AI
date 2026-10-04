@@ -248,38 +248,59 @@ class Session:
             self.targets.append(t); return t
         found: list[Finding] = []
         seen: set[str] = set()
+        # E1: the target is on the board from the first round and checkpointed after each one, so
+        # a run killed mid-campaign resumes with every finding proven so far.
+        t = Target(name=name, build_status="amber", roe_level=roe, note="campaign running")
+        self.targets.append(t)
+        self.checkpoint()
+        ending = f"campaign stopped after {max_bugs} round(s) (round cap)"
         t0 = _time.monotonic()
         for _round in range(max_bugs):
             if _time.monotonic() - t0 > budget:
                 self.emit("campaign_budget_spent", target=name, found=len(found))
+                # E3: ran out — say so, and keep everything already found
+                ending = (f"per-target budget of {budget:.0f}s spent after {_round} round(s); "
+                          f"reporting the {len(found)} finding(s) found so far")
                 break
             r = _dispatch_autofuzz(work)
             if not r.found:
                 self.emit("campaign_clean", target=name, found=len(found), round=_round)
+                ending = f"no further crash after {len(found)} finding(s)"
                 break
             f = r.finding
             sig = _sig(f)
             if sig in seen:            # a bug we already handled — stop rather than loop on it
+                ending = "the same defect re-appeared; stopped rather than loop"
                 break
             seen.add(sig)
             self.emit("campaign_crash", target=name, finding=f.id, signature=sig, round=_round)
             _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
                     corpus=(corpus or [b"ok", b"test", b"\x01\x02"]) + list(getattr(r, "benign_corpus", [])))
             self.add_finding(f); found.append(f)
+            t.finding_ids.append(f.id)
+            self.checkpoint()
             if hasattr(r, "cleanup"):
                 try: r.cleanup()
                 except Exception: pass  # noqa: BLE001
             if f.status is Status.VERIFIED and f.patch_diff:
                 if not self._apply_to_tree(f.patch_diff, work):
-                    self.emit("campaign_patch_unapplied", target=name, finding=f.id); break
+                    self.emit("campaign_patch_unapplied", target=name, finding=f.id)
+                    ending = "a proven patch did not apply to the working copy; stopped"
+                    break
                 self.emit("campaign_patch_applied", target=name, finding=f.id, signature=sig)
             else:
                 # could not prove a fix; applying nothing would re-find it next round, so stop here
                 self.emit("campaign_unfixed", target=name, finding=f.id, status=f.status.value)
+                ending = f"finding {f.id[:8]} could not be fixed ({f.status.value}); stopped"
                 break
         shutil.rmtree(work.parent, ignore_errors=True)
-        return self.attach_target(name, found, build_status="green", roe=roe,
-                                  languages=sorted({f.language for f in found}) or None)
+        _assets.annotate(found, self.registry, target=name)
+        t.build_status = "green"
+        t.languages = sorted({f.language for f in found})
+        t.note = ending
+        self._annotate_evidence()
+        self.checkpoint()
+        return t
 
     @staticmethod
     def _apply_to_tree(patch_diff: str, tree: Path) -> bool:
