@@ -11,7 +11,7 @@ const SCREENS = [
   ["board","Mission Board"],["pipeline","Live Pipeline"],["events","Event Log"],
   ["detail","Finding Detail"],["graph","Attack Graph"],["estate","Estate Map"],
   ["pqc","Post-Quantum"],["vault","Evidence Vault"],["score","Scorecard"],["brief","Commander's Brief"],
-  ["demo","Demo Beats"],["timelapse","Time-lapse"],
+  ["demo","Demo Beats"],["timelapse","Time-lapse"],["projects","Projects"],["learning","Learning"],
 ];
 
 function buildTabs(){
@@ -48,7 +48,7 @@ async function refresh(){
     const r = await fetch("/api/snapshot"); STATE = await r.json();
     renderBadges(); renderBoard(); populateFilters(); renderList(); renderPipeline(); renderRisk();
     renderEvents(); renderGraph(); renderEstate(); renderPqc(); renderVaultList(); renderScore(); renderBriefList();
-    renderDemo();
+    renderDemo(); loadProjects(); loadLearning();
     $("#foot-count").textContent = STATE.findings.length+" findings · "+STATE.board.length+" targets";
     $("#foot-time").textContent = "updated "+new Date().toLocaleTimeString();
   }catch(e){ $("#foot-time").textContent = "offline"; }
@@ -536,6 +536,119 @@ function renderDemo(){
 $("#saysno-run").addEventListener("click", async()=>{ const r=await post("saysno"); if(!r.ok) $("#saysno-state").textContent=r.error; refresh(); });
 $("#intake-go").addEventListener("click", async()=>{ const r=await post("intake",{path:$("#intake-path").value}); $("#intake-state").textContent = r.ok ? "accepted" : r.error; refresh(); });
 $("#egress-reset").addEventListener("click", async()=>{ await post("egress_reset",{actor:"operator"}); refresh(); });
+
+// ---- Wave 5: projects (K5, K3, K4, K6, K12, K14, K15, K25)
+const MARKS = {fixed:["var(--green)","✓","fixed"], "not-refound":["var(--faint)","?","not re-found"],
+  "new":["var(--red)","✚","new"], open:["var(--amber)","●","still open"], "needs-human":["var(--blue)","⚑","needs a human"]};
+let PROJ=null, PROJ_BODY=null;
+async function getJSON(u){ const r=await fetch(u); return r.json(); }
+async function loadProjects(){
+  try{
+    const d=await getJSON("/api/projects"), host=$("#proj-list");
+    if(!d.projects || !d.projects.length) return;
+    host.textContent="";
+    d.projects.forEach(p=>{
+      const row=el("div","frow"); row.dataset.id=p.id;
+      const sc = p.score==null ? "n/a" : p.score;
+      row.appendChild(el("span","x", p.name+" · v"+p.version+" · score "+sc+" · "+(p.counts.critical||0)+" critical · "+p.needs_human+" need you"));
+      row.addEventListener("click",()=>selectProject(p.id)); host.appendChild(row);
+    });
+    const m=await getJSON("/api/mission"), mh=$("#mission-list"); mh.textContent="";
+    Object.entries(m.mission||{}).forEach(([fn,rows])=>mh.appendChild(el("div","frow", fn+": "+rows.length+" open ("+rows.filter(r=>r.severity==="critical").length+" critical)")));
+    const h=await getJSON("/api/heatmap"), hh=$("#heat-list"); hh.textContent="";
+    (h.heatmap||[]).forEach(r=>hh.appendChild(el("div","frow", r.name+": "+r.versions.map(v=>"v"+v.version+"="+(v.score==null?"n/a":v.score)).join("  →  "))));
+  }catch(e){}
+}
+async function selectProject(pid, ver){
+  PROJ=pid;
+  const d=await getJSON("/api/project/"+encodeURIComponent(pid));
+  const sel=$("#proj-ver"); sel.textContent="";
+  d.versions.slice().reverse().forEach(v=>{ const o=el("option",null,"v"+v); o.value=v; sel.appendChild(o); });
+  const v = ver || d.versions[d.versions.length-1]; sel.value=v;
+  PROJ_BODY = v==d.versions[d.versions.length-1] ? d.latest : await getJSON("/api/project/"+encodeURIComponent(pid)+"/v/"+v);
+  PROJ_BODY._chain = d.chain_verified;
+  renderProject();
+}
+function renderProject(){
+  const b=PROJ_BODY, box=$("#proj-detail"); if(!b) return; box.textContent="";
+  const role=$("#proj-role").value;
+  if(role){ fetch("/api/project/"+encodeURIComponent(PROJ)+"/role/"+role).then(r=>r.json()).then(v=>{
+      box.textContent=""; const pre=el("pre",null,JSON.stringify(v,null,2)); pre.style.whiteSpace="pre-wrap"; box.appendChild(pre); }); return; }
+  const p=b.project;
+  box.appendChild(el("div","row", p.name+" ("+p.id+") — report v"+b.version+" · "+b.created));
+  box.appendChild(el("div","row dim", "tier "+(p.tier||"unclassified")+" · owner "+(p.owner_unit||"—")+" · chain "+(b._chain?"verified ✓":"BROKEN ✗")));
+  const sc=el("div","row"); sc.style.fontSize="20px";
+  sc.textContent="Posture score: "+(b.score.score==null?"n/a":b.score.score)+(b.trend?"   ·   "+Object.entries(b.trend).map(([k,[a,c]])=>k+" "+a+" → "+c).join(", "):"");
+  box.appendChild(sc);
+  const by={}; b.findings.forEach(r=>by[r.key]=r);
+  box.appendChild(el("h3",null,b.prev_version?("Since v"+b.prev_version):"First report"));
+  ["fixed","not-refound","new","open"].forEach(kind=>{
+    (b.diff[kind]||[]).forEach(k=>{
+      const [col,icon,word]=MARKS[kind]; const r=by[k];
+      const title = r ? r.title : ((b.gone_titles||{})[k] || k.split("|")[3]);
+      const row=el("div","row"); row.style.borderLeft="6px solid "+col; row.style.paddingLeft="8px";
+      const tag=el("b",null,icon+" "+word+"  "); tag.style.color=col; row.appendChild(tag);
+      row.appendChild(el("span",null,title+(kind==="open"?"  (open "+(b.versions_open[k]||1)+" versions)":"")));
+      box.appendChild(row);
+    });
+  });
+  if(b.needs_human.length){
+    box.appendChild(el("h3",null,"⚑ Needs a human ("+b.needs_human.length+")"));
+    b.needs_human.forEach(h=>{
+      const row=el("div","row"); row.style.borderLeft="6px solid var(--blue)"; row.style.paddingLeft="8px";
+      row.appendChild(el("div",null,"⚑ "+h.title)); row.appendChild(el("div","dim",h.why));
+      h.checklist.forEach(c=>row.appendChild(el("div","dim","☐ "+c)));
+      const btn=el("button","ctl","Mark done"); btn.addEventListener("click",async()=>{
+        const r=await post("mark_done",{project:PROJ,key:h.key,actor:"operator"}); $("#proj-act").textContent = r.ok ? "marked — re-checked on the next run" : r.error; });
+      row.appendChild(btn); box.appendChild(row);
+    });
+  }
+  if((b.marks_rechecked||[]).length){
+    box.appendChild(el("h3",null,"Marked done, re-checked"));
+    b.marks_rechecked.forEach(m=>box.appendChild(el("div","row",(m.closed?"✓ ":"✚ ")+m.verdict)));
+  }
+  if((b.drift||[]).length){ box.appendChild(el("h3",null,"⚠ New attack surface")); b.drift.forEach(a=>box.appendChild(el("div","row",a.detail))); }
+  const br=(b.exposure||[]).filter(e=>e.breached);
+  if(br.length){ box.appendChild(el("h3",null,"Past deadline")); br.forEach(e=>box.appendChild(el("div","row",e.severity+": open "+e.days+" days (deadline "+e.deadline_days+")"))); }
+  box.appendChild(el("div","row dim","Data handling: "+b.data_statement.statement));
+}
+$("#proj-ver").addEventListener("change",()=>selectProject(PROJ, +$("#proj-ver").value));
+$("#proj-role").addEventListener("change",renderProject);
+$("#proj-sum-en").addEventListener("click",()=>{ if(PROJ_BODY) window.open("/api/project/"+encodeURIComponent(PROJ)+"/summary/"+PROJ_BODY.version+"?lang=en"); });
+$("#proj-sum-hi").addEventListener("click",()=>{ if(PROJ_BODY) window.open("/api/project/"+encodeURIComponent(PROJ)+"/summary/"+PROJ_BODY.version+"?lang=hi"); });
+$("#proj-cert").addEventListener("click",async()=>{ if(!PROJ) return; const r=await post("certificate",{project:PROJ}); $("#proj-act").textContent = r.ok ? "✓ "+r.statement : "✗ "+r.error; });
+
+// ---- Wave 5: learning (K7-K11)
+async function loadLearning(){
+  try{
+    const d=await getJSON("/api/learning"), gl=$("#g-list"), ll=$("#l-list"); gl.textContent=""; ll.textContent="";
+    const gs=d.health.guidelines||[];
+    if(!gs.length) gl.appendChild(el("p","empty","No draft yet — a family must recur across two or more projects."));
+    gs.forEach(g=>{
+      const row=el("div","frow"); row.appendChild(el("span","x","["+g.status+"] "+g.id+" — "+g.rule+" ("+g.evidence_count+" cases, "+g.projects.length+" projects)"));
+      if(g.status==="proposed"){
+        const a=el("button","ctl","Approve"), r=el("button","ctl","Reject");
+        a.addEventListener("click",async()=>{ const who=window.prompt("Approver name (a guideline is policy)"); if(!who) return; await post("guideline",{id:g.id,approve:true,actor:who}); loadLearning(); });
+        r.addEventListener("click",async()=>{ const who=window.prompt("Your name"); if(!who) return; await post("guideline",{id:g.id,approve:false,actor:who}); loadLearning(); });
+        row.appendChild(a); row.appendChild(r);
+      } else row.appendChild(el("span","dim"," by "+g.decided_by));
+      gl.appendChild(row);
+    });
+    const ls=d.health.lessons||[];
+    if(!ls.length) ll.appendChild(el("p","empty","No lessons yet."));
+    ls.forEach(l=>{
+      const row=el("div","frow"); row.appendChild(el("span","x","["+l.state+"] "+l.kind+": "+l.value+" — "+l.evidence.length+" verified case(s); from "+l.source_project));
+      if(l.state!=="rolled-back"){ const b=el("button","ctl","Roll back"); b.addEventListener("click",async()=>{ await post("lesson_rollback",{id:l.id,actor:"operator"}); loadLearning(); }); row.appendChild(b); }
+      ll.appendChild(row);
+    });
+    const an=d.analytics, box=$("#l-analytics"); box.textContent="";
+    box.appendChild(el("div","row","Observations: "+an.observations+" · regressions: "+an.regressions.length+" · quarantined sources: "+(d.health.quarantined_sources||[]).length));
+    box.appendChild(el("div","row","By family: "+an.by_family.slice(0,6).map(([k,n])=>k+" "+n).join(" · ")));
+    box.appendChild(el("div","row","By unit: "+an.by_unit.slice(0,6).map(([k,n])=>k+" "+n).join(" · ")));
+    const unf=Object.keys(an.unfamiliar_surface||{}); if(unf.length) box.appendChild(el("div","row dim","Unfamiliar packages: "+unf.slice(0,12).join(", ")));
+  }catch(e){}
+}
+$("#g-propose").addEventListener("click",async()=>{ const r=await post("guideline",{propose:true}); $("#g-act").textContent = r.ok ? (r.guidelines.length+" draft(s)") : r.error; loadLearning(); });
 
 // ---- J9 time-lapse
 let TL=null;

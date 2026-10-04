@@ -11,7 +11,7 @@
   would contradict the air-gap claim. The air-gap guard (raksha/airgap.py) enforces this.
   System fonts, inline CSS/JS, inline SVG. Theme-aware, with a high-contrast projector mode and an
   English/Hindi toggle. Screens: Mission Board, Live Pipeline, Event Log, Finding Detail (the money
-  screen), Attack Graph, Estate Map, Post-Quantum, Evidence Vault, Scorecard, Commander's Brief, Demo Beats, Time-lapse.
+  screen), Attack Graph, Estate Map, Post-Quantum, Evidence Vault, Scorecard, Commander's Brief, Demo Beats, Time-lapse, Projects, Learning.
 -->
 <style>
   :root{
@@ -300,6 +300,27 @@
       <div id="tl-sum" class="dim" style="margin-bottom:8px"></div>
       <input type="range" id="tl-range" min="0" max="59" value="59" style="width:100%" aria-label="time in run">
       <div class="detail" id="tl-state" style="margin-top:10px"><p class="empty">Loading…</p></div>
+    </section>
+    <section id="projects" hidden>
+      <div class="split">
+        <div><h2>Projects</h2><div class="flist" id="proj-list"><p class="empty">No project report yet.</p></div>
+          <h2 style="margin-top:18px">By mission function</h2><div class="flist" id="mission-list"></div>
+          <h2 style="margin-top:18px">Posture over versions</h2><div class="flist" id="heat-list"></div></div>
+        <div><h2>Project</h2>
+          <div style="margin-bottom:8px"><select id="proj-ver" class="ctl" aria-label="report version"></select>
+            <select id="proj-role" class="ctl" aria-label="view as"><option value="">view: owner</option>
+              <option value="developer">developer</option><option value="commander">commander</option><option value="auditor">auditor</option></select>
+            <button class="ctl" id="proj-sum-en">Summary (EN)</button> <button class="ctl" id="proj-sum-hi">सारांश (HI)</button>
+            <button class="ctl" id="proj-cert">Readiness certificate</button> <span id="proj-act"></span></div>
+          <div class="detail" id="proj-detail"><p class="empty">Select a project.</p></div></div>
+      </div>
+    </section>
+    <section id="learning" hidden>
+      <h2>Learning — proposes, never decides</h2>
+      <div style="margin-bottom:8px"><button class="ctl" id="g-propose">Draft guidelines from the history</button> <span id="g-act"></span></div>
+      <h2>Draft guidelines for ACG</h2><div class="flist" id="g-list"></div>
+      <h2 style="margin-top:18px">Lessons</h2><div class="flist" id="l-list"></div>
+      <h2 style="margin-top:18px">Recurring faults</h2><div class="detail" id="l-analytics"></div>
     </section>
     <section id="score" hidden><h2 data-i18n="Scorecard">The jury's scoresheet, live</h2><div id="score-body"></div></section>
     <section id="brief" hidden>

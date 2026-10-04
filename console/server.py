@@ -13,6 +13,8 @@ Read routes (GET):
   /api/brief/<id>            the bilingual Commander's Brief (F10)
   /api/verify/<id>           re-verify the sealed evidence bundle
   /api/labels                Hindi console labels (F10)
+  /api/projects, /api/project/<id>[/v/<n>|/summary/<n>?lang=|/role/<r>|/fixes?q=]  (K5, K6, K25, K23)
+  /api/mission, /api/heatmap, /api/learning   (K12, K14, K7-K10)
   /api/timelapse[?n=|?t=]    J9: frames of the journal (or the recorded run), or the state at t seconds
   /api/help                  keyboard shortcuts (F12)
   /api/export/findings.csv   | findings.xlsx | brief/<id>.pdf   (F12)
@@ -20,6 +22,7 @@ Read routes (GET):
 Write routes (POST, operator actions — F7), each requiring the session token in X-RAKSHA-Token:
   /api/action/approve|reject|false_positive|rerun_red_team|export   {finding, actor, reason}
   /api/action/advisory    {finding}            issue a signed internal-CERT advisory (J8)
+  /api/action/mark_done|certificate|guideline|lesson_rollback   Wave 5 owner and learning actions
   /api/action/saysno                       run the "it says no" beat (J1)
   /api/action/intake      {path, name, deep}   ingest a judge's media without a restart (J2)
   /api/action/egress_reset                 zero the egress counter for the air-gap beat (J6)
@@ -115,6 +118,13 @@ def make_handler(session, *, token: str | None = None):
                     self._json(200, rec.at(float(q["t"][0]))); return
                 self._json(200, {"summary": rec.summary(), "frames": rec.frames(int(q.get("n", ["60"])[0]))})
                 return
+            if path.startswith("/api/projects") or path.startswith("/api/project/") or path in (
+                    "/api/mission", "/api/heatmap", "/api/learning"):
+                q = parse_qs(urlsplit(self.path).query)
+                res = _projects_get(session, path, q)
+                if isinstance(res, tuple):          # (html, code)
+                    self._send(res[1], res[0].encode("utf-8"), "text/html; charset=utf-8"); return
+                self._json(200 if "error" not in res else 404, res); return
             if path == "/api/labels":
                 from raksha.brief import console_labels_hi
                 self._json(200, console_labels_hi()); return
@@ -212,7 +222,89 @@ def _egress_reset(session, body: dict) -> dict:
     return {"ok": True, "egress": egress_counter(reset=True)}
 
 
-_JOBS = {"saysno": _saysno, "intake": _intake, "egress_reset": _egress_reset}
+def _projects_get(session, path: str, q: dict):
+    """K5/K12/K14/K25 and the learning dashboard (K10): read-only views of the project store."""
+    from raksha import reports, views
+    from raksha.learning import Learning
+    st = session.store()
+    if path == "/api/projects":
+        rows = []
+        for p in st.all():
+            b = views.latest(st, p.id)
+            if b is None:
+                continue
+            rows.append({"id": p.id, "name": p.name, "tier": p.tier, "owner_unit": p.owner_unit,
+                         "version": b["version"], "created": b["created"], "score": b["score"]["score"],
+                         "counts": b["counts"], "needs_human": len(b["needs_human"]),
+                         "diff": {k: len(v) for k, v in b["diff"].items()}})
+        return {"projects": rows}
+    if path == "/api/mission":
+        return {"mission": views.mission_view(st)}
+    if path == "/api/heatmap":
+        return {"heatmap": views.heatmap(st)}
+    if path == "/api/learning":
+        L = Learning(st)
+        return {"health": L.health(), "analytics": L.analytics()}
+    parts = path.strip("/").split("/")          # api project <pid> [v <n> | summary <n> | role <r>]
+    if len(parts) < 3:
+        return {"error": "not found"}
+    pid = unquote(parts[2])
+    vs = reports.versions(st, pid)
+    if not vs:
+        return {"error": "no report for this project"}
+    if len(parts) == 3:
+        ok, problems = reports.verify_chain(st, pid)
+        return {"project": pid, "versions": vs, "chain_verified": ok, "chain_problems": problems,
+                "latest": reports.load(st, pid, vs[-1])}
+    if parts[3] == "v" and len(parts) == 5:
+        return reports.load(st, pid, int(parts[4]))
+    if parts[3] == "summary" and len(parts) == 5:
+        return (reports.summary_html(reports.load(st, pid, int(parts[4])), lang=q.get("lang", ["en"])[0]), 200)
+    if parts[3] == "role" and len(parts) == 5:
+        return views.role_view(st, pid, parts[4])
+    if parts[3] == "fixes":
+        return {"fixes": views.kb_search(st, q.get("q", [""])[0])}
+    return {"error": "not found"}
+
+
+def _mark_done(session, body: dict) -> dict:
+    """K4: a person marks a needs-human item done; the next run re-checks it."""
+    pid, key = body.get("project") or "", body.get("key") or ""
+    if not pid or not key:
+        return {"ok": False, "error": "project and key are required"}
+    m = session.store().mark_done(pid, key, actor=body.get("actor") or "operator", note=body.get("note") or "")
+    session.emit("project_mark_done", project=pid, actor=m["actor"])
+    return {"ok": True, "mark": m, "note": "re-checked on the next run, not taken on trust"}
+
+
+def _certificate(session, body: dict) -> dict:
+    from raksha import reports
+    res = reports.issue_certificate(session.store(), body.get("project") or "")
+    session.emit("certificate_requested", project=body.get("project"), issued=res.get("ok"))
+    return res
+
+
+def _guideline(session, body: dict) -> dict:
+    from raksha.learning import Learning
+    L = Learning(session.store())
+    if body.get("propose"):
+        return {"ok": True, "guidelines": L.propose_guidelines()}
+    return L.decide_guideline(body.get("id") or "", approver=body.get("actor") or "",
+                              approve=bool(body.get("approve")))
+
+
+def _lesson_rollback(session, body: dict) -> dict:
+    from raksha.learning import Learning
+    L = Learning(session.store())
+    if (body.get("id") or "") not in L.state["lessons"]:
+        return {"ok": False, "error": "no such lesson"}
+    return {"ok": True, "lesson": L.rollback(body["id"], actor=body.get("actor") or "operator",
+                                             note=body.get("reason") or "")}
+
+
+_JOBS = {"saysno": _saysno, "intake": _intake, "egress_reset": _egress_reset,
+         "mark_done": _mark_done, "certificate": _certificate, "guideline": _guideline,
+         "lesson_rollback": _lesson_rollback}
 
 
 def _id(path: str) -> str:
