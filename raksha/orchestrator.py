@@ -401,6 +401,8 @@ class Session:
         detail["patch_diff"] = f.patch_diff     # shown on the detail screen, rendered as text
         detail["frontier"] = list(f.frontier)   # the candidates that passed, and which was chosen
         detail["red_team"] = f.red_team
+        from .grade import deploy_grade
+        detail["deploy_grade"] = deploy_grade(f)   # D2: A/B/C readiness with the factors behind it
         return detail
 
     def risk_register(self) -> list[dict]:

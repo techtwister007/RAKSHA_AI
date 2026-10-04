@@ -358,6 +358,9 @@ class Finding:
     #: "imported" / "not-imported" / "unknown" (no source for that language was seen). Proven
     #: present is not proven reached; the risk register ranks accordingly.
     reachability: str | None = None
+    #: D4: resources this finding's repair consumed, measured (getrusage deltas) around the gate.
+    cpu_seconds: float | None = None
+    peak_rss_kb: int | None = None
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
@@ -718,6 +721,7 @@ class Finding:
                 "rejected_before_gate": list(self.rejected_candidates),
             },
             "reachability": self.reachability,
+            "resource": {"cpu_seconds": self.cpu_seconds, "peak_rss_kb": self.peak_rss_kb},
             "assurance": {
                 "structure": self.structure,
                 "evidence_score": self.evidence_score,

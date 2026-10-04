@@ -196,6 +196,8 @@ def scorecard(
         "repair_rounds_total": sum(f.repair_rounds for f in findings),
         "full_loop_completions": len(verified),
         "roe_levels_exercised": sorted({f.roe_level.value for f in findings}),
+        # D2: deploy-readiness grades across the verified fixes.
+        "deploy_grades": _grade_counts(verified),
     }
 
     # ---- Scalability: languages, not thread count ------------------------
@@ -243,6 +245,10 @@ def scorecard(
         "inference_calls": run["inference_calls"],
         # Live VRAM, or None off-GPU — honestly absent rather than a faked zero.
         "vram": vram_reading.as_dict() if vram_reading else None,
+        # D4: measured CPU per verified fix (getrusage deltas incl. child processes), and the
+        # process peak RSS. None when unmeasured, never a flattering zero.
+        "median_cpu_seconds_per_fix": _median([f.cpu_seconds for f in verified if f.cpu_seconds is not None]),
+        "peak_rss_kb": max([f.peak_rss_kb for f in findings if f.peak_rss_kb] or [0]) or None,
     }
 
     # ---- Posture: badges backed by live counters, not constants ----------
@@ -343,6 +349,16 @@ def assurance_statement(boundary: dict[str, Any], performance: dict[str, Any]) -
     parts.append("This run establishes presence, not absence: unexercised code paths, bug classes without an "
                  "oracle here, and the environment around the code are outside the claim.")
     return " ".join(parts)
+
+
+def _grade_counts(verified) -> dict[str, int]:
+    from .grade import deploy_grade
+    out: dict[str, int] = {}
+    for f in verified:
+        g = deploy_grade(f).get("grade")
+        if g:
+            out[g] = out.get(g, 0) + 1
+    return dict(sorted(out.items()))
 
 
 def _window():

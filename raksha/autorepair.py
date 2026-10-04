@@ -175,6 +175,11 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
     """
     if finding.status is not Status.CONFIRMED:
         raise ValueError("repair() needs a CONFIRMED finding")
+    import resource as _res
+    def _cpu():
+        s = _res.getrusage(_res.RUSAGE_SELF); c = _res.getrusage(_res.RUSAGE_CHILDREN)
+        return s.ru_utime + s.ru_stime + c.ru_utime + c.ru_stime
+    _cpu0 = _cpu()
     root = Path(root)
     client = client if client is not None else (get_client() if use_model else None)
     use_frontier = frontier_enabled(frontier)
@@ -264,6 +269,11 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
     if finding.status is Status.CONFIRMED:
         finding.report_only(f"no repair candidate cleared the gate ({tried} gated, "
                             f"{len(finding.rejected_candidates)} refused by patch hygiene)")
+    finding.cpu_seconds = round(_cpu() - _cpu0, 3)
+    try:
+        finding.peak_rss_kb = _res.getrusage(_res.RUSAGE_SELF).ru_maxrss  # process peak (KB on Linux)
+    except Exception:  # noqa: BLE001
+        finding.peak_rss_kb = None
     if finding.status is Status.VERIFIED:
         mem.remember(finding)        # one proven fix, reused across the estate at zero inference
     return RepairOutcome(finding.status, finding.repair_lane if finding.status is Status.VERIFIED else None,
