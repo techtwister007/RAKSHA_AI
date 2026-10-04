@@ -11,6 +11,7 @@ const SCREENS = [
   ["board","Mission Board"],["pipeline","Live Pipeline"],["events","Event Log"],
   ["detail","Finding Detail"],["graph","Attack Graph"],["estate","Estate Map"],
   ["pqc","Post-Quantum"],["vault","Evidence Vault"],["score","Scorecard"],["brief","Commander's Brief"],
+  ["demo","Demo Beats"],["timelapse","Time-lapse"],
 ];
 
 function buildTabs(){
@@ -47,6 +48,7 @@ async function refresh(){
     const r = await fetch("/api/snapshot"); STATE = await r.json();
     renderBadges(); renderBoard(); populateFilters(); renderList(); renderPipeline(); renderRisk();
     renderEvents(); renderGraph(); renderEstate(); renderPqc(); renderVaultList(); renderScore(); renderBriefList();
+    renderDemo();
     $("#foot-count").textContent = STATE.findings.length+" findings · "+STATE.board.length+" targets";
     $("#foot-time").textContent = "updated "+new Date().toLocaleTimeString();
   }catch(e){ $("#foot-time").textContent = "offline"; }
@@ -497,6 +499,64 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Enter"){ const sel=document.querySelector("#flist .frow.sel"); if(sel) sel.click(); }
 });
 
+// ---- J1/J2/J6 demo beats
+async function post(action, body){
+  const r = await fetch("/api/action/"+action, {method:"POST", headers:{"Content-Type":"application/json","X-RAKSHA-Token":TOKEN},
+    body: JSON.stringify(body||{})});
+  return r.json();
+}
+function renderDemo(){
+  const sn = STATE.saysno, box=$("#saysno-beats"); box.textContent="";
+  $("#saysno-state").textContent = !sn ? "not run yet" : sn.running ? "running…" :
+    (sn.error ? "error: "+sn.error : (sn.as_scripted ? "as scripted" : "NOT as scripted")+" in "+sn.seconds+"s");
+  ((sn && sn.beats) || []).forEach(b=>{
+    const row=el("div","frow");
+    row.appendChild(el("span", b.said_no ? "sev high" : "sev low", b.said_no ? "NO" : "YES"));
+    row.appendChild(el("span","x", b.beat+" — "+(b.refused_by||"accepted")+" · "+b.detail));
+    box.appendChild(row);
+  });
+  const it = STATE.intake, ib=$("#intake-box");
+  if(it && it.current){
+    const j=it.current; ib.textContent="";
+    const ticking = j.first_finding_s==null && !["done","failed"].includes(j.state);
+    ib.appendChild(el("div","row", j.name+" · "+j.state+" · "+j.findings+" findings"));
+    ib.appendChild(el("div","row", "time to first finding: "+(j.first_finding_s!=null ? j.first_finding_s+"s" : (ticking ? j.elapsed_s+"s and counting" : "none"))));
+    if(j.stage) ib.appendChild(el("div","row dim", "staged "+j.stage.files+" files, "+j.stage.bytes+" bytes"+(j.stage.truncated?" (truncated at the budget)":"")+"; "+j.stage.skipped_links+" links skipped"));
+    if(j.error) ib.appendChild(el("div","row", "error: "+j.error));
+    ib.appendChild(el("div","row dim", "allowed roots: "+it.roots.join(", ")));
+  }
+  const eg = STATE.egress, eb=$("#egress-box"); eb.textContent="";
+  if(eg){
+    const big=el("div","row"); big.style.fontSize="22px"; big.style.fontFamily="var(--mono)";
+    big.textContent = "TX packets since zero: "+eg.tx_packets_delta+"   ·   links up: "+eg.links_up+"   ·   RAKSHA egress calls: "+eg.raksha_egress_calls;
+    eb.appendChild(big);
+    eg.interfaces.forEach(i=>eb.appendChild(el("div","row dim", i.name+": "+(i.operstate||"?")+", carrier "+(i.carrier==null?"n/a":i.carrier?"up":"down")+", +"+i.tx_packets_delta+" packets")));
+  }
+}
+$("#saysno-run").addEventListener("click", async()=>{ const r=await post("saysno"); if(!r.ok) $("#saysno-state").textContent=r.error; refresh(); });
+$("#intake-go").addEventListener("click", async()=>{ const r=await post("intake",{path:$("#intake-path").value}); $("#intake-state").textContent = r.ok ? "accepted" : r.error; refresh(); });
+$("#egress-reset").addEventListener("click", async()=>{ await post("egress_reset",{actor:"operator"}); refresh(); });
+
+// ---- J9 time-lapse
+let TL=null;
+async function loadTimelapse(){
+  try{
+    const r=await fetch("/api/timelapse?n=60"); if(!r.ok){ $("#tl-state").textContent="no recorded run"; return; }
+    TL=await r.json(); const s=TL.summary;
+    $("#tl-sum").textContent = s.path+" · "+s.records+" events over "+Math.round(s.duration_s)+"s · chain verified";
+    $("#tl-range").max = TL.frames.length-1; $("#tl-range").value = TL.frames.length-1; showFrame();
+  }catch(e){ $("#tl-state").textContent="time-lapse unavailable"; }
+}
+async function showFrame(){
+  if(!TL) return; const f=TL.frames[+$("#tl-range").value]; const box=$("#tl-state"); box.textContent="";
+  box.appendChild(el("div","row", "+"+f.offset_s+"s ("+f.at+") — "+f.doing));
+  box.appendChild(el("div","row", f.findings+" findings on "+f.targets+" targets · "+Object.entries(f.by_status).map(([k,v])=>k+" "+v).join(" · ")));
+  try{ const d=await (await fetch("/api/timelapse?t="+f.offset_s)).json();
+    (d.recent||[]).forEach(e=>box.appendChild(el("div","row dim", "+"+e.offset_s+"s  "+e.kind+(e.target?"  "+e.target:"")+(e.status?"  "+e.status:""))));
+  }catch(e){}
+}
+$("#tl-range").addEventListener("input", showFrame);
+
 // inline favicon (built in JS so the served HTML carries no URL of any kind)
 (function(){ try{
   const svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M8 1 2 3v5c0 4 6 7 6 7s6-3 6-7V3z' fill='%235bbf84'/></svg>";
@@ -505,5 +565,5 @@ document.addEventListener("keydown",e=>{
 }catch(e){} })();
 
 // ---- init
-buildTabs(); loadLabels().then(applyLang); buildHelp();
+buildTabs(); loadLabels().then(applyLang); buildHelp(); loadTimelapse();
 refresh(); setInterval(refresh, 2500);

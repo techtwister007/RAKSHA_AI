@@ -32,6 +32,15 @@ _TEMPLATES = {
     "operator_exported": ("ok", "operator {actor} exported the evidence bundle for {finding}"),
     "campaign_budget_spent": ("warn", "{t}: per-target budget spent; reporting what was found"),
     "campaign_clean": ("ok", "{t}: no further crash found"),
+    "saysno_started": ("info", "refusal beat started: four patches, the real gate, hygiene and red team"),
+    "saysno_done": ("info", "refusal beat finished in {seconds}s"),
+    "intake_started": ("info", "{t}: media accepted; staging as data"),
+    "intake_staged": ("info", "{t}: staged {files} files ({bytes} bytes); {skipped_links} links skipped"),
+    "intake_first_finding": ("alert", "{t}: first finding on the board {seconds}s after the media went in"),
+    "intake_done": ("info", "{t}: intake {state}; {findings} findings in {seconds}s"),
+    "intake_deep_skipped": ("dim", "{t}: deep lane skipped ({reason})"),
+    "egress_reset": ("info", "egress counter zeroed by {actor} for the air-gap beat"),
+    "advisory_issued": ("ok", "{t}: internal-CERT advisory {advisory} issued and verified"),
 }
 
 
@@ -66,6 +75,13 @@ def narrate(ev: dict) -> dict | None:
         verb = "held; no input broke it" if held else (f"BROKEN by {ev.get('wins')} input(s)" if held is False else "ran")
         return {"seq": ev.get("seq"), "at": ev.get("at"), "level": "ok" if held else "warn",
                 "text": f"{fields['t']}: independent red team {verb} ({ev.get('attempts')} attempts)"}
+    if k == "saysno_beat":
+        name = ev.get("beat")
+        if ev.get("said_no"):
+            return {"seq": ev.get("seq"), "at": ev.get("at"), "level": "warn",
+                    "text": f"refusal beat — {name} patch: NO, refused by {ev.get('refused_by')} ({str(ev.get('detail'))[:140]})"}
+        return {"seq": ev.get("seq"), "at": ev.get("at"), "level": "ok",
+                "text": f"refusal beat — {name} patch: accepted ({str(ev.get('detail'))[:140]})"}
     tmpl = _TEMPLATES.get(k)
     if tmpl is None:
         return None

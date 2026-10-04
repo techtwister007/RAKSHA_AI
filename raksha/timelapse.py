@@ -47,6 +47,13 @@ class Recording:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
+        if self.path.suffix == ".gz":                 # a recorded run shipped compressed
+            import gzip
+            import tempfile
+            tmp = Path(tempfile.mkdtemp(prefix="raksha-tl-")) / self.path.stem
+            tmp.write_bytes(gzip.decompress(self.path.read_bytes()))
+            self._source = self.path
+            self.path = tmp
         ok, problems = _journal.verify(self.path)
         if not ok:
             raise ValueError("journal failed verification: " + "; ".join(problems[:3]))
@@ -110,10 +117,25 @@ class Recording:
         return out
 
     def summary(self) -> dict:
-        return {"path": self.path.name, "records": len(self.records),
+        return {"path": getattr(self, "_source", self.path).name, "records": len(self.records),
                 "duration_s": round(self.duration, 1),
                 "started": self.records[0]["ts"], "ended": self.records[-1]["ts"],
                 "chain_verified": True}
+
+
+#: The recorded long run shipped with the repository (journal of RAKSHA's own demo work only).
+RECORDED_RUN = Path(__file__).parents[1] / "docs" / "runs" / "longrun.jsonl.gz"
+
+
+def for_session(session) -> "Recording | None":
+    """The session's own journal when it has one with records, else the shipped recorded run."""
+    j = getattr(session, "journal", None)
+    if j is not None and j.path.exists() and j.path.stat().st_size:
+        try:
+            return Recording(j.path)
+        except ValueError:
+            pass
+    return Recording(RECORDED_RUN) if RECORDED_RUN.exists() else None
 
 
 def record(out: str | Path, *, minutes: float = 30.0, include_saysno: bool = True) -> dict:

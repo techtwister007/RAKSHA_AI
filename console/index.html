@@ -11,7 +11,7 @@
   would contradict the air-gap claim. The air-gap guard (raksha/airgap.py) enforces this.
   System fonts, inline CSS/JS, inline SVG. Theme-aware, with a high-contrast projector mode and an
   English/Hindi toggle. Screens: Mission Board, Live Pipeline, Event Log, Finding Detail (the money
-  screen), Attack Graph, Estate Map, Post-Quantum, Evidence Vault, Scorecard, Commander's Brief.
+  screen), Attack Graph, Estate Map, Post-Quantum, Evidence Vault, Scorecard, Commander's Brief, Demo Beats, Time-lapse.
 -->
 <style>
   :root{
@@ -282,6 +282,24 @@
       <h2 data-i18n="Evidence Vault">Signed evidence bundles — verify one yourself</h2>
       <div class="flist" id="vault-list"></div>
       <div class="detail" id="vault-result" style="margin-top:14px"><p class="empty">Pick a reportable finding and press Verify.</p></div>
+    </section>
+    <section id="demo" hidden>
+      <h2>It says no — refusal as the trust-maker (J1)</h2>
+      <div style="margin-bottom:8px"><button class="ctl" id="saysno-run">Run the beat</button> <span id="saysno-state" class="dim"></span></div>
+      <div class="flist" id="saysno-beats"></div>
+      <h2 style="margin-top:22px">Bring your own target (J2)</h2>
+      <div style="margin-bottom:8px"><input class="ctl" id="intake-path" placeholder="/media/usb/target" aria-label="media path" style="min-width:260px">
+        <button class="ctl" id="intake-go">Ingest</button> <span id="intake-state"></span></div>
+      <div class="detail" id="intake-box"><p class="empty">No intake yet. Allowed roots are shown once one runs.</p></div>
+      <h2 style="margin-top:22px">Air-gap: egress counter (J6)</h2>
+      <div style="margin-bottom:8px"><button class="ctl" id="egress-reset">Zero the counter</button></div>
+      <div class="detail" id="egress-box"></div>
+    </section>
+    <section id="timelapse" hidden>
+      <h2>Time-lapse — scrub the run's journal (J9)</h2>
+      <div id="tl-sum" class="dim" style="margin-bottom:8px"></div>
+      <input type="range" id="tl-range" min="0" max="59" value="59" style="width:100%" aria-label="time in run">
+      <div class="detail" id="tl-state" style="margin-top:10px"><p class="empty">Loading…</p></div>
     </section>
     <section id="score" hidden><h2 data-i18n="Scorecard">The jury's scoresheet, live</h2><div id="score-body"></div></section>
     <section id="brief" hidden>

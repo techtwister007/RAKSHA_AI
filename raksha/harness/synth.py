@@ -35,6 +35,7 @@ _C_HARNESS = r"""#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 extern {signature_decl};
 
@@ -71,9 +72,11 @@ int main(int argc, char **argv) {{
         unsigned char *buf = malloc(n ? n : 1);
         if (n && !read_n(0, buf, n)) {{ free(buf); break; }}
         pid_t pid = fork();
-        if (pid == 0) {{ run(buf, n); _exit(0); }}   /* child: crash here aborts only the child */
+        if (pid == 0) {{ alarm(2); run(buf, n); _exit(0); }}   /* child: a crash aborts only the child;
+                                                    a hang is cut at 2 s so the loop never stalls */
         int st; waitpid(pid, &st, 0);
-        unsigned char s = (WIFSIGNALED(st) || (WIFEXITED(st) && WEXITSTATUS(st) != 0)) ? 1 : 0;
+        unsigned char s = (WIFSIGNALED(st) && WTERMSIG(st) == SIGALRM) ? 0 :   /* hang: the hang lane's */
+                          (WIFSIGNALED(st) || (WIFEXITED(st) && WEXITSTATUS(st) != 0)) ? 1 : 0;
         if (write(1, &s, 1) != 1) {{ free(buf); break; }}
         free(buf);
     }}
@@ -121,7 +124,7 @@ def synthesize(entrypoint: Entrypoint) -> Harness:
 
 # ---- Python ------------------------------------------------------------------------------------
 
-_PY_HARNESS = r'''import os, sys, struct, importlib
+_PY_HARNESS = r'''import os, sys, struct, importlib, signal
 import {guard}
 {guard}.install()
 
@@ -158,11 +161,15 @@ if __name__ == "__main__":
         pid = os.fork()
         if pid == 0:                      # child: runs the target, dies alone on a crash
             try:
+                signal.alarm(2)           # a hang is cut, never stalls the loop (the hang lane's job)
                 _run(data)
                 os._exit(0)
             except BaseException:
                 os._exit(1)
         _, st = os.waitpid(pid, 0)
+        if os.WIFSIGNALED(st) and os.WTERMSIG(st) == signal.SIGALRM:
+            os.write(1, bytes([0]))
+            continue
         crashed = 1 if (os.WIFSIGNALED(st) or (os.WIFEXITED(st) and os.WEXITSTATUS(st) != 0)) else 0
         os.write(1, bytes([crashed]))
 '''

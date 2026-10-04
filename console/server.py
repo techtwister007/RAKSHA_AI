@@ -13,6 +13,7 @@ Read routes (GET):
   /api/brief/<id>            the bilingual Commander's Brief (F10)
   /api/verify/<id>           re-verify the sealed evidence bundle
   /api/labels                Hindi console labels (F10)
+  /api/timelapse[?n=|?t=]    J9: frames of the journal (or the recorded run), or the state at t seconds
   /api/help                  keyboard shortcuts (F12)
   /api/export/findings.csv   | findings.xlsx | brief/<id>.pdf   (F12)
 
@@ -34,7 +35,7 @@ import json
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit, unquote
+from urllib.parse import parse_qs, urlsplit, unquote
 from pathlib import Path
 
 CONSOLE_DIR = Path(__file__).parent
@@ -104,6 +105,16 @@ def make_handler(session, *, token: str | None = None):
                 return
             if path == "/api/snapshot":
                 self._json(200, session.snapshot()); return
+            if path == "/api/timelapse":
+                from raksha.timelapse import for_session
+                rec = for_session(session)
+                if rec is None:
+                    self._json(404, {"error": "no journal and no recorded run"}); return
+                q = parse_qs(urlsplit(self.path).query)
+                if "t" in q:
+                    self._json(200, rec.at(float(q["t"][0]))); return
+                self._json(200, {"summary": rec.summary(), "frames": rec.frames(int(q.get("n", ["60"])[0]))})
+                return
             if path == "/api/labels":
                 from raksha.brief import console_labels_hi
                 self._json(200, console_labels_hi()); return
