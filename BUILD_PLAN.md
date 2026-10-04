@@ -85,6 +85,21 @@ hand-written harness (synthesized, Phase 11; Java via the shipped Jazzer replay 
     (imported / not-imported / unknown), because a proven-present CVE in an unused library is not
     an exploit.
 
+17. **Breadth belongs in the pipeline, behind the gate.** Capabilities the first review pass deferred
+    as "too costly" were built this session (`docs/external-review-vetting.md` §5a): the crypto/PQC
+    lane, the structural CPG lane, the attack graph, the asset registry, the triage funnel, the model
+    parliament, the evidence-fusion kernel, the TSan race oracle, the patch frontier + perf check, and
+    the independent red team. None may decide truth — the gate does; each is a proposer, a ranker, a
+    detector or an annotator. Optimisation (a real fuzzer behind triage, a full crypto catalogue, a
+    GNN over the CPG) comes after breadth.
+18. **No single model decides, and model influence is capped.** The parliament measures disagreement
+    (an investigation signal, never a status change); evidence fusion holds model votes below the
+    proven threshold so they can never manufacture proof; triage's model assist re-orders but cannot
+    veto a real bug. Offline, each uses a deterministic fallback and says so.
+19. **Presence, never absence; and the horizon is named.** `docs/future-technologies.md` marks every
+    capability built / wired / roadmap, so what is not yet done (attestation, CHERI migration, schedule
+    fuzzing, the GNN, federated assurance) is stated, not implied.
+
 ## The one rule
 
 > **A criterion you cannot measure is a criterion you cannot score.**
@@ -114,6 +129,14 @@ measured per run from the records and live counters — never typed in. Key name
 | Patch hygiene (scope · size · primitives) before the gate | **Precision** | `candidate_patches_rejected_before_gate` |
 | Dependency reachability (import index in the build-free walk) | **Precision** | `dependency_reachability` {imported, not-imported, unknown}; risk register weights 0.9 / 0.3 / 0.6 |
 | Assurance boundary | Trust · **Precision** | `boundary.*` and `boundary.statement` on Screen 5, `summary.json`, `ASSURANCE_BOUNDARY.txt` |
+| Crypto + post-quantum readiness lane | **Functionality · Scalability** | `depth.crypto_findings`; `depth.pqc_quantum_vulnerable_sites`; `depth.pqc_blast_radius` |
+| Structural source→sink (CPG) lane | **Precision** | `precision.structural_hypotheses` (SUSPECTED; promoted ones count in `static_findings_promoted`) |
+| Attack graph (attack economics) | **Functionality** | `depth.attack_chains`; `depth.viable_attack_chains` |
+| Asset registry (mission tiers) | **Functionality** | `depth.mission_tiers`; folded into the risk score |
+| Decision-funnel triage | **Speed · Resource** | `snapshot.triage` reduction stages |
+| Model parliament + evidence fusion | **Precision** | `depth.median_evidence_confidence`; `depth.findings_with_2plus_independent_channels`; `depth.findings_flagged_for_investigation` |
+| Independent red team | **Precision** | `depth.patches_red_team_held`; `depth.patches_red_team_broke` |
+| TSan race oracle; patch frontier; perf check | **Precision · Functionality** | `depth.race_findings`; `depth.patches_with_frontier_alternatives` |
 | Sandbox, no network interface | Trust | `network_interfaces` = 0 only if every target-code run went through the sandbox, else `unenforced`; `cloud_calls` = live egress counter |
 
 ## Phases

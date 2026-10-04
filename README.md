@@ -19,7 +19,7 @@ real. Nothing unproven ever ships.
 | `RAKSHA_AI_Dossier/` | The settled brief — competition decode, architecture, tool map, models, honest gaps. Read `README.md` there first. |
 | **`HANDOVER.md`** | **Start here on a new machine:** current state, how to resume, prioritised remaining work, honest limits. |
 | `BUILD_PLAN.md` | The execution plan: finale answers, settled decisions, phases, and the scoring ledger. |
-| `docs/` | The architecture sheet, campaign plan and plan map (HTML; also published as artifacts — links in `BUILD_PLAN.md`). **`docs/laptop-setup.md`: run the whole system on your own machine.** `docs/external-review-vetting.md`: the build vetted against an outside critical review — what changed, what was rejected and why. |
+| `docs/` | The architecture sheet, campaign plan and plan map (HTML). **`docs/laptop-setup.md`: run the whole system on your own machine.** `docs/external-review-vetting.md`: the build vetted against an outside critical review. **`docs/future-technologies.md`: the 2026→2030 technology horizon — PQC, heterogeneous intelligence, concurrency, attack graphs, attestation — marked built / wired / roadmap.** |
 | `raksha/` | The product. |
 | `tests/` | The invariant and keystone tests. |
 
@@ -29,7 +29,7 @@ real. Nothing unproven ever ships.
 fixes and proves vulnerabilities across C, Java, Python and Go through one gate — including
 on targets that ship **no fuzz harness**, which it synthesizes automatically — scans any
 language build-free, serves the offline operator console, and signs an evidence bundle.
-Last verified run: **380 tests pass**, lint and air-gap guard clean, all slices `VERIFIED`.
+Last verified run: **516 tests pass**, lint and air-gap guard clean, all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5: the
 36-hour rehearsal and the real-Docker sandbox need the finale hardware; the model lane has run
 only against a mock endpoint; JS/TS and Rust are build-free only; fix templates are few and the
@@ -45,12 +45,17 @@ raksha/
                   fuzz it (fork-server), confirm; no hand-written driver needed
   autorepair.py   repair ladder (templates → model → mitigation) driven through the gate
   hygiene.py      patch hygiene: scope, size and primitive checks a candidate passes before any gate run
-  lanes/          build-free: supply-chain (Maven/npm/PyPI/Go), secrets, service, dependency bump
+  lanes/          build-free: supply-chain (Maven/npm/PyPI/Go), secrets, service, dependency bump,
+                  crypto + post-quantum readiness, structural source->sink (CPG-lite)
   adapters/       one per language — a real toolchain to the gate (c_asan, java, python_sink, go_fuzz)
   buildagent.py   detect → build → escalate → degrade to build-free
   inference.py    the ONE interface any model call goes through (air-gap guard proves it)
   repair.py       the repair ladder: template → retrieval → model → mitigation floor
   roe.py          Rules of Engagement — asset tiers, step-downs, two-person rule
+  assets.py       the asset registry (mission tiers per codebase) that weights the risk ranking
+  attackgraph.py  composes findings into attack chains scored by attack economics
+  triage.py parliament.py evidence.py   decision funnel, model parliament, evidence-fusion kernel
+  redteam.py      an independent red team that re-attacks every proven fix to falsify it
   vaccine.py      one verified fix → a proven detection rule → a fleet sweep
   bundle.py brief.py risk.py rollback.py   signed evidence (with environment), Commander's Brief, risk register
   replay.py __main__.py                    safe replay scripts and the `python -m raksha` replay CLI
@@ -64,7 +69,7 @@ raksha/
 
 ```sh
 pip install -e '.[dev]'
-pytest                       # 380 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
+pytest                       # 516 tests: invariants, gate, lanes, oracles, autofuzz, evidence, hardening
 
 python -m raksha.demo        # a C, a Java and a Python finding through one pipeline
 python -m raksha.slice_three # three languages verified live through the one gate (needs gcc; Maven warm for Java)

@@ -23,7 +23,7 @@ regenerated from the repository as the last step.
 
 Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24):
 
-- **380 tests pass**, 6 skipped (opt-in slow/hardware tests), `pyflakes` clean, air-gap guard clean.
+- **516 tests pass**, 6 skipped (opt-in slow/hardware tests), `pyflakes` clean, air-gap guard clean.
 - **Four deep languages through one five-check gate**, each find → fix → prove to `VERIFIED` live:
   C (gcc+ASan), Java (Jazzer/Maven, real Log4Shell), Python (sink sanitizer), Go (native `go test -fuzz`).
 - **Automatic harness generation** (`raksha/harness/`): on a target that ships **no fuzz harness**,
@@ -39,6 +39,14 @@ Verified on the last run (Linux, gcc 13, Python 3.11, JDK 21/Maven 3.9, Go 1.24)
 - **Honest scoring interface**: every BUILD_PLAN ledger row is emitted on the Scorecard; counters are
   per run; the posture badge reads `0` only when all target code ran in the sandbox, else
   `unenforced`; VRAM is `null` without a GPU, never a faked zero.
+- **Breadth pass from the external review** (`docs/external-review-vetting.md` §5a, `docs/future-technologies.md`):
+  the capabilities first deferred as "too costly" were built behind the gate — a post-quantum/weak-crypto
+  lane (`raksha crypto-match`), a structural source→sink (CPG) lane feeding cross-confirmation and triage,
+  an attack-graph with attack-economics scoring, an asset registry with mission tiers, a decision-funnel
+  triage tier, a model parliament with epistemic-conflict detection, a deterministic evidence-fusion
+  kernel (model votes capped below the proven threshold), a ThreadSanitizer race oracle, a patch
+  frontier with a perf-regression check, and an independent red team that re-attacks every VERIFIED fix.
+  The Scorecard gained a `depth` section for all of it.
 - **Vetted against an external critical review** (`docs/external-review-vetting.md`, 2026-10-04):
   the gate's CLEAN_REFUZZ now opens with 24 deterministic variants of the reproducer (a planted
   shallow fix dies on the real C target); patch hygiene refuses out-of-scope, oversized or
@@ -86,8 +94,12 @@ it has only ever been exercised with a mock client in CI, so the first real run 
 Tick items off here as they land. Effort is a solo-builder estimate.
 
 **Progress mark 2026-10-04:** Phases 0–11 built; the external-review course correction landed
-(380 tests). Nothing in P0 has started — every P0 item needs the finale node or a model endpoint.
-P1-1 is the single highest-value item buildable on the laptop today.
+(first pass 380 tests), then the breadth pass built the deferred capabilities behind the gate
+(crypto/PQC, CPG, attack graph, assets, triage, parliament, evidence fusion, TSan, patch frontier,
+perf check, red team) — now **516 tests**. Nothing in P0 has started; every P0 item needs the
+finale node or a model endpoint. P1-1 (the first real model-lane run) is still the single
+highest-value item buildable on the laptop today, and it now also lights up the parliament, the
+triage model-assist and the red-team model inputs, which have only run against a mock.
 
 ### P0 — must happen before the finale (needs the finale hardware or a real model endpoint)
 
@@ -142,7 +154,10 @@ P1-1 is the single highest-value item buildable on the laptop today.
   the gate's fresh campaign use it too; stop when coverage plateaus (the review's "marginal
   information" stopping rule becomes measurable). Exit: `refuzz` detail reports coverage-guided
   execs, and a planted shallow fix still dies. *~1 day.*
-- [ ] **P1-10 · Weak-crypto / PQC-readiness inventory lane** (build-free, deterministic, any
+- [x] **P1-10 · Weak-crypto / PQC-readiness inventory lane** — DONE (`raksha/lanes/crypto.py`,
+  `raksha crypto-match`). A full OSV-style crypto rule-set and the migration-patch generator remain.
+  <!-- original scope kept below -->
+  **(was)** Weak-crypto / PQC-readiness inventory lane (build-free, deterministic, any
   language): MD5/SHA-1 as signature or password hash, RSA < 2048, ECB, static IVs/nonces,
   hard-coded keys already covered; plus an *inventory* (not a finding) of RSA/ECDSA/DH use for a
   post-quantum migration list in the Commander's Brief. Replayable via `python -m raksha
@@ -155,7 +170,8 @@ P1-1 is the single highest-value item buildable on the laptop today.
 
 ### P2 — polish and the sealed-deployment extras
 
-- [ ] **P2-1 · Asset registry** as data (`roe.Asset` objects are built ad hoc in slices): a file the
+- [x] **P2-1 · Asset registry** DONE (`raksha/assets.py`, `raksha/data/assets.json`) — tiers weight the
+  risk ranking and bridge to ROE. Console editing of it remains. **(was)** Asset registry as data (`roe.Asset` objects are built ad hoc in slices): a file the
   console loads, tiers per codebase, used by ROE and the vaccine sweep. *~half a day.*
 - [ ] **P2-2 · cosign / in-toto signing** replacing the HMAC demo key (`RAKSHA_BUNDLE_KEY_FILE`
   already exists as the provisioning seam). *~half a day on the finale node.*
@@ -165,7 +181,8 @@ P1-1 is the single highest-value item buildable on the laptop today.
   repair round; keyboard-only operation for the demo.
 - [ ] **P2-5 · Housekeeping**: `autofuzz` leaves one scratch dir per target in `/tmp` (the gate cleans
   its own builds); delete it after `repair()` completes.
-- [ ] **P2-7 · TSan oracle** (`-fsanitize=thread`) behind the oracle API, and `DATA RACE` already
+- [x] **P2-7 · TSan oracle** DONE (`raksha/oracles/tsan.py`, `demo-targets/c-race`). Schedule fuzzing
+  remains roadmap. **(was)** TSan oracle (`-fsanitize=thread`) behind the oracle API, and `DATA RACE` already
   parsed from `go test -race`; the first honest step toward the review's concurrency/temporal
   layer. No schedule fuzzing. *~half a day.*
 - [ ] **P2-8 · Previous-known-good as a second differential baseline** when a target ships git
@@ -193,6 +210,12 @@ P1-1 is the single highest-value item buildable on the laptop today.
 - **The bundle signature uses a published demo key** unless `RAKSHA_BUNDLE_KEY_FILE` is provisioned;
   verification says so explicitly.
 - **Deep coverage is four languages**; JS/TS and Rust are build-free only today (§2 table).
+- **The new assurance layers are real but offline-shaped**: the model parliament and the triage/red
+  model-assist have only ever run with a mock client (same as the repair lane, P1-1); offline they
+  use the deterministic fallbacks (epistemic-conflict, pure-deterministic triage). The structural
+  lane is intra-procedural; the attack-graph edge rules are a fixed deterministic set; the crypto
+  lane is a curated rule-set, not a full catalogue. All are stated as such in their docstrings and
+  in `docs/future-technologies.md` (built / wired / roadmap).
 - **Untested paths**: the Windows PowerShell wrapper (no Windows available), the old-Ubuntu
   (22.04) fallback branches in `deploy/laptop-bootstrap.sh`, and everything in P0.
 

@@ -351,11 +351,23 @@ class Session:
         from .lanes import crypto
         return crypto.pqc_report(self.crypto_uses)
 
+    def triage(self) -> dict:
+        """The decision funnel over the current findings: cheap deterministic scoring that would,
+        at estate scale, decide where the expensive lanes spend their budget. Here it shows the
+        honest reduction (all findings -> worth-deep-work -> top priorities)."""
+        from . import triage as _triage
+        fs = list(self.findings.values())
+        res = _triage.funnel(fs, stages=[("all findings", 0.0, len(fs) or 1),
+                                         ("worth deeper work", 0.35, max(1, len(fs))),
+                                         ("top priorities", 0.5, 10)])
+        return {"stages": res.stages, "reduction_ratio": res.reduction_ratio,
+                "top": [f.id for f in res.kept]}
+
     def snapshot(self) -> dict:
         return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
                 "risk": self.risk_register(), "pipeline": self.pipeline_stages(),
                 "attack_graph": self.attack_graph(), "pqc": self.pqc_report(),
-                "structure": self.structure_summaries}
+                "triage": self.triage(), "structure": self.structure_summaries}
 
 
 def demo_session(repo_root: Path | None = None) -> Session:

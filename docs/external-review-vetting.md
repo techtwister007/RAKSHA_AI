@@ -16,8 +16,9 @@ assurance boundary instead" was a real gap in our *outputs* and is now fixed. It
 technical criticisms — shallow fixes that kill the crash and not the defect, and the target's source
 being untrusted input to the model — were valid against our build and are now closed with tests.
 Everything else in it is either (a) something we already do and it did not know, (b) a legitimate
-P1/P2 item for after the finale, or (c) scope that would lose the finale (judged on accuracy,
-speed, resources, functionality, scalability in 36 hours) in exchange for a slide.
+P1/P2 item for after the finale, or (c) scope now built this
+session after the user overruled the earlier "too costly for the finale" calls (see §5a): the
+breadth is in the pipeline, behind the gate, and optimisation comes later.
 
 The one thing the review does better than our brief is **language**: "Model what the system must
 never do, then make the machine try to do it" is a sharper sentence than ours, and it is a true
@@ -97,6 +98,35 @@ not · **GAP→P1/P2**: real, scheduled in `HANDOVER.md` · **REJECT**: not for 
 3. Intent is not extracted. The functional contract is "behaviour the corpus and the target's own
    tests observe". A bug class with no oracle here is outside the claim — and the boundary now says so.
 4. Deep coverage is four languages; JS/TS and Rust are build-free only.
+
+## 5a. The rejections were overruled — and built (2026-10-04, second pass)
+
+The user's instruction was explicit: breadth that makes the system stronger goes **in** the
+pipeline first; optimisation comes later; "resource cost" is not a reason to omit a capability,
+because scope is what convinces the jury of the width of the design. Every item §3 marked REJECT or
+GAP-for-later that could be built offline and behind the gate was therefore built this session. The
+three rules in `docs/future-technologies.md` (the verifier decides, presence-never-absence,
+offline-by-construction) are what let the breadth grow without diluting the central bet.
+
+| §3 item | Was | Now |
+|---|---|---|
+| Heterogeneous intelligence / "Jev-like" decision model | REJECT for finale | **BUILT**: `raksha/triage.py` — a deterministic decision funnel, live in the console snapshot, that re-orders by cheap signals and (with a TRIAGE model) blends a score but never vetoes a real bug. |
+| Model parliament / epistemic conflict | REJECT for finale | **BUILT**: `raksha/parliament.py` — independent model roles vote, disagreement is an investigation signal, offline it degrades to a deterministic epistemic-conflict channel; never touches status. |
+| Evidence fusion | PARTIAL | **BUILT**: `raksha/evidence.py` — a deterministic kernel fuses independent channels with model votes capped below the proven threshold; the quantitative face of "no reproducer, no report". |
+| Concurrency / temporal (TSan) | GAP→P2 | **BUILT**: `raksha/oracles/tsan.py` + a `c-race` demo found and fixed through all five gate checks. Schedule fuzzing stays roadmap. |
+| Attack-chain / attack-graph reasoning | GAP→later | **BUILT**: `raksha/attackgraph.py` — chains scored by attack economics, live on the Scorecard and console. |
+| Repair alternatives / patch frontier (Pareto) | PARTIAL (deliberate) | **BUILT**: the repair ladder now gates every candidate and chooses the Pareto-smallest passer (`finding.frontier`). |
+| Patch cost (performance) | REJECT for finale | **BUILT**: the gate measures a patched/baseline perf ratio and fails a fix that is >5× slower. |
+| Independent red team (blue/red rounds) | PARTIAL→P1 | **BUILT**: `raksha/redteam.py` re-attacks every VERIFIED patch to falsify it; runs after an autofuzz fix. |
+| CPG + structural lane | GAP→later | **BUILT**: `raksha/lanes/structure.py` — a source→sink taint graph feeding cross-confirmation and triage; the GNN over it stays roadmap (the graph is exported as the training hook). |
+| PQC / crypto-agility | GAP→P1 | **BUILT**: `raksha/lanes/crypto.py` — weak-crypto findings + a post-quantum readiness inventory with NIST ML-KEM/ML-DSA/SLH-DSA migrations and a blast-radius. |
+| Mission impact / asset registry | P2-1 | **BUILT**: `raksha/assets.py` + `raksha/data/assets.json` — mission tiers weight the risk ranking. |
+
+What stays **roadmap**, with the honest reason, is now collected in `docs/future-technologies.md`
+§8–10: hardware-rooted attestation (a property of the customer's node, not ours to claim), C→Rust /
+CHERI migration (a structural remediation above our ladder), schedule fuzzing (needs a per-target
+state model), the GNN (needs training data we do not have), and federated / continuous assurance
+(an ops deployment, not a finale artifact). These are named, not quietly dropped.
 
 ## 6. Language we adopt
 
