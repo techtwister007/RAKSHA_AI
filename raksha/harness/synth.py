@@ -202,9 +202,8 @@ def _scratch(target_root: Path) -> Path:
 
 
 def _sh(cmd: list[str] | str, cwd: Path, stdin: bytes | None = None, timeout: float = 120.0):
-    shell = isinstance(cmd, str)
-    return subprocess.run(cmd, cwd=str(cwd), input=stdin, capture_output=True, timeout=timeout,
-                          shell=shell)
+    from ..sandbox import run_target      # building/running the harness runs target code
+    return run_target(cmd, str(cwd), input=stdin, timeout=timeout, shell=isinstance(cmd, str))
 
 
 def _c_quality(harness, target_root, benign, cc, timeout):

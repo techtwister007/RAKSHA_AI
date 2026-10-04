@@ -140,7 +140,8 @@ def run_untrusted(cmd: str, cwd: str, *, stdin: bytes | None = None, timeout: fl
         if not box.available():
             return 126, b"", f"SANDBOX UNAVAILABLE: {box.policy.runtime} not found".encode(), False
         _SANDBOXED_RUNS += 1
-        argv = box.wrap(cmd.replace(str(cwd), "/work"), workdir="/work", mount=str(cwd))
+        # the target's own variables (not the host's) ride into the sandbox as -e flags
+        argv = _sandboxed_argv(box, cmd, str(cwd), env, True)
     elif os.environ.get("RAKSHA_REQUIRE_SANDBOX") == "1":
         return 126, b"", b"SANDBOX REQUIRED: refusing to run untrusted code unsandboxed", False
     else:
@@ -155,3 +156,79 @@ def run_untrusted(cmd: str, cwd: str, *, stdin: bytes | None = None, timeout: fl
         return p.returncode, p.stdout, p.stderr, False
     except subprocess.TimeoutExpired as e:
         return -1, e.stdout or b"", e.stderr or b"", True
+
+
+# ---- the same door for hot loops and long-lived processes --------------------------------------
+# run_untrusted() covers the gate's commands. The fuzzing hot loops (fork server, per-input
+# runners, batch drivers, the interpose/observe shims, quality-gate harness builds) spawn target
+# code too, and must not bypass the sandbox: in the deployed layout RAKSHA's own container holds
+# the container-runtime socket, so target code running in it could reach the host. These two
+# helpers give those call sites the same rule — sandboxed when provisioned, refused when
+# RAKSHA_REQUIRE_SANDBOX=1 and none is available, on the host (counted) on a development box.
+# Paths under `cwd` are remapped to /work; every file the target needs must live under `cwd`.
+
+
+class SandboxRequired(RuntimeError):
+    """Raised by popen_target when a sandbox is required but none is available."""
+
+
+def _extra_env(env: dict | None) -> dict[str, str]:
+    """Only the variables the caller ADDED or CHANGED relative to RAKSHA's own environment — the
+    host's environment is never copied into the sandbox."""
+    if not env:
+        return {}
+    return {k: v for k, v in env.items() if os.environ.get(k) != v}
+
+
+def _sandboxed_argv(box: "Sandbox", argv: list[str] | str, cwd: str, env: dict | None,
+                    shell: bool) -> list[str]:
+    cwd = str(cwd)
+    if shell or isinstance(argv, str):
+        inner = str(argv).replace(cwd, "/work")
+    else:
+        inner = " ".join(shlex.quote(str(a).replace(cwd, "/work")) for a in argv)
+    full = box.wrap(inner, workdir="/work", mount=cwd)
+    flags = []
+    for k, v in sorted(_extra_env(env).items()):
+        flags += ["-e", f"{k}={str(v).replace(cwd, '/work')}"]
+    i = full.index(box.policy.image)
+    return full[:i] + flags + full[i:]
+
+
+def run_target(argv: list[str] | str, cwd: str, *, input: bytes | None = None,
+               timeout: float | None = None, env: dict | None = None, shell: bool = False,
+               sandbox: "Sandbox | None" = None) -> subprocess.CompletedProcess:
+    """`subprocess.run(..., capture_output=True)` for target code, through the sandbox door.
+    Raises subprocess.TimeoutExpired exactly as subprocess.run does."""
+    global _SANDBOXED_RUNS, _UNSANDBOXED_RUNS
+    box = sandbox if sandbox is not None else Sandbox.from_env()
+    if box is not None:
+        if not box.available():
+            return subprocess.CompletedProcess(argv, 126, b"",
+                                               f"SANDBOX UNAVAILABLE: {box.policy.runtime} not found".encode())
+        _SANDBOXED_RUNS += 1
+        return subprocess.run(_sandboxed_argv(box, argv, cwd, env, shell), input=input,
+                              capture_output=True, timeout=timeout)
+    if os.environ.get("RAKSHA_REQUIRE_SANDBOX") == "1":
+        return subprocess.CompletedProcess(argv, 126, b"",
+                                           b"SANDBOX REQUIRED: refusing to run untrusted code unsandboxed")
+    _UNSANDBOXED_RUNS += 1
+    return subprocess.run(argv, cwd=str(cwd), input=input, capture_output=True, timeout=timeout,
+                          env=env, shell=shell)
+
+
+def popen_target(argv: list[str], cwd: str, *, env: dict | None = None,
+                 sandbox: "Sandbox | None" = None, **kw) -> subprocess.Popen:
+    """A long-lived target process (the fork server) through the sandbox door. `docker run -i`
+    passes stdin/stdout through, so the fork-server protocol is unchanged inside the sandbox."""
+    global _SANDBOXED_RUNS, _UNSANDBOXED_RUNS
+    box = sandbox if sandbox is not None else Sandbox.from_env()
+    if box is not None:
+        if not box.available():
+            raise SandboxRequired(f"SANDBOX UNAVAILABLE: {box.policy.runtime} not found")
+        _SANDBOXED_RUNS += 1
+        return subprocess.Popen(_sandboxed_argv(box, argv, cwd, env, False), **kw)
+    if os.environ.get("RAKSHA_REQUIRE_SANDBOX") == "1":
+        raise SandboxRequired("SANDBOX REQUIRED: refusing to run untrusted code unsandboxed")
+    _UNSANDBOXED_RUNS += 1
+    return subprocess.Popen(argv, cwd=str(cwd), env=env, **kw)

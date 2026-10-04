@@ -51,7 +51,7 @@ def build_shim(cc: str = "gcc", *, out_dir: str | os.PathLike[str] | None = None
     so = base / "raksha_interpose.so"
     cmd = [cc, "-shared", "-fPIC", "-O2", "-o", str(so), str(SHIM_SOURCE), "-ldl"]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+        proc = subprocess.run(cmd, capture_output=True, text=True)  # raksha-own: compiles OUR shim
     except OSError:
         return None
     if proc.returncode != 0 or not so.exists():
@@ -76,19 +76,20 @@ def run_with_shim(
     operation never runs. On timeout, whatever output was produced is still returned. ``cwd`` and
     ``env`` let a caller (and the test) place the run and point the demo's sentinel path.
     """
+    from ..sandbox import run_target
     data = Path(input_path).read_bytes() if input_path is not None else b""
+    # The shim must sit under the run's directory so the sandbox (which mounts only that
+    # directory) sees it too.
+    workdir = Path(cwd) if cwd is not None else Path(str(argv[0])).resolve().parent
+    local = workdir / ".raksha_interpose.so"
+    if Path(shim).resolve() != local.resolve():
+        shutil.copy2(shim, local)
     run_env = dict(os.environ if env is None else env)
     existing = run_env.get("LD_PRELOAD", "").strip()
-    run_env["LD_PRELOAD"] = f"{shim}:{existing}" if existing else str(shim)
+    run_env["LD_PRELOAD"] = f"{local}:{existing}" if existing else str(local)
     try:
-        proc = subprocess.run(
-            [str(a) for a in argv],
-            input=data,
-            capture_output=True,
-            timeout=timeout,
-            cwd=str(cwd) if cwd is not None else None,
-            env=run_env,
-        )
+        proc = run_target([str(a) for a in argv], str(workdir), input=data, timeout=timeout,
+                          env=run_env)
         out = (proc.stdout or b"") + (proc.stderr or b"")
     except subprocess.TimeoutExpired as e:
         out = (e.stdout or b"") + (e.stderr or b"")

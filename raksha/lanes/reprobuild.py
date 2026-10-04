@@ -41,8 +41,11 @@ def _run_build(build_cmd, root: Path) -> bool:
     """Run the build once in ``root``. True if it exited 0; False on any failure (incl. missing tool)."""
     shell = isinstance(build_cmd, str)
     try:
-        proc = subprocess.run(build_cmd, cwd=str(root), shell=shell, capture_output=True,
-                              text=True, timeout=_BUILD_TIMEOUT, check=False)
+        from ..sandbox import run_target   # a target's build runs its code (build scripts)
+        raw = run_target(build_cmd, str(root), shell=shell, timeout=_BUILD_TIMEOUT)
+        proc = subprocess.CompletedProcess(raw.args, raw.returncode,
+                                           (raw.stdout or b"").decode("utf-8", "replace"),
+                                           (raw.stderr or b"").decode("utf-8", "replace"))
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired, ValueError):
         return False
     return proc.returncode == 0

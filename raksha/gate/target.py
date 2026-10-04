@@ -122,7 +122,7 @@ class CommandTarget:
                                                       timeout=timeout or self.timeout, env=env)
             return RunResult(code, out, err, timed_out=timed_out)
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # raksha-own: tree copy / patch apply, never target code
                 cmd, shell=True, cwd=str(cwd), input=stdin, capture_output=True,
                 timeout=timeout or self.timeout, env=env,
             )

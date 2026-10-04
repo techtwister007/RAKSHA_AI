@@ -29,6 +29,7 @@ from .entrypoints import Entrypoint, discover, rank_with_model
 from .forkserver import ForkClient, asan_env
 from .mutator import Fuzzer
 from ..contract import demotion_reason
+from ..sandbox import SandboxRequired, run_target
 from ..minimise import minimise
 from ..signature import _owned as _owned_frames
 
@@ -109,7 +110,10 @@ def autofuzz(target_root: str | Path, *, max_entrypoints: int = 4, max_execs: in
             continue
         tried += 1
         oracle = _oracle_for(ep.language)
-        result = _fuzz(ep, built, oracle, max_execs, seed_corpus)
+        try:
+            result = _fuzz(ep, built, oracle, max_execs, seed_corpus)
+        except SandboxRequired as e:   # never fuzz unsandboxed when the policy requires a sandbox
+            return AutofuzzResult(None, ep, harness, None, None, tried=tried, note=str(e))
         if result is not None:
             finding, crashing, target = result
             if finding.contract:
@@ -226,7 +230,7 @@ def _c_runner(work: Path, built: dict, oracle: Oracle):
     def replay(data: bytes) -> str:
         f = work / ".raksha_replay_in"
         f.write_bytes(data)
-        p = subprocess.run([str(binary), str(f)], cwd=str(work), capture_output=True, timeout=30, env=env)
+        p = run_target([str(binary), str(f)], str(work), timeout=30, env=env)
         return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
 
     return ForkClient([str(binary)], work, env=env), replay
@@ -278,8 +282,7 @@ def _py_runner(work: Path, ep: Entrypoint, oracle: Oracle):
     def replay(data: bytes) -> str:
         f = work / ".raksha_replay_in"
         f.write_bytes(data)
-        p = subprocess.run(["python3", "raksha_harness.py", str(f)], cwd=str(work),
-                           capture_output=True, timeout=30)
+        p = run_target(["python3", "raksha_harness.py", str(f)], str(work), timeout=30)
         return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
 
     return ForkClient(["python3", "raksha_harness.py"], work), replay

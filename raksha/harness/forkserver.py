@@ -35,8 +35,9 @@ class ForkClient:
 
     def _spawn(self) -> None:
         self.close()
-        self.proc = subprocess.Popen(
-            self.argv, cwd=self.cwd, env=self.env,
+        from ..sandbox import popen_target   # the sandbox door: hot loops may not bypass it
+        self.proc = popen_target(
+            self.argv, self.cwd, env=self.env,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     def run_one(self, data: bytes) -> bool:

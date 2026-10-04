@@ -33,6 +33,7 @@ from ..harness.entrypoints import Entrypoint, _name_bonus
 from ..harness.mutator import _mutate
 from ..minimise import minimise
 from ..oracles.jazzer import JazzerOracle
+from ..sandbox import run_target
 
 DRIVER = "RakshaDriver"
 _OUT = ".raksha_classes"
@@ -216,8 +217,7 @@ class JavaAutofuzzResult:
 
 
 def _run(work: Path, arg: str, timeout: float = 120.0) -> str:
-    p = subprocess.run(["java", "-cp", _OUT, DRIVER, arg], cwd=str(work), capture_output=True,
-                       timeout=timeout)
+    p = run_target(["java", "-cp", _OUT, DRIVER, arg], str(work), timeout=timeout)
     return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
 
 
@@ -238,7 +238,7 @@ def java_autofuzz(target_root: str | Path, *, max_execs: int = 4000, batch: int 
         shutil.copytree(root, work, symlinks=True,
                         ignore=shutil.ignore_patterns("target", ".raksha*", _OUT))
         (work / f"{DRIVER}.java").write_text(synthesize_driver(je))
-        built = subprocess.run(_sources_cmd(), shell=True, cwd=str(work), capture_output=True)
+        built = run_target(_sources_cmd(), str(work), shell=True, timeout=600)
         if built.returncode != 0:
             continue
         rng = random.Random(seed)

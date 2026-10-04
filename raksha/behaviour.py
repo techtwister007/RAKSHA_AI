@@ -81,7 +81,7 @@ def build_shim(cc: str = "gcc", *, out_dir: str | os.PathLike[str] | None = None
     base = Path(out_dir) if out_dir else Path(tempfile.mkdtemp(prefix="raksha-observe-"))
     base.mkdir(parents=True, exist_ok=True)
     so = base / "raksha_observe.so"
-    p = subprocess.run([cc, "-shared", "-fPIC", "-O2", "-o", str(so), str(SHIM_SOURCE), "-ldl"],
+    p = subprocess.run([cc, "-shared", "-fPIC", "-O2", "-o", str(so), str(SHIM_SOURCE), "-ldl"],  # raksha-own
                        capture_output=True)
     return so if p.returncode == 0 and so.exists() else None
 
@@ -127,31 +127,36 @@ class Observer:
         self.ignore = _IGNORE_PREFIXES + _STDLIB + (os.path.realpath(self.shim),)
 
     def run(self, data: bytes) -> set[Event]:
-        with tempfile.TemporaryDirectory(prefix="raksha-obs-") as d:
+        from .sandbox import run_target
+        # Everything the run needs lives under the target root, so the same run works inside the
+        # sandbox (which mounts only the root): the shim, the input, the event log.
+        with tempfile.TemporaryDirectory(prefix=".raksha-obs-", dir=self.root) as d:
             inp = os.path.join(d, "input")
             log = os.path.join(d, "events.log")
+            shim = os.path.join(d, "observe.so")
+            shutil.copy2(self.shim, shim)
             Path(inp).write_bytes(data)
             env = dict(self.env)
             env["RAKSHA_OBSERVE_LOG"] = log
             prior = env.get("LD_PRELOAD", "").strip()
-            env["LD_PRELOAD"] = f"{self.shim}:{prior}" if prior else self.shim
+            env["LD_PRELOAD"] = f"{shim}:{prior}" if prior else shim
             argv = [a.replace("{input}", inp) for a in self.argv]
             try:
-                subprocess.run(argv, input=data, cwd=self.root, env=env, capture_output=True,
-                               timeout=self.timeout)
+                run_target(argv, self.root, input=data, env=env, timeout=self.timeout)
             except (subprocess.TimeoutExpired, OSError):
                 pass
             events: set[Event] = set()
             if not os.path.exists(log):
                 return events
-            ignore = self.ignore + (d,)
+            ignore = self.ignore + (os.path.realpath(d),)
             for line in Path(log).read_text(errors="replace").splitlines():
                 parts = line.split("\t")
                 if len(parts) < 2:
                     continue
-                if parts[0] == "open" and os.path.realpath(parts[1]).startswith(d):
-                    if os.path.realpath(parts[1]) == os.path.realpath(inp):
-                        events.add(Event("open", "<input>", parts[2] if len(parts) > 2 else "r"))
+                if parts[0] == "open" and os.path.realpath(parts[1]) == os.path.realpath(inp):
+                    events.add(Event("open", "<input>", parts[2] if len(parts) > 2 else "r"))
+                    continue
+                if parts[0] == "open" and os.path.realpath(parts[1]).startswith(os.path.realpath(d)):
                     continue
                 ev = _normalise(parts[0], parts[1], parts[2] if len(parts) > 2 else "", self.root,
                                 os.path.realpath(inp), ignore)

@@ -36,6 +36,7 @@ from pathlib import Path
 
 from ..finding import Finding, Frame, Reproducer, ReplayResult, utcnow
 from ..gate.target import BuildResult, RunResult, TestResult
+from ..sandbox import run_target
 from ..harness.entrypoints import Entrypoint
 from ..oracles.rust_panic import RustPanicOracle
 from ..repair_templates import _diff, _read_fix_site
@@ -188,8 +189,7 @@ class RustFuzzTarget:
 
     def _sh(self, cmd: str, cwd: Path, *, env: dict, timeout: float | None = None) -> RunResult:
         try:
-            p = subprocess.run(cmd, shell=True, cwd=str(cwd), capture_output=True,
-                               timeout=timeout or self.timeout, env=env)
+            p = run_target(cmd, str(cwd), shell=True, timeout=timeout or self.timeout, env=env)
             return RunResult(p.returncode, p.stdout, p.stderr)
         except subprocess.TimeoutExpired as e:
             return RunResult(-1, e.stdout or b"", e.stderr or b"", timed_out=True)
@@ -419,8 +419,7 @@ def _fuzz_until_panic(bin_path: Path, root: Path, env: dict, seeds: list[bytes],
             data = _mutate(rng, rng.choice(pool))
         (root / _INPUT_FILE).write_bytes(data)
         try:
-            p = subprocess.run(f"{bin_path} --test-threads=1", shell=True, cwd=str(root),
-                               capture_output=True, timeout=30, env=env)
+            p = run_target(f"{bin_path} --test-threads=1", str(root), shell=True, timeout=30, env=env)
         except subprocess.TimeoutExpired:
             continue
         text = (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
@@ -455,8 +454,7 @@ def rust_autofuzz(target_root: str | Path, *, fuzztime_s: int = 10,
         (work / "tests").mkdir(exist_ok=True)
         (work / "tests" / "raksha_fuzz.rs").write_text(harness)
         env = _cargo_env(home, work / "target")
-        built = subprocess.run("cargo build --tests", shell=True, cwd=str(work),
-                               capture_output=True, env=env)
+        built = run_target("cargo build --tests", str(work), shell=True, env=env)
         if built.returncode != 0:
             shutil.rmtree(work.parent, ignore_errors=True)
             continue
@@ -470,8 +468,7 @@ def rust_autofuzz(target_root: str | Path, *, fuzztime_s: int = 10,
             continue
         # replay the crasher once more to capture the panic text for the oracle
         (work / _INPUT_FILE).write_bytes(crasher)
-        p = subprocess.run(f"{bin_path} --test-threads=1", shell=True, cwd=str(work),
-                           capture_output=True, timeout=30, env=env)
+        p = run_target(f"{bin_path} --test-threads=1", str(work), shell=True, timeout=30, env=env)
         text = (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
         findings = RustPanicOracle().parse(text, target=root.name)
         shutil.rmtree(work.parent, ignore_errors=True)

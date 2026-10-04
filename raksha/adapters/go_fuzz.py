@@ -22,6 +22,7 @@ from pathlib import Path
 
 from ..finding import Finding, Frame, Reproducer, ReplayResult, utcnow
 from ..gate.target import BuildResult, RunResult, TestResult
+from ..sandbox import run_target
 from ..harness.entrypoints import Entrypoint, discover
 from ..oracles.go_panic import GoOracle
 
@@ -91,8 +92,7 @@ class GoFuzzTarget:
 
     def _sh(self, cmd: str, cwd: Path, timeout: float | None = None) -> RunResult:
         try:
-            p = subprocess.run(cmd, shell=True, cwd=str(cwd), capture_output=True,
-                               timeout=timeout or self.timeout, env=self.env)
+            p = run_target(cmd, str(cwd), shell=True, timeout=timeout or self.timeout, env=self.env)
             return RunResult(p.returncode, p.stdout, p.stderr)
         except subprocess.TimeoutExpired as e:
             return RunResult(-1, e.stdout or b"", e.stderr or b"", timed_out=True)
@@ -205,12 +205,11 @@ def go_autofuzz(target_root: str | Path, *, fuzztime_s: int = 10, max_entrypoint
         pkgpath = work / pkg_dir
         (pkgpath / "raksha_fuzz_test.go").write_text(synthesize_go_test(ep, _package_of(src)))
         env = _go_env()
-        if subprocess.run("go build ./...", shell=True, cwd=str(pkgpath), env=env,
-                          capture_output=True).returncode != 0:
+        if run_target("go build ./...", str(pkgpath), shell=True, env=env).returncode != 0:
             shutil.rmtree(work.parent, ignore_errors=True)
             continue
-        r = subprocess.run(f"go test -run='^$' -fuzz='FuzzRaksha' -fuzztime={fuzztime_s}s",
-                           shell=True, cwd=str(pkgpath), capture_output=True, env=env, timeout=fuzztime_s + 90)
+        r = run_target(f"go test -run='^$' -fuzz='FuzzRaksha' -fuzztime={fuzztime_s}s",
+                       str(pkgpath), shell=True, env=env, timeout=fuzztime_s + 90)
         text = (r.stdout + b"\n" + r.stderr).decode("utf-8", "replace")
         findings = GoOracle().parse(text, target=root.name)
         crasher = _read_latest_crasher(pkgpath / "testdata" / "fuzz" / "FuzzRaksha")

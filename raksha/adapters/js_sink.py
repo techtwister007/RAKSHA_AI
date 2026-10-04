@@ -33,6 +33,7 @@ from ..gate.target import CommandTarget
 from ..harness.entrypoints import Entrypoint, _name_bonus
 from ..harness.mutator import Fuzzer
 from ..oracles.js_sink import JsSinkOracle
+from ..sandbox import run_target
 
 _SKIP_DIRS = {".git", "node_modules", "dist", "build", "coverage", "__pycache__", ".venv",
               "test", "tests", "__tests__"}
@@ -156,15 +157,13 @@ def _js_runner(work: Path, entrypoint: Entrypoint):
 
     def run_one(data: bytes) -> bool:
         infile.write_bytes(data)
-        p = subprocess.run(["node", "jssinkguard.js", str(infile)], cwd=str(work),
-                           capture_output=True, timeout=30, env=env)
+        p = run_target(["node", "jssinkguard.js", str(infile)], str(work), timeout=30, env=env)
         return p.returncode == 99 or JsSinkOracle().detects(
             (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace"))
 
     def replay(data: bytes) -> str:
         infile.write_bytes(data)
-        p = subprocess.run(["node", "jssinkguard.js", str(infile)], cwd=str(work),
-                           capture_output=True, timeout=30, env=env)
+        p = run_target(["node", "jssinkguard.js", str(infile)], str(work), timeout=30, env=env)
         return (p.stdout + b"\n" + p.stderr).decode("utf-8", "replace")
 
     return run_one, replay
