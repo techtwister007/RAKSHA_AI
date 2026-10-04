@@ -23,3 +23,7 @@ raksha-java-slice.sarif
 raksha-buildfree.sarif
 submission/
 
+demo-targets/c-overflow/harness
+demo-targets/**/__pycache__/
+demo-targets/**/.raksha*
+raksha-*.sarif

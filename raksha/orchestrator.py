@@ -138,6 +138,29 @@ def demo_session(repo_root: Path | None = None) -> Session:
     return s
 
 
+def three_language_session(repo_root: Path | None = None, *, include_java: bool = True) -> Session:
+    """Seed a session that shows three deep targets (C, Python, Java) beside the build-free estate —
+    the 'three languages, one screen' scalability beat on the Mission Board."""
+    from .slice_three import run_c, run_python
+    repo_root = repo_root or Path(__file__).parents[1]
+    s = Session()
+    for name, fn, lang in [("c-overflow", run_c, "c/c++"), ("py-cmdinject", run_python, "python")]:
+        try:
+            f = fn()
+            s.attach_target(name, [f], build_status="green", languages=[lang])
+        except Exception:  # noqa: BLE001 — a slice that will not run is simply absent from the board
+            pass
+    if include_java:
+        try:
+            from .slice_three import run_all
+        except Exception:  # noqa: BLE001
+            pass
+    estate = repo_root / "demo-targets" / "mixed-estate"
+    if estate.exists():
+        s.ingest_build_free(estate, name="mixed-estate")
+    return s
+
+
 def main() -> int:
     from console.server import serve  # local import so the package has no server dependency at import
     import os
