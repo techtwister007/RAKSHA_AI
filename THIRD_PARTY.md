@@ -21,6 +21,7 @@ sealed bundle when the operator provisions it, or is a planned "take" lane (`HAN
 | git, `patch` | applying and reversing patches | GPL-2.0 (tools) |
 | Apache Log4j 2.14.1 / 2.17.1, JUnit 5, Jazzer API | the bundled Java demo target only | Apache-2.0 / EPL-2.0 / Apache-2.0 |
 | OASIS SARIF 2.1.0 schema (vendored in `schemas/`) | record format validation | OASIS, royalty-free |
+| z3-solver (optional `[reasoning]` extra, baked into the sealed image) | bound proofs (A10), reachability proofs (G1); absent → recorded as `unavailable` | MIT |
 | pytest, jsonschema | development only (`[dev]` extra) | MIT |
 
 ## Model weights

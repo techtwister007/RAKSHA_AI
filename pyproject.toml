@@ -14,6 +14,9 @@ dependencies = []
 # either stdlib or a tool invoked as a subprocess, which keeps the offline bundle small
 # and the air-gap claim easy to audit.
 dev = ["pytest>=8", "jsonschema>=4"]
+# Optional, import-with-fallback: the SMT solver behind the bound proofs (A10) and the
+# reachability lane (G1). Absent, those records read "unavailable" -- never "proved".
+reasoning = ["z3-solver>=4.12"]
 
 [tool.setuptools.packages.find]
 include = ["raksha*"]

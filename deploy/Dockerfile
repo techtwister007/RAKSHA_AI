@@ -18,8 +18,10 @@ COPY raksha/ ./raksha/
 COPY console/ ./console/
 COPY schemas/ ./schemas/
 COPY demo-targets/ ./demo-targets/
-# Runtime has no third-party Python deps by design. A failed install fails the build — never hidden.
-RUN pip install --no-cache-dir .
+# Runtime has no required third-party Python deps by design. The one optional extra, the SMT solver
+# (`reasoning`), is baked in here on the networked build machine so proofs run on the sealed node.
+# A failed install fails the build — never hidden.
+RUN pip install --no-cache-dir ".[reasoning]"
 
 # The offline model server (vLLM) is a separate service in the compose file. Targets are mounted
 # read-only at /targets; the jury submission and evidence bundles are written to /out.

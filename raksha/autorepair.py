@@ -294,6 +294,13 @@ def repair(finding: Finding, target: Target, *, root: str | Path, reproducer: by
             finding.rollback_proof = prove_rollback(root, finding.patch_diff)
         except Exception:  # noqa: BLE001 — additive evidence, never fatal
             finding.rollback_proof = None
+        if finding.bug_class in ("CWE-125", "CWE-787", "CWE-129", "CWE-119", "CWE-120",
+                                 "CWE-121", "CWE-122"):
+            try:   # G1: solver evidence on the guard (never a decider)
+                from .reachproof import reach_proof
+                finding.reach_proof = reach_proof(finding, root, finding.patch_diff)
+            except Exception:  # noqa: BLE001
+                finding.reach_proof = None
     finding.cpu_seconds = round(_cpu() - _cpu0, 3)
     try:
         finding.peak_rss_kb = _res.getrusage(_res.RUSAGE_SELF).ru_maxrss  # process peak (KB on Linux)
