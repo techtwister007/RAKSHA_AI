@@ -28,6 +28,21 @@ from ..oracles.base import Oracle
 from .entrypoints import Entrypoint, discover, rank_with_model
 from .forkserver import ForkClient, asan_env
 from .mutator import Fuzzer
+from ..minimise import minimise
+from ..signature import _owned as _owned_frames
+
+#: Files that are RAKSHA's own synthesized harness, never the target. A crash whose top owned frame
+#: sits in one of these is a harness artifact (B6), not a defect in the system under test.
+_HARNESS_FILES = ("raksha_harness", "raksha_fuzz", "raksha_sinkguard", "jssinkguard")
+
+
+def _crash_is_in_harness(finding) -> bool:
+    own = _owned_frames(finding.frames)
+    if not own:
+        return False
+    top = own[0]
+    base = (top.uri or "").rsplit("/", 1)[-1]
+    return any(h in base for h in _HARNESS_FILES)
 from .synth import Harness, quality_gate, synthesize
 
 
@@ -120,17 +135,34 @@ def _fuzz(ep, built, oracle, max_execs, seed_corpus):
     crashing = raw = None
     for cand in res.crashes:
         text = replay(cand)
-        if oracle.parse(text, target="<autofuzz>"):
-            crashing, raw = cand, text
-            break
+        parsed = oracle.parse(text, target="<autofuzz>")
+        if not parsed:
+            continue
+        # B6 attribution: a crash whose top owned frame is inside our synthesized harness is OUR
+        # bug, not the target's — drop it rather than report a false positive.
+        if _crash_is_in_harness(parsed[0]):
+            continue
+        # B6 agreement: require the input to fire the oracle again on a fresh run before trusting it.
+        if not oracle.parse(replay(cand), target="<autofuzz>"):
+            continue
+        crashing, raw = cand, text
+        break
     if crashing is None:
         return None
+    # B2: shrink the crashing input to a locally minimal one that still fires the oracle.
+    try:
+        reduced = minimise(crashing, lambda b: bool(oracle.parse(replay(b), target="<autofuzz>")))
+        if reduced and oracle.parse(replay(reduced), target="<autofuzz>"):
+            crashing = reduced
+    except Exception:  # noqa: BLE001 — minimisation is best-effort; the original crasher still stands
+        pass
+    raw = replay(crashing)
     findings = oracle.parse(raw, target=Path(work).name)
-    if not findings:
+    if not findings or _crash_is_in_harness(findings[0]):
         return None
     f = findings[0]
     f.attach_reproducer(Reproducer.from_bytes(
-        crashing, target.run_cmd.split(), minimised=False, detail=f"autofuzz: synthesized harness for {ep.symbol}"))
+        crashing, target.run_cmd.split(), minimised=True, detail=f"autofuzz: synthesized harness for {ep.symbol}"))
     f.record_replay_before(ReplayResult(oracle_fired=True, at=utcnow(),
                                          abort_signature=f.abort_signature, exit_code=1))
     f.confirm(reason=f"crash reproduced via a synthesized harness for {ep.symbol}")
