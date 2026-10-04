@@ -417,6 +417,25 @@ _C_ASSIGN = re.compile(r"(?:^|[;{]\s*|^\s*)(?:[\w\s\*]+?\b)?(\w+)\s*(?:\[[^\]]*\
 _GO_ASSIGN = re.compile(r"^\s*(?:var\s+)?(\w+)(?:\s*,\s*\w+)?\s*(?::=|=)(?!=)\s*(.+)$")
 
 
+_C_LITERAL = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'')
+
+
+def _sized_by(body: str, dest: str, length: str) -> bool:
+    """True when `dest` is assigned from malloc/calloc/realloc in this body with a size expression
+    that contains every identifier of the copy `length` (e.g. `copy = malloc(len + 1)` then
+    `memcpy(copy, data, len)`). Narrow on purpose: anything less obvious stays a hypothesis."""
+    d = re.sub(r"[()\s]|\(\s*\w+\s*\*?\s*\)", "", dest)
+    if not re.fullmatch(r"\w+", d or ""):
+        return False
+    ids = set(re.findall(r"[A-Za-z_]\w*", _C_LITERAL.sub("", length))) - {"size_t", "int", "unsigned", "long"}
+    if not ids:
+        return False
+    for m in re.finditer(rf"\b{re.escape(d)}\s*=\s*(?:\([^)]*\)\s*)?(?:malloc|calloc|realloc)\s*\(([^;]*)\)\s*;", body):
+        if ids <= set(re.findall(r"[A-Za-z_]\w*", m.group(1))):
+            return True
+    return False
+
+
 def _scan_c(text: str, rel: str, graph: Graph) -> list[StructuralPath]:
     paths: list[StructuralPath] = []
     for m in _C_FUNC.finditer(text):
@@ -460,8 +479,12 @@ def _scan_c(text: str, rel: str, graph: Graph) -> list[StructuralPath]:
             args = _split_args(_call_span(body, cm.end() - 1))
             if len_idx is not None and len_idx < len(args) and "sizeof" in args[len_idx]:
                 continue                          # bounded by the destination's size
-            hits = [t for i in idx if i < len(args)
-                    for t in tainted if re.search(rf"\b{re.escape(t)}\b", args[i])]
+            if len_idx is not None and len_idx < len(args) and args and _sized_by(body, args[0], args[len_idx]):
+                continue                          # the destination was allocated to hold that length
+            # string/char literals carry no data flow: a tainted `n` must not match the `n` in "\n"
+            code_args = [_C_LITERAL.sub('""', a) for a in args]
+            hits = [t for i in idx if i < len(code_args)
+                    for t in tainted if re.search(rf"\b{re.escape(t)}\b", code_args[i])]
             if not hits:
                 continue
             hit = sorted(hits, key=lambda t: (-len(tainted[t][1]), t))[0]

@@ -293,3 +293,24 @@ def test_new_lanes_add_no_false_positives_on_negative_controls(tmp_path, monkeyp
     # Transitive lane (offline, deterministic fallback): every control version is patched
     monkeypatch.setattr(transitive, "_run", lambda *a, **k: None)
     assert transitive.scan_transitive(tmp_path) == []
+
+
+def test_git_history_of_a_subdirectory_stays_inside_it(tmp_path):
+    """A target that is a subdirectory of a larger repo: only its own history, paths relative to it."""
+    import shutil
+    import subprocess
+    if shutil.which("git") is None:
+        import pytest
+        pytest.skip("git absent")
+    from raksha.lanes.githistory import scan_git_history
+    repo = tmp_path / "repo"; (repo / "svc").mkdir(parents=True); (repo / "other").mkdir()
+    g = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)
+    g("init", "-q"); g("config", "user.email", "t@t"); g("config", "user.name", "t")
+    (repo / "svc" / "app.cfg").write_text('password = "S3cretValue99"\n')
+    (repo / "other" / "x.cfg").write_text('password = "0therSecret77"\n')
+    g("add", "-A"); g("commit", "-q", "-m", "a")
+    (repo / "svc" / "app.cfg").write_text("password = env\n")
+    (repo / "other" / "x.cfg").write_text("password = env\n")
+    g("add", "-A"); g("commit", "-q", "-m", "b")
+    found = scan_git_history(repo / "svc")
+    assert [f.target for f in found] == ["app.cfg"]

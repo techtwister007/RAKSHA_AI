@@ -179,3 +179,21 @@ def test_graph_json_unreachable_is_none_not_zero():
     res = structure.scan_structure(DEMO / "go-decoder")
     g = structure.graph_json(res)
     assert res.paths == [] and all(n["distance_to_sink"] is None for n in g["nodes"])
+
+
+def test_a_tainted_name_inside_a_string_literal_is_not_a_flow():
+    """`printf("sum=%d\\n", r)` must not read as tainted because `n` appears in the escape `\\n`."""
+    from raksha.lanes.structure import scan_file
+    src = ('int main(int argc, char **argv) {\n  char data[64];\n  size_t n = fread(data, 1, 64, stdin);\n'
+           '  printf("sum=%d\\n", 1);\n  printf("src/x.c:11\\n");\n  return 0;\n}\n')
+    assert [p for p in scan_file(src, "h.c") if p.cwe == "CWE-134"] == []
+
+
+def test_a_copy_into_a_buffer_allocated_for_that_length_is_not_flagged():
+    from raksha.lanes.structure import scan_file
+    ok = ("int stash(const unsigned char *data, int len) {\n  char *copy = (char *) malloc((size_t) len + 1);\n"
+          "  memcpy(copy, data, (size_t) len);\n  return 0;\n}\n")
+    bad = ("int stash(const unsigned char *data, int len) {\n  char copy[16];\n"
+           "  memcpy(copy, data, (size_t) len);\n  return 0;\n}\n")
+    assert [p for p in scan_file(ok, "s.c") if p.cwe == "CWE-120"] == []
+    assert [p for p in scan_file(bad, "s.c") if p.cwe == "CWE-120"]

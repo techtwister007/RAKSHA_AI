@@ -161,18 +161,25 @@ def scan_git_history(root: str | Path, max_commits: int = 200) -> list[Finding]:
     root = Path(root)
     if not _is_repo(root):
         return []
-    log = _git(root, ["log", f"--max-count={max_commits}", "--format=%H"])
+    # The target may be a subdirectory of a larger repository: walk only ITS history, and report
+    # paths relative to the target, as every other lane does (and as the working-tree check keys them).
+    prefix = (_git(root, ["rev-parse", "--show-prefix"]) or "").strip()
+    log = _git(root, ["log", f"--max-count={max_commits}", "--format=%H", "--", "."])
     if not log:
         return []
     present = _working_tree_values(root)
     findings: list[Finding] = []
     seen: set[tuple[str, str]] = set()                 # (value, path) — most recent commit wins
     for commit in (c.strip() for c in log.splitlines() if c.strip()):
-        diff = _git(root, ["show", "--no-color", "--format=", "--unified=0", commit])
+        diff = _git(root, ["show", "--no-color", "--format=", "--unified=0", commit, "--", "."])
         if not diff:
             continue
         by_file: dict[str, list[tuple[int, str]]] = {}
         for path, line_no, line in _added_lines(diff):
+            if prefix:
+                if not path.startswith(prefix):
+                    continue
+                path = path[len(prefix):]
             by_file.setdefault(path, []).append((line_no, line))
         for path, lines in by_file.items():
             blob = "\n".join(text for _ln, text in lines)
