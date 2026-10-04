@@ -128,3 +128,71 @@ def _verified_recommendation(roe: RoeLevel) -> str:
     if roe is RoeLevel.R2:
         return "Approve deployment of the proven patch (ROE R2: staged, awaiting sign-off)."
     return "Note autonomous deployment of the proven patch under standing orders (ROE R3)."
+
+
+# ---------------------------------------------------------------- F10: the full Hindi brief
+
+def _glossary() -> dict:
+    import json
+    from pathlib import Path
+    return json.loads((Path(__file__).parent / "data" / "glossary_hi.json").read_text(encoding="utf-8"))
+
+
+def jssd_brief_hi(f: Finding, *, serial: int = 1) -> str:
+    """The whole Commander's Brief in Hindi, composed from the glossary. Facts (CWE, location,
+    numbers, vectors) are the record's own; the finding's technical message stays in English and
+    is marked as such rather than machine-translated."""
+    g = _glossary()["brief"]
+    sev = g["severity"].get(f.severity.lower(), f.severity)
+    site = f.fix_site_set[0] if f.fix_site_set else None
+    where = one_line(f"{site.uri}:{site.start_line}" if site and site.start_line else (site.uri if site else f.target))
+    kind = f.reproducer.kind.replace("-", " ") if f.reproducer else "none"
+    lines = [g["restricted"], "", g["title"], f"{g['serial']} {serial:03d}", "",
+             g["subject"].format(target=one_line(f.target), sev=sev, cwe=f.bug_class), "",
+             g["situation"],
+             g["nature"].format(message=one_line(f.message, 600)),
+             g["location"].format(where=where),
+             g["evidence"].format(evidence=g["evidence_kind"].get(kind, kind))]
+    try:
+        from .cvss import attack_map, derive
+        sv, tm = derive(f), attack_map(f)
+        lines.append(g["severity_line"].format(
+            score=sv["cvss31"]["base_score"], band=sv["cvss31"]["severity"], vector=sv["cvss40"]["vector"],
+            tech=", ".join(t["id"] for t in tm["attack"]) or "—"))
+    except Exception:  # noqa: BLE001
+        pass
+    lines += ["", g["action"]]
+    if f.status is Status.VERIFIED:
+        lines += [g["verified"][0], g["verified"][1].format(test=g["with_test"] if f.regression_test else ""),
+                  g["verified"][2].format(roe=f.roe_level.value)]
+        reco = g["reco"].get(f.roe_level.value, g["reco"]["R1"])
+    elif f.status is Status.REPORT_ONLY:
+        lines += list(g["report_only"])
+        reco = g["reco"]["report_only"]
+    else:
+        lines += list(g["pending"])
+        reco = g["reco"]["pending"]
+    try:
+        from .method import cycles
+        cs = cycles(f)
+    except Exception:  # noqa: BLE001
+        cs = []
+    if cs:
+        n = sum(1 for ln in lines if ln.startswith("     3.")) + 1
+        sup = sum(1 for c in cs if c["conclusion"].startswith("supported")
+                  or "patch held" in c["conclusion"])
+        ref = sum(1 for c in cs if c["conclusion"].startswith("refuted"))
+        lines.append(g["method"].format(n=n, total=len(cs), supported=sup, refuted=ref))
+    lines += ["", g["recommendation"].format(reco=reco), "", g["attachments"], "", g["footer"], g["restricted"]]
+    return "\n".join(lines)
+
+
+def plain_summary_hi(f: Finding) -> str:
+    g = _glossary()["brief"]
+    key = f.status.value if f.status.value in g["plain"] else "OTHER"
+    return g["plain"][key].format(sev=g["severity"].get(f.severity.lower(), f.severity),
+                                  cwe=f.bug_class, target=one_line(f.target))
+
+
+def console_labels_hi() -> dict:
+    return _glossary()["labels"]

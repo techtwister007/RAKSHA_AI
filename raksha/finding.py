@@ -416,6 +416,11 @@ class Finding:
     #: G3: the proven fix in another language this finding's repair drew on (similarity, idea,
     #: which vector backend ranked it), or None.
     retrieved_from: dict | None = None
+    #: F7: every operator decision on this finding (approve / reject / false-positive / red-team
+    #: re-run / export), with who, when and why. Append-only; never changes status by itself.
+    operator_actions: list[dict] = field(default_factory=list)
+    #: F7/F14: set when an operator marks the finding a false positive, with their reason.
+    disputed: str | None = None
 
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: datetime = field(default_factory=utcnow)
@@ -791,6 +796,8 @@ class Finding:
             "rollback_proof": self.rollback_proof,
             "reach_proof": self.reach_proof,
             "retrieved_from": self.retrieved_from,
+            "operator_actions": list(self.operator_actions),
+            "disputed": self.disputed,
             "method": _method_cycles(self),
             **_severity_language(self),
             "assurance": {

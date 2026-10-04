@@ -152,6 +152,7 @@ def snapshot_finding(f: Finding) -> dict:
         "mission_impact": f.mission_impact, "chain_ids": list(f.chain_ids),
         "evidence_score": f.evidence_score, "parliament": f.parliament, "red_team": f.red_team,
         "frontier": list(f.frontier), "roe_level": f.roe_level.value,
+        "operator_actions": list(f.operator_actions), "disputed": f.disputed,
         "history": [{"from": t.from_status.value if t.from_status else None, "to": t.to_status.value,
                      "at": t.at.isoformat(), "reason": t.reason} for t in f.history],
     }
@@ -193,6 +194,7 @@ def finding_from_snapshot(d: dict) -> Finding:
         mission_impact=d.get("mission_impact"), chain_ids=list(d.get("chain_ids", [])),
         evidence_score=d.get("evidence_score"), parliament=d.get("parliament"),
         red_team=d.get("red_team"), frontier=list(d.get("frontier", [])),
+        operator_actions=list(d.get("operator_actions", [])), disputed=d.get("disputed"),
         roe_level=RoeLevel(d["roe_level"]), id=d["id"], created_at=dt(d["created_at"]),
         history=history, _status=Status(d["status"]),
     )

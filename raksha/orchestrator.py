@@ -62,6 +62,9 @@ class Target:
         return "finding"
 
 
+_EVENT_CAP = 5000
+
+
 @dataclass
 class Session:
     targets: list[Target] = field(default_factory=list)
@@ -86,6 +89,12 @@ class Session:
     #: The append-only, hash-chained session journal (W0-1). None keeps the session journal-free
     #: (tests, the demo); set it via open_journal() or the journal_path argument to record and resume.
     journal: "_journal.Journal | None" = None
+    #: F1: the live event stream the console narrates — always kept in memory (bounded), whether or
+    #: not a journal is open. The journal remains the durable, hash-chained record.
+    events: list = field(default_factory=list)
+    #: F7: what a red-team re-run needs per finding (target, reproducer, corpus), kept while the
+    #: session lives; absent for findings ingested without a live target.
+    _rerun_ctx: dict = field(default_factory=dict, repr=False)
 
     def open_journal(self, path: str | Path) -> None:
         """Begin (or continue) journalling pipeline events to `path`."""
@@ -93,13 +102,45 @@ class Session:
         self.emit("session_open", targets=len(self.targets), findings=len(self.findings))
 
     def emit(self, kind: str, **fields) -> None:
-        """Append one event to the journal if one is open; a no-op otherwise. Never raises."""
+        """Record one pipeline event: in the bounded in-memory stream the console narrates, and in
+        the journal when one is open. Never raises."""
+        try:
+            light = {k: v for k, v in fields.items() if k not in ("snapshot", "findings")}
+            self.events.append({"seq": (self.events[-1]["seq"] + 1) if self.events else 1,
+                                "at": utcnow().isoformat(), "kind": kind, **light})
+            if len(self.events) > _EVENT_CAP:
+                del self.events[: len(self.events) - _EVENT_CAP]
+        except Exception:  # noqa: BLE001
+            pass
         if self.journal is None:
             return
         try:
             self.journal.emit(kind, **fields)
         except Exception:  # noqa: BLE001 — journalling must never take the run down
             pass
+
+    def _emit_story(self, f: Finding, target: str) -> None:
+        """F1: the repair rounds and verdict of one finding, as events the console narrates."""
+        rounds: list[list] = []
+        for g in f.gate_history:
+            if g.check.value == "COMPILES" or not rounds:
+                rounds.append([])
+            rounds[-1].append(g)
+        lanes = [lane.value for lane in f.lane_history]
+        for i, rnd in enumerate(rounds):
+            failed = next((g for g in rnd if not g.passed), None)
+            self.emit("candidate_gated", target=target, finding=f.id, round=i + 1,
+                      lane=lanes[i] if i < len(lanes) else None,
+                      passed=failed is None and len(rnd) >= 5,
+                      failed_check=failed.check.value if failed else None,
+                      reason=(failed.detail or "")[:200] if failed else None)
+        for reason in f.rejected_candidates:
+            self.emit("candidate_refused", target=target, finding=f.id, reason=str(reason)[:200])
+        self.emit("finding_status", target=target, finding=f.id, status=f.status.value,
+                  bug_class=f.bug_class, lane=f.repair_lane.value if f.repair_lane else None)
+        if f.red_team:
+            self.emit("red_team_round", target=target, finding=f.id, held=f.red_team.get("held"),
+                      attempts=f.red_team.get("attempts"), wins=f.red_team.get("wins"))
 
     def _journal_finding(self, f: Finding, event: str) -> None:
         self.emit(event, finding=f.id, status=f.status.value, bug_class=f.bug_class,
@@ -189,6 +230,11 @@ class Session:
             t.finding_ids.append(f.id)
         self.targets.append(t)
         self._annotate_evidence()
+        lanes: dict[str, int] = {}
+        for f in found:
+            lanes[f.oracle.split(":", 1)[0]] = lanes.get(f.oracle.split(":", 1)[0], 0) + 1
+        self.emit("build_free_scanned", target=name, count=len(found),
+                  proven=sum(1 for f in found if f.is_reportable), lanes=lanes)
         return t
 
     def ingest(self, root: str | Path, runner=None, *, name: str | None = None,
@@ -328,8 +374,15 @@ class Session:
         from .autorepair import repair as _repair
         root = Path(root)
         name = name or root.name
+        self.emit("autofuzz_started", target=name)
         r = _dispatch_autofuzz(root)
+        ep = getattr(r, "entrypoint", None)
+        ep = getattr(ep, "ep", ep)
+        if ep is not None:
+            self.emit("harness_synthesized", target=name, symbol=getattr(ep, "symbol", None),
+                      language=getattr(ep, "language", None))
         if not r.found:
+            self.emit("autofuzz_no_crash", target=name, note=str(getattr(r, "note", ""))[:200])
             demoted = list(getattr(r, "demoted", []))
             if demoted:   # B7: shown as SUSPECTED with the contract reason, never reported
                 t = self.attach_target(name, demoted, build_status="amber", roe=roe)
@@ -340,6 +393,11 @@ class Session:
             self.targets.append(t)
             return t
         f = r.finding
+        site = f.fix_site_set[0] if f.fix_site_set else None
+        self.emit("crash_confirmed", target=name, finding=f.id, bug_class=f.bug_class, oracle=f.oracle,
+                  site=(f"{site.uri}:{site.start_line}" if site and site.start_line else None),
+                  size=f.reproducer.size_bytes if f.reproducer else None)
+        self._rerun_ctx[f.id] = (r.target, r.crashing_input, list(corpus or [b"ok", b"test", b"\x01\x02"]))
         if repair_it:
             _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
                     corpus=(corpus or [b"ok", b"test", b"\x01\x02"]) + list(getattr(r, "benign_corpus", [])))
@@ -357,6 +415,7 @@ class Session:
                     r.target.discard(r.target.build(None))
                 except Exception:  # noqa: BLE001
                     pass
+            self._emit_story(f, name)
         return self.attach_target(name, [f], build_status="green",
                                   languages=[f.language])
 
@@ -468,9 +527,12 @@ class Session:
         f = self.findings.get(finding_id)
         if f is None or not f.is_reportable:
             return None
-        from .brief import _HINDI
-        return {"id": f.id, "plain": plain_summary(f), "jssd": jssd_brief(f, hindi=True),
-                "hindi": _HINDI.get(f.status, "सुभेद्यता पाई गई।")}
+        from .brief import jssd_brief_hi, plain_summary_hi
+        return {"id": f.id,
+                "en": {"plain": plain_summary(f), "jssd": jssd_brief(f)},
+                "hi": {"plain": plain_summary_hi(f), "jssd": jssd_brief_hi(f)},
+                # kept for older callers: the English brief with the Hindi headline appended
+                "plain": plain_summary(f), "jssd": jssd_brief(f, hindi=True)}
 
     def bundle_dir(self, finding_id: str) -> Path | None:
         """The finding's sealed evidence bundle — built once, then kept, so it can be re-verified."""
@@ -610,6 +672,74 @@ class Session:
         self.emit("finding_marked_wrong", finding=finding_id, demoted=n)
         return n
 
+    # -- F7: operator actions — each one recorded on the finding and in the event stream ----------
+    def _operator(self, finding_id: str, action: str, actor: str, reason: str | None, **extra) -> dict:
+        f = self.findings.get(finding_id)
+        if f is None:
+            return {"ok": False, "error": "no such finding"}
+        entry = {"action": action, "actor": (actor or "operator")[:80], "at": utcnow().isoformat(),
+                 "reason": (reason or "")[:500] or None, **extra}
+        f.operator_actions.append(entry)
+        self.emit(f"operator_{action}", finding=finding_id, actor=entry["actor"], reason=entry["reason"],
+                  **extra)
+        self.checkpoint()
+        return {"ok": True, "finding": finding_id, **entry}
+
+    def approve(self, finding_id: str, *, actor: str, reason: str | None = None) -> dict:
+        """Record a human sign-off on a VERIFIED fix (what the ROE/authority model asks for). It
+        authorises deployment through the asset's change process; it does not deploy anything."""
+        f = self.findings.get(finding_id)
+        if f is None or f.status is not Status.VERIFIED:
+            return {"ok": False, "error": "only a VERIFIED fix can be approved"}
+        return self._operator(finding_id, "approved", actor, reason)
+
+    def reject(self, finding_id: str, *, actor: str, reason: str) -> dict:
+        """Refuse a fix, with a reason. A rejected VERIFIED fix is also demoted from the fix memory
+        (E7) so its shape is never offered again."""
+        if not (reason or "").strip():
+            return {"ok": False, "error": "a rejection needs a reason"}
+        f = self.findings.get(finding_id)
+        demoted = 0
+        if f is not None and f.status is Status.VERIFIED:
+            from .retrieval import default_memory
+            demoted = default_memory().demote(f)
+        return self._operator(finding_id, "rejected", actor, reason, demoted=demoted)
+
+    def mark_false_positive(self, finding_id: str, *, actor: str, reason: str) -> dict:
+        """An operator disputes a finding. Status is the gate's and is not changed; the dispute is
+        recorded, shown everywhere the finding is, and counted against its lane (F14)."""
+        if not (reason or "").strip():
+            return {"ok": False, "error": "a false-positive mark needs a reason"}
+        f = self.findings.get(finding_id)
+        if f is None:
+            return {"ok": False, "error": "no such finding"}
+        f.disputed = reason.strip()[:500]
+        return self._operator(finding_id, "false_positive", actor, reason)
+
+    def rerun_red_team(self, finding_id: str, *, actor: str, rounds: int = 120, seconds: float = 4.0) -> dict:
+        """Run the independent red team again against a VERIFIED patch."""
+        f = self.findings.get(finding_id)
+        if f is None or f.status is not Status.VERIFIED:
+            return {"ok": False, "error": "only a VERIFIED patch can be red-teamed"}
+        ctx = self._rerun_ctx.get(finding_id)
+        if ctx is None:
+            return {"ok": False, "error": "the target this finding came from is not held by this session"}
+        target, reproducer, corpus = ctx
+        from .redteam import red_round
+        red_round(f, target, reproducer=reproducer, corpus=corpus, rounds=rounds, seconds=seconds)
+        rt = f.red_team or {}
+        self.emit("red_team_round", target=f.target, finding=f.id, held=rt.get("held"),
+                  attempts=rt.get("attempts"), wins=rt.get("wins"))
+        return self._operator(finding_id, "red_team_rerun", actor, None, held=rt.get("held"),
+                              attempts=rt.get("attempts"))
+
+    def export_bundle(self, finding_id: str, *, actor: str) -> dict:
+        """Seal (or re-use) the finding's evidence bundle and report where it is."""
+        out = self.bundle_dir(finding_id)
+        if out is None:
+            return {"ok": False, "error": "only a reportable finding has a bundle"}
+        return self._operator(finding_id, "exported", actor, None, path=str(out))
+
     def save_memory(self, path=None):
         """E5: persist the fix memory so a learned fix survives a reboot."""
         from .retrieval import default_memory
@@ -655,12 +785,34 @@ class Session:
         return {"stages": res.stages, "reduction_ratio": res.reduction_ratio,
                 "top": [f.id for f in res.kept]}
 
+    def event_log(self) -> list[dict]:
+        """F1: the live run narrative, newest first."""
+        from . import console_api
+        return console_api.event_log(self)
+
+    def lane_trust(self) -> dict:
+        """F14: each lane's measured record on this estate."""
+        from . import console_api
+        return console_api.lane_trust(self.findings.values())
+
+    def estate_map(self) -> dict:
+        """F9: targets by asset tier against status, with the top three risks."""
+        from . import console_api
+        return console_api.estate_map(self)
+
+    def two_voices(self, finding_id: str) -> dict | None:
+        """F13: the staff-officer and engineer renderings of one finding."""
+        from . import console_api
+        f = self.findings.get(finding_id)
+        return console_api.two_voices(f) if f is not None else None
+
     def snapshot(self) -> dict:
         return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
                 "risk": self.risk_register(), "pipeline": self.pipeline_stages(),
                 "attack_graph": self.attack_graph(), "pqc": self.pqc_report(),
                 "triage": self.triage(), "structure": self.structure_summaries,
-                "fleet": self.fleet_rollup()}
+                "fleet": self.fleet_rollup(), "events": self.event_log(),
+                "lane_trust": self.lane_trust(), "estate_map": self.estate_map()}
 
 
 def _dispatch_autofuzz(root: Path):

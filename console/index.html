@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RAKSHA Console</title>
+<meta name="raksha-token" content="__RAKSHA_TOKEN__">
 <!--
   Operator console for RAKSHA AI. Served entirely offline by console/server.py.
-  No external asset of any kind — no CDN, no web font, no remote script — because a console that
-  phoned out would contradict the air-gap claim. The air-gap guard (raksha/airgap.py) enforces this.
-  System fonts, inline CSS/JS, inline SVG. Theme-aware. Three screens: Mission Board, Finding
-  Detail (the money screen), Scorecard (left visible during judging).
+  No external asset of any kind (no CDN, no web font, no remote script): a console that phoned out
+  would contradict the air-gap claim. The air-gap guard (raksha/airgap.py) enforces this.
+  System fonts, inline CSS/JS, inline SVG. Theme-aware, with a high-contrast projector mode and an
+  English/Hindi toggle. Screens: Mission Board, Live Pipeline, Event Log, Finding Detail (the money
+  screen), Attack Graph, Estate Map, Post-Quantum, Evidence Vault, Scorecard, Commander's Brief.
 -->
 <style>
   :root{
@@ -19,49 +21,75 @@
     --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  @media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="contrast"]){
     --bg:#f3f5f0; --panel:#fff; --panel2:#e8ebe4; --line:#c9cfc6;
     --fg:#1a2420; --dim:#5b6660; --faint:#8a948c;
     --green:#2c6540; --amber:#9c5f14; --red:#993024; --violet:#474785; --blue:#2f5f86;
   }}
+  /* F11: high-contrast projector theme — pure black on white, heavy lines, brighter accents */
+  :root[data-theme="contrast"]{
+    --bg:#fff; --panel:#fff; --panel2:#f0f0f0; --line:#000;
+    --fg:#000; --dim:#222; --faint:#444;
+    --green:#0a7a2f; --amber:#8a4b00; --red:#b00000; --violet:#3a1a8a; --blue:#004a99;
+  }
+  :root[data-theme="contrast"] .card,:root[data-theme="contrast"] .kpi,
+  :root[data-theme="contrast"] .flist,:root[data-theme="contrast"] .detail,
+  :root[data-theme="contrast"] .stage,:root[data-theme="contrast"] .gate{border-width:2px}
+  :root[data-theme="contrast"] body{font-size:15px}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
   body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.5;
        -webkit-font-smoothing:antialiased}
   .app{display:flex;flex-direction:column;height:100%}
 
-  header{display:flex;align-items:center;gap:16px;padding:12px 18px;border-bottom:1.5px solid var(--line);
+  header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1.5px solid var(--line);
          background:var(--panel);flex-wrap:wrap}
   header h1{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:0}
   header h1 .sub{font-weight:400;color:var(--dim);font-size:12px;margin-left:8px}
-  .badges{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+  .badges{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .badge{font-family:var(--mono);font-size:11px;letter-spacing:.04em;padding:4px 9px;border-radius:3px;
          border:1px solid var(--line);background:var(--panel2);color:var(--dim);white-space:nowrap}
   .badge b{color:var(--green);font-weight:700}
   .badge b.warn,.zerobadge.warn .n{color:var(--amber)} .zerobadge.warn{border-color:var(--amber)}
+  .ctl{font-family:var(--mono);font-size:11px;border:1px solid var(--line);background:var(--panel2);
+       color:var(--fg);border-radius:3px;padding:4px 8px;cursor:pointer}
+  .ctl[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+  #search{min-width:150px}
   nav.tabs{display:flex;gap:4px;padding:0 18px;border-bottom:1.5px solid var(--line);background:var(--panel);
            overflow-x:auto}
   nav.tabs button{background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);
-           font-family:var(--mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;
-           padding:10px 12px;cursor:pointer;white-space:nowrap}
+           font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+           padding:10px 11px;cursor:pointer;white-space:nowrap}
   nav.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--amber)}
-  .frow.sel{outline:2px solid var(--amber);outline-offset:-2px}
   main{flex:1;overflow:auto;padding:18px;min-height:0}
+  section[hidden]{display:none}
+  h2{font-size:13px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
+     margin:0 0 12px;font-weight:600}
+  .empty{color:var(--faint);font-style:italic}
+
   /* live pipeline */
   .pipe{display:flex;gap:0;flex-wrap:wrap;align-items:stretch}
   .stage{flex:1 1 120px;min-width:110px;border:1px solid var(--line);border-radius:5px;background:var(--panel);
          padding:12px;margin:4px;text-align:center}
   .stage .n{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
   .stage .s{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:4px}
-  .stage.on{border-color:var(--amber)} .stage .arrow{color:var(--faint)}
+  .stage.on{border-color:var(--amber)}
+
+  /* F1 event log */
+  .log{border:1px solid var(--line);border-radius:5px;background:var(--panel);overflow:hidden;font-family:var(--mono);font-size:12px}
+  .ev{display:grid;grid-template-columns:auto auto 1fr;gap:10px;padding:6px 12px;border-bottom:1px solid var(--line);align-items:baseline}
+  .ev:last-child{border-bottom:none}
+  .ev .t{color:var(--faint);font-size:10.5px}
+  .ev .dot{width:7px;height:7px;border-radius:50%;align-self:center}
+  .ev.ok .dot{background:var(--green)} .ev.warn .dot,.ev.alert .dot{background:var(--amber)}
+  .ev.info .dot{background:var(--blue)} .ev.dim .dot{background:var(--faint)}
+  .ev.alert .x{color:var(--red)} .ev.ok .x{color:var(--green)}
+
   .verify-btn{font-family:var(--mono);font-size:11px;border:1px solid var(--green);color:var(--green);
          background:none;border-radius:3px;padding:4px 10px;cursor:pointer}
   .verify-ok{color:var(--green);font-weight:600} .verify-bad{color:var(--red);font-weight:600}
   pre.brief{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:12px;
-         overflow:auto;font-family:var(--mono);font-size:11.5px;line-height:1.5;white-space:pre-wrap;max-height:60vh}
-  section[hidden]{display:none}
-  h2{font-size:13px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);
-     margin:0 0 12px;font-weight:600}
+         overflow:auto;font-family:var(--mono);font-size:11.5px;line-height:1.5;white-space:pre-wrap;max-height:58vh}
 
   /* mission board */
   .board{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
@@ -71,32 +99,34 @@
   .card h3{margin:0 0 3px;font-size:15px}
   .card .langs{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-bottom:10px}
   .card .row{display:flex;justify-content:space-between;align-items:baseline;margin-top:4px}
-  .card .k{font-size:11px;color:var(--faint)}
-  .card .v{font-family:var(--mono);font-size:12px}
-  .pill{font-family:var(--mono);font-size:10px;letter-spacing:.05em;padding:2px 7px;border-radius:10px;
-        text-transform:uppercase}
+  .card .k{font-size:11px;color:var(--faint)} .card .v{font-family:var(--mono);font-size:12px}
+  .pill{font-family:var(--mono);font-size:10px;letter-spacing:.05em;padding:2px 7px;border-radius:10px;text-transform:uppercase}
   .pill.green{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green)}
   .pill.amber{background:color-mix(in srgb,var(--amber) 20%,transparent);color:var(--amber)}
   .pill.red{background:color-mix(in srgb,var(--red) 20%,transparent);color:var(--red)}
   .card .note{font-size:11px;color:var(--faint);margin-top:9px;font-style:italic}
 
   /* findings list + detail */
-  .split{display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:16px;align-items:start}
+  .split{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:16px;align-items:start}
   @media (max-width:760px){.split{grid-template-columns:1fr}}
-  .flist{border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel)}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .filters select{font-family:var(--mono);font-size:11px;background:var(--panel2);color:var(--fg);
+         border:1px solid var(--line);border-radius:3px;padding:3px 6px}
+  .flist{border:1px solid var(--line);border-radius:5px;overflow:hidden;background:var(--panel);max-height:70vh;overflow-y:auto}
   .frow{display:grid;grid-template-columns:auto 1fr;gap:9px;padding:9px 12px;border-bottom:1px solid var(--line);
         cursor:pointer;align-items:baseline}
   .frow:last-child{border-bottom:none}
-  .frow:hover{background:var(--panel2)} .frow[aria-selected="true"]{background:var(--panel2)}
+  .frow:hover{background:var(--panel2)} .frow[aria-selected="true"],.frow.sel{background:var(--panel2);outline:2px solid var(--amber);outline-offset:-2px}
   .frow .sev{width:8px;height:8px;border-radius:50%;margin-top:5px}
   .sev.critical,.dot.critical{background:var(--red)} .sev.high,.dot.high{background:var(--amber)}
-  .sev.medium,.dot.medium{background:var(--blue)} .sev.low,.dot.low{background:var(--faint)}
+  .sev.medium,.dot.medium{background:var(--blue)} .sev.low,.dot.low,.sev.info{background:var(--faint)}
   .frow .fmsg{font-size:12.5px;min-width:0}
   .frow .fmeta{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:2px}
+  .frow .disp{color:var(--red);font-size:10px;font-family:var(--mono)}
   .detail{border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:16px;min-width:0}
-  .detail .empty{color:var(--faint);font-style:italic}
   .detail h3{margin:0 0 2px;font-size:16px}
-  .detail .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:14px}
+  .detail .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
+  .voices{display:flex;gap:6px;margin-bottom:12px}
   .replay{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
   @media (max-width:520px){.replay{grid-template-columns:1fr}}
   .pane{border-radius:5px;padding:12px;border:1px solid var(--line)}
@@ -104,7 +134,7 @@
   .pane.fixed{background:color-mix(in srgb,var(--green) 10%,transparent);border-color:var(--green)}
   .pane .lab{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
   .pane.vuln .lab{color:var(--red)} .pane.fixed .lab{color:var(--green)}
-  .pane .big{font-size:15px;font-weight:600}
+  .pane .big{font-size:15px;font-weight:600} .pane .mono{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px;word-break:break-all}
   .gate{margin:14px 0;border:1px solid var(--line);border-radius:5px;overflow:hidden}
   .gate .g{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:12.5px}
   .gate .g:last-child{border-bottom:none}
@@ -114,377 +144,166 @@
   pre.diff{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:10px;overflow:auto;
            font-family:var(--mono);font-size:11.5px;line-height:1.45;max-height:260px}
   pre.diff .add{color:var(--green)} pre.diff .del{color:var(--red)}
-  .hindi-head{font-size:16px;font-weight:600;color:var(--amber);margin:0 0 8px}
-  .rounds{margin:10px 0}.rounds .r{font-family:var(--mono);font-size:12px;color:var(--dim);padding:3px 0}
-  .rounds .chosen{color:var(--green)} .kbd-hint{font-size:11px;color:var(--dim);margin-left:auto}
+  .lab{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:14px 0 6px}
+  .rounds .r{font-family:var(--mono);font-size:12px;color:var(--dim);padding:3px 0}
+  .rounds .chosen{color:var(--green)}
   .evidence{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0;padding-top:12px;border-top:1px solid var(--line)}
+  .act{font-family:var(--mono);font-size:11px;border-radius:3px;padding:6px 11px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--fg)}
+  .act.ok{border-color:var(--green);color:var(--green)} .act.bad{border-color:var(--red);color:var(--red)}
+  .act:disabled{opacity:.4;cursor:not-allowed}
+  .actlog{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px}
+  .banner{border-left:3px solid var(--red);background:color-mix(in srgb,var(--red) 10%,transparent);
+          padding:8px 12px;margin-bottom:12px;font-size:12.5px}
+
+  /* F2 attack graph */
+  .ag-wrap{border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:10px;overflow:auto}
+  .ag svg{display:block;width:100%;height:auto}
+  .ag .node rect{fill:var(--panel2);stroke:var(--line);stroke-width:1.5}
+  .ag .node.crit rect{stroke:var(--red)} .ag .node text{fill:var(--fg);font-family:var(--mono);font-size:11px}
+  .ag .node .cwe{fill:var(--dim);font-size:9.5px}
+  .ag .edge{stroke:var(--faint);stroke-width:1.4;fill:none}
+  .ag .edge.lit{stroke:var(--amber);stroke-width:2.6}
+  .ag-legend{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px}
+  #ag-tip{position:fixed;pointer-events:none;background:var(--panel2);border:1px solid var(--amber);
+          border-radius:4px;padding:5px 9px;font-family:var(--mono);font-size:11px;max-width:320px;display:none;z-index:9}
+
+  /* F9 estate map */
+  .tiers{display:grid;gap:10px}
+  .tier{border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:12px 14px}
+  .tier.mission-critical{border-left:4px solid var(--red)} .tier.operational{border-left:4px solid var(--amber)}
+  .tier.support{border-left:4px solid var(--blue)} .tier.test,.tier.unknown{border-left:4px solid var(--faint)}
+  .tier .th{display:flex;justify-content:space-between;align-items:baseline}
+  .tier .tt{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+  .tier .cells{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .tgt{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-radius:3px;padding:3px 8px;background:var(--panel2)}
+  .top3{margin-top:16px} .top3 .r{display:flex;gap:10px;align-items:baseline;padding:4px 0;font-size:12.5px}
+
+  /* F6 post-quantum */
+  .pqc-sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  table.mig{width:100%;border-collapse:collapse;font-size:12px}
+  table.mig th,table.mig td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.mig th{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+  table.mig td.prim{font-family:var(--mono);color:var(--amber)}
 
   /* scorecard */
   .kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
   .kpi{border:1px solid var(--line);border-radius:5px;background:var(--panel);padding:14px 16px}
   .kpi .n{font-size:26px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
   .kpi .l{font-size:11px;color:var(--dim);margin-top:3px}
-  .kpi.hl{border-color:var(--green)} .kpi.hl .n{color:var(--green)}
-  .kpi.vi{border-color:var(--violet)}
+  .kpi.hl{border-color:var(--green)} .kpi.hl .n{color:var(--green)} .kpi.vi{border-color:var(--violet)}
+  /* F5 boundary bars */
+  .bars{margin-top:16px}
+  .bar{margin:8px 0}
+  .bar .bl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+  .bar .track{height:14px;background:var(--panel2);border:1px solid var(--line);border-radius:3px;overflow:hidden;display:flex}
+  .bar .seg{height:100%} .seg.exploit{background:var(--green)} .seg.buildfree{background:var(--amber)} .seg.none{background:var(--faint)}
+  .seg.reported{background:var(--green)} .seg.suspected{background:var(--faint)}
+  .seg.built{background:var(--green)} .seg.degraded{background:var(--amber)}
   .boundary{margin-top:16px;border-left:3px solid var(--amber);padding:8px 12px;color:var(--dim)}
   .boundary h3{margin:0 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
-  .boundary p{margin:0;font-size:13px;line-height:1.5}
   .zero{display:grid;gap:12px;grid-template-columns:1fr 1fr;margin-top:14px}
   @media (max-width:520px){.zero{grid-template-columns:1fr}}
-  .zerobadge{border:1.5px solid var(--green);border-radius:5px;padding:16px;text-align:center;
-             background:color-mix(in srgb,var(--green) 8%,transparent)}
+  .zerobadge{border:1.5px solid var(--green);border-radius:5px;padding:16px;text-align:center;background:color-mix(in srgb,var(--green) 8%,transparent)}
   .zerobadge .n{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--green)}
   .zerobadge .l{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .lanetrust{margin-top:16px;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .lanetrust span{margin-right:14px}
+
   footer{padding:8px 18px;border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;
          color:var(--faint);background:var(--panel);display:flex;gap:16px;flex-wrap:wrap}
+  /* F12 help overlay */
+  #help{position:fixed;inset:0;background:color-mix(in srgb,#000 55%,transparent);display:none;z-index:20;
+        align-items:center;justify-content:center}
+  #help .box{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:20px 24px;max-width:420px}
+  #help kbd{font-family:var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:1px 6px;font-size:11px}
+  #help .hr{display:flex;justify-content:space-between;gap:16px;padding:4px 0;font-size:13px}
 </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <h1>RAKSHA AI<span class="sub">operator console</span></h1>
+    <h1>RAKSHA AI<span class="sub" data-i18n="operator console">operator console</span></h1>
+    <input id="search" class="ctl" placeholder="/ search findings" aria-label="search findings">
     <div class="badges">
-      <span class="badge">NETWORK INTERFACES: <b id="b-net">0</b></span>
-      <span class="badge">CLOUD CALLS: <b id="b-cloud">0</b></span>
+      <span class="badge">NET IF: <b id="b-net">0</b></span>
+      <span class="badge">CLOUD: <b id="b-cloud">0</b></span>
       <span class="badge">PRECISION: <b id="b-prec">—</b></span>
+      <button class="ctl" id="t-lang" aria-pressed="false" title="English / हिन्दी">EN</button>
+      <button class="ctl" id="t-contrast" aria-pressed="false" title="projector / high-contrast">◑</button>
+      <button class="ctl" id="t-help" title="keyboard help">?</button>
     </div>
   </header>
-  <nav class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-screen="board">1 · Mission Board</button>
-    <button role="tab" aria-selected="false" data-screen="pipeline">2 · Live Pipeline</button>
-    <button role="tab" aria-selected="false" data-screen="detail">3 · Finding Detail</button>
-    <button role="tab" aria-selected="false" data-screen="vault">4 · Evidence Vault</button>
-    <button role="tab" aria-selected="false" data-screen="score">5 · Scorecard</button>
-    <button role="tab" aria-selected="false" data-screen="brief">6 · Commander's Brief</button>
-  </nav>
+  <nav class="tabs" role="tablist"></nav>
   <main>
-    <section id="board"><h2>Targets</h2><div class="board" id="board-grid"></div></section>
+    <section id="board"><h2 data-i18n="Mission Board">Targets</h2><div class="board" id="board-grid"></div></section>
     <section id="pipeline" hidden>
       <h2>Findings flowing through the status machine</h2>
       <div class="pipe" id="pipe-flow"></div>
       <h2 style="margin-top:22px">Ranked risk register — fix these first</h2>
       <div class="flist" id="risk-list"></div>
     </section>
+    <section id="events" hidden>
+      <h2 data-i18n="Event Log">Live event log — the run's story</h2>
+      <div class="log" id="event-log"></div>
+    </section>
     <section id="detail" hidden>
       <div class="split">
-        <div><h2>Findings</h2><div class="flist" id="flist"></div></div>
+        <div>
+          <h2>Findings</h2>
+          <div class="filters">
+            <select id="f-lang"><option value="">all languages</option></select>
+            <select id="f-status"><option value="">all status</option></select>
+            <select id="f-sev"><option value="">all severity</option></select>
+            <select id="f-lane"><option value="">all lanes</option></select>
+            <select id="f-sort"><option value="sev">sort: severity</option><option value="lang">sort: language</option><option value="status">sort: status</option></select>
+          </div>
+          <div class="flist" id="flist"></div>
+        </div>
         <div><h2>Detail</h2><div class="detail" id="fdetail"><p class="empty">Select a finding.</p></div></div>
       </div>
     </section>
-    <section id="vault" hidden>
-      <h2>Signed evidence bundles — verify one yourself</h2>
-      <div class="flist" id="vault-list"></div>
-      <div class="detail" id="vault-result" style="margin-top:14px"><p class="empty">Pick a verified finding and press Verify.</p></div>
+    <section id="graph" hidden>
+      <h2 data-i18n="Attack Graph">Attack graph — single-step findings chained to impact</h2>
+      <div class="ag-wrap"><div class="ag" id="ag"></div></div>
+      <div class="ag-legend" id="ag-legend"></div>
     </section>
-    <section id="score" hidden><h2>The jury's scoresheet, live</h2><div id="score-body"></div></section>
+    <section id="estate" hidden>
+      <h2 data-i18n="Estate Map">Estate map — asset tier against status</h2>
+      <div class="tiers" id="tiers"></div>
+      <div class="top3"><h2 style="margin-top:18px">Top three risks</h2><div id="top3"></div></div>
+    </section>
+    <section id="pqc" hidden>
+      <h2 data-i18n="Post-Quantum">Post-quantum migration</h2>
+      <div class="pqc-sum" id="pqc-sum"></div>
+      <table class="mig"><thead><tr><th>file</th><th>line</th><th>primitive</th><th>migration</th></tr></thead><tbody id="pqc-body"></tbody></table>
+    </section>
+    <section id="vault" hidden>
+      <h2 data-i18n="Evidence Vault">Signed evidence bundles — verify one yourself</h2>
+      <div class="flist" id="vault-list"></div>
+      <div class="detail" id="vault-result" style="margin-top:14px"><p class="empty">Pick a reportable finding and press Verify.</p></div>
+    </section>
+    <section id="score" hidden><h2 data-i18n="Scorecard">The jury's scoresheet, live</h2><div id="score-body"></div></section>
     <section id="brief" hidden>
       <div class="split">
         <div><h2>Reportable findings</h2><div class="flist" id="brief-list"></div></div>
-        <div><h2>Commander's Brief</h2><div class="detail" id="brief-body"><p class="empty">Select a finding.</p></div></div>
+        <div>
+          <h2 data-i18n="Commander's Brief">Commander's Brief</h2>
+          <div style="margin-bottom:8px"><button class="ctl" id="brief-pdf" disabled>Export PDF</button></div>
+          <div class="detail" id="brief-body"><p class="empty">Select a finding.</p></div>
+        </div>
       </div>
     </section>
   </main>
   <footer>
     <span>offline · self-contained · no external assets</span>
-    <span id="foot-count"></span>
-    <span id="foot-time"></span>
+    <span><a href="/api/export/findings.csv" style="color:inherit">export CSV</a> · <a href="/api/export/findings.xlsx" style="color:inherit">export XLSX</a></span>
+    <span id="foot-count"></span><span id="foot-time"></span>
   </footer>
 </div>
+<div id="ag-tip"></div>
+<div id="help"><div class="box"><h2>Keyboard</h2><div id="help-rows"></div></div></div>
 
-<script>
-"use strict";
-const $ = (s, r=document) => r.querySelector(s);
-const el = (tag, cls, txt) => { const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; };
-let STATE = null, SELECTED = null;
-
-// ---- tabs
-const SCREENS = ['board','pipeline','detail','vault','score','brief'];
-document.querySelectorAll('nav.tabs button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b===btn));
-    SCREENS.forEach(s => $('#'+s).hidden = (s !== btn.dataset.screen));
-  });
-});
-// keyboard-only operation for the demo: 1-6 switch screens; j/k walk the finding list; Enter opens
-document.addEventListener('keydown', (e) => {
-  if(e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-  const n = parseInt(e.key, 10);
-  if(n>=1 && n<=SCREENS.length){ document.querySelector('nav.tabs button[data-screen="'+SCREENS[n-1]+'"]').click(); return; }
-  if(e.key==='j' || e.key==='k' || e.key==='ArrowDown' || e.key==='ArrowUp'){
-    const rows = Array.from(document.querySelectorAll('#detail .frow, #detail-list .frow'));
-    if(!rows.length) return;
-    let i = rows.findIndex(r=>r.classList.contains('sel'));
-    rows.forEach(r=>r.classList.remove('sel'));
-    i = (e.key==='j'||e.key==='ArrowDown') ? Math.min(rows.length-1, i+1) : Math.max(0, i<0?0:i-1);
-    rows[i].classList.add('sel'); rows[i].scrollIntoView({block:'nearest'});
-    e.preventDefault();
-  }
-  if(e.key==='Enter'){ const sel=document.querySelector('#detail .frow.sel, #detail-list .frow.sel'); if(sel) sel.click(); }
-});
-
-// ---- data
-async function refresh(){
-  try{
-    const r = await fetch('/api/snapshot'); STATE = await r.json();
-    renderBoard(); renderList(); renderScore(); renderBadges();
-    renderPipeline(); renderRisk(); renderVaultList(); renderBriefList();
-    $('#foot-count').textContent = STATE.findings.length + ' findings · ' + STATE.board.length + ' targets';
-    $('#foot-time').textContent = 'updated ' + new Date().toLocaleTimeString();
-  }catch(e){ $('#foot-time').textContent = 'offline'; }
-}
-
-function renderPipeline(){
-  const flow = $('#pipe-flow'); if(!STATE.pipeline) return; flow.textContent='';
-  STATE.pipeline.forEach((st,i)=>{
-    const d = el('div','stage'+(st.count?' on':''));
-    d.appendChild(el('div','n', String(st.at_or_past)));
-    d.appendChild(el('div','s', st.status.replace(/_/g,' ')));
-    flow.appendChild(d);
-  });
-}
-function renderRisk(){
-  const list = $('#risk-list'); if(!STATE.risk) return; list.textContent='';
-  STATE.risk.slice(0,12).forEach((r,i)=>{
-    const row = el('div','frow'); row.appendChild(el('span','sev '+r.severity));
-    const b = el('div','fmsg');
-    b.appendChild(el('div',null, '#'+(i+1)+'  '+(r.message||r.bug_class)));
-    b.appendChild(el('div','fmeta', 'score '+r.score+' · '+r.language+' · '+r.status+(r.has_fix?' · fix ready':'')));
-    row.appendChild(b); list.appendChild(row);
-  });
-}
-function reportable(){ return STATE.findings.filter(f=>f.status!=='SUSPECTED'); }
-function renderVaultList(){
-  const list = $('#vault-list'); list.textContent='';
-  reportable().forEach(f=>{
-    const row = el('div','frow'); row.appendChild(el('span','sev '+f.severity));
-    const b = el('div','fmsg');
-    b.appendChild(el('div',null, f.bug_class+' · '+f.status));
-    b.appendChild(el('div','fmeta', f.target+' · '+(f.evidence||'')));
-    row.appendChild(b);
-    const btn = el('button','verify-btn','Verify'); btn.style.alignSelf='center';
-    btn.addEventListener('click', (e)=>{ e.stopPropagation(); verifyBundle(f.id); });
-    row.appendChild(btn); list.appendChild(row);
-  });
-}
-async function verifyBundle(id){
-  const box = $('#vault-result'); box.innerHTML='<p class="empty">verifying…</p>';
-  const r = await fetch('/api/verify/'+encodeURIComponent(id));
-  if(!r.ok){ box.innerHTML='<p class="empty">not reportable</p>'; return; }
-  const v = await r.json(); box.textContent='';
-  box.appendChild(el('div', v.ok?'verify-ok':'verify-bad', v.ok?'✓ SIGNATURE VALID':'✗ VERIFICATION FAILED'));
-  box.appendChild(el('div','evidence', v.summary));
-}
-function renderBriefList(){
-  const list = $('#brief-list'); list.textContent='';
-  reportable().forEach(f=>{
-    const row = el('div','frow'); row.appendChild(el('span','sev '+f.severity));
-    const b = el('div','fmsg');
-    b.appendChild(el('div',null, f.bug_class)); b.appendChild(el('div','fmeta', f.target+' · '+f.status));
-    row.appendChild(b); row.addEventListener('click', ()=>showBrief(f.id)); list.appendChild(row);
-  });
-}
-async function showBrief(id){
-  const body = $('#brief-body'); body.innerHTML='<p class="empty">loading…</p>';
-  const r = await fetch('/api/brief/'+encodeURIComponent(id));
-  if(!r.ok){ body.innerHTML='<p class="empty">not reportable</p>'; return; }
-  const d = await r.json(); body.textContent='';
-  if(d.hindi){ const h=el('p','hindi-head', d.hindi); body.appendChild(h); }
-  body.appendChild(el('p', null, d.plain));
-  const pre = el('pre','brief', d.jssd); body.appendChild(pre);
-}
-
-function renderBadges(){
-  const p = STATE.scorecard.precision.reports_with_reproducer_pct;
-  $('#b-prec').textContent = (p==null?'—':p+'%');
-  const post = STATE.scorecard.posture;
-  for (const [id, v] of [['#b-net', post.network_interfaces], ['#b-cloud', post.cloud_calls]]) {
-    $(id).textContent = v;
-    $(id).classList.toggle('warn', v !== 0);   // a badge that is not zero must not look reassuring
-  }
-}
-
-function renderBoard(){
-  const g = $('#board-grid'); g.textContent='';
-  for(const t of STATE.board){
-    const c = el('div','card '+t.build_status);
-    c.appendChild(el('h3', null, t.name));
-    c.appendChild(el('div','langs', (t.languages.join(' · ')||'—')));
-    const bs = el('div','row');
-    bs.appendChild(el('span','k','build'));
-    const pill = el('span','pill '+t.build_status,
-      t.build_status==='green'?'built':t.build_status==='amber'?'build-free · finding':'could not ingest');
-    bs.appendChild(pill); c.appendChild(bs);
-    addRow(c,'findings', t.findings + (t.verified?(' · '+t.verified+' fixed'):''));
-    addRow(c,'ROE', t.roe_level);
-    addRow(c,'status', t.status);
-    if(t.note) c.appendChild(el('div','note', t.note));
-    g.appendChild(c);
-  }
-}
-function addRow(card,k,v){ const r=el('div','row'); r.appendChild(el('span','k',k)); r.appendChild(el('span','v',String(v))); card.appendChild(r); }
-
-function renderList(){
-  const list = $('#flist'); list.textContent='';
-  for(const f of STATE.findings){
-    const row = el('div','frow'); row.dataset.id=f.id; row.setAttribute('aria-selected', f.id===SELECTED);
-    row.appendChild(el('span','sev '+f.severity));
-    const body = el('div','fmsg');
-    body.appendChild(el('div',null,f.message.length>70?f.message.slice(0,70)+'…':f.message));
-    body.appendChild(el('div','fmeta', f.language+' · '+f.bug_class+' · '+f.status+(f.evidence?(' · '+f.evidence):'')));
-    row.appendChild(body);
-    row.addEventListener('click', ()=>selectFinding(f.id));
-    list.appendChild(row);
-  }
-}
-
-async function selectFinding(id){
-  SELECTED = id; renderList();
-  document.querySelector('nav.tabs button[data-screen="detail"]').click();
-  const r = await fetch('/api/finding/'+encodeURIComponent(id));
-  if(!r.ok){ $('#fdetail').innerHTML='<p class="empty">not found</p>'; return; }
-  renderDetail(await r.json());
-}
-
-function tick(state){ // 'pass'|'fail'|'pend'
-  return state==='pass'?'✓':state==='fail'?'✗':'·';
-}
-function renderDetail(p){
-  const d = $('#fdetail'); d.textContent='';
-  d.appendChild(el('h3', null, p.bug_class+' — '+p.severity.toUpperCase()));
-  d.appendChild(el('div','meta', p.language+' · '+p.target+' · '+p.oracle+' · '+p.status));
-
-  // split-screen replay: vulnerable (fires) vs patched (dead)
-  const rep = el('div','replay');
-  const before = p.replay_before, after = p.replay_after;
-  const v = el('div','pane vuln');
-  v.appendChild(el('div','lab','vulnerable build'));
-  v.appendChild(el('div','big', before && before.oracle_fired ? 'attack fires ✗' : 'attack fires'));
-  rep.appendChild(v);
-  const fx = el('div','pane fixed');
-  fx.appendChild(el('div','lab','patched build'));
-  fx.appendChild(el('div','big', after ? (after.oracle_fired?'still fires ✗':'attack dead ✓') : 'not yet patched'));
-  rep.appendChild(fx);
-  d.appendChild(rep);
-
-  // the five-check gate, ticking
-  const gate = el('div','gate');
-  const order = ['COMPILES','POV_DEAD','DIFFERENTIAL_CORPUS','COVERAGE_HELD','CLEAN_REFUZZ'];
-  for(const c of order){
-    const res = p.gate ? p.gate[c] : null;
-    const st = res==null?'pend':(res.passed?'pass':'fail');
-    const g = el('div','g');
-    g.appendChild(el('span','tick '+st, tick(st)));
-    g.appendChild(el('span',null,c.replace(/_/g,' ').toLowerCase()));
-    if(res && res.detail) g.appendChild(el('span','gd', res.detail.length>48?res.detail.slice(0,48)+'…':res.detail));
-    gate.appendChild(g);
-  }
-  d.appendChild(gate);
-
-  // evidence kind + fix site
-  if(p.reproducer){
-    d.appendChild(el('div','evidence','evidence: '+p.reproducer.kind+(p.reproducer.detail?(' — '+p.reproducer.detail):'')));
-  }
-  if(p.fix_site_set && p.fix_site_set.length){
-    const s=p.fix_site_set[0];
-    d.appendChild(el('div','evidence','fix site: '+s.uri+(s.start_line?(':'+s.start_line):'')+(s.rationale?(' — '+s.rationale):'')));
-  }
-
-  // repair rounds: every candidate that cleared the gate, and the one chosen (the frontier)
-  if(p.frontier && p.frontier.length){
-    d.appendChild(el('div','lab','repair frontier — candidates that passed the gate'));
-    const rr=el('div','rounds');
-    p.frontier.forEach((c,i)=>{
-      const parts=[`#${i+1} ${c.lane}`, `${c.hunks} hunk(s)`, `+${c.added_lines}/-${c.removed_lines}`];
-      if(c.perf_delta!=null) parts.push(`perf ${Number(c.perf_delta).toFixed(2)}x`);
-      if(c.refuzz_variants!=null) parts.push(`${c.refuzz_variants} variants dead`);
-      if(c.chosen) parts.push('← chosen'+(c.confirmed_on_rerun?' (re-gated)':''));
-      rr.appendChild(el('div','r'+(c.chosen?' chosen':''), parts.join(' · ')));
-    });
-    d.appendChild(rr);
-  }
-  if(p.red_team){
-    const rt=p.red_team;
-    d.appendChild(el('div','evidence','independent red team: '+(rt.held?'held — no input broke the fix':
-      (rt.wins+' input(s) broke the fix'))+' ('+rt.attempts+' attempts, '+Object.keys(rt.strategies||{}).join('/')+')'));
-  }
-
-  // the patch diff, coloured
-  if(p.patch_diff){
-    d.appendChild(el('div','lab', p.status==='VERIFIED' ? 'proven patch' : 'candidate patch (not proven)'));
-    const pre=el('pre','diff');
-    // line by line, as text: the diff carries target code and must never be parsed as markup
-    p.patch_diff.split('\n').forEach(line=>{
-      const cls = line.startsWith('+') && !line.startsWith('+++') ? 'add'
-                : line.startsWith('-') && !line.startsWith('---') ? 'del' : '';
-      pre.appendChild(el('span', cls, line+'\n'));
-    });
-    d.appendChild(pre);
-  }
-}
-
-function renderScore(){
-  const s = STATE.scorecard, body = $('#score-body'); body.textContent='';
-  const kpis = el('div','kpis');
-  const add=(n,l,cls)=>{const k=el('div','kpi '+(cls||'')); k.appendChild(el('div','n',n)); k.appendChild(el('div','l',l)); kpis.appendChild(k);};
-  add((s.precision.reports_with_reproducer_pct==null?'—':s.precision.reports_with_reproducer_pct+'%'),
-      'reports with a replaying reproducer','hl');
-  add(s.performance.findings_reported, 'proven findings reported');
-  add(s.performance.bugs_verified_fixed, 'verified fixed');
-  add(s.scalability.language_count, 'languages covered','vi');
-  add((s.resource.zero_inference_fix_pct==null?'—':s.resource.zero_inference_fix_pct+'%'), 'fixes at zero inference','vi');
-  add(s.functionality.zero_human_input_verified, 'fixes with zero human input');
-  add((s.speed.median_time_to_pov_seconds==null?'—':s.speed.median_time_to_pov_seconds+'s'), 'median time to proof');
-  add((s.speed.time_to_first_proven_finding_seconds==null?'—':s.speed.time_to_first_proven_finding_seconds+'s'),
-      'time to first proven finding','hl');
-  add((s.speed.median_time_to_validated_patch_seconds==null?'—':s.speed.median_time_to_validated_patch_seconds+'s'),
-      'median time to validated patch');
-  add((s.precision.patches_surviving_differential_pct==null?'—':s.precision.patches_surviving_differential_pct+'%'),
-      'candidate patches surviving the gate');
-  add(s.precision.static_findings_promoted, 'static findings cross-confirmed');
-  add((s.resource.tokens_per_validated_patch==null?'—':s.resource.tokens_per_validated_patch), 'tokens per validated patch','vi');
-  add((s.resource.vram==null?'— no GPU':s.resource.vram.used_mb+' MB'), 'live VRAM in use','vi');
-  add((s.scalability.vaccine_variants_found==null?'—':s.scalability.vaccine_variants_found), 'vaccine variants found','vi');
-  add(s.precision.unproven_findings_suppressed, 'unproven findings suppressed');
-  body.appendChild(kpis);
-
-  const zero = el('div','zero');
-  const z=(n,l)=>{const b=el('div','zerobadge'+(n!==0?' warn':'')); b.appendChild(el('div','n',String(n))); b.appendChild(el('div','l',l)); zero.appendChild(b);};
-  z(s.posture.network_interfaces,'network interfaces');
-  z(s.posture.cloud_calls,'cloud calls');
-  body.appendChild(zero);
-
-  // depth: the assurance layers for the AI-vs-AI / quantum / concurrency horizon
-  const d = s.depth || {};
-  const dep = el('div','kpis');
-  const dadd=(n,l,cls)=>{const k=el('div','kpi '+(cls||'')); k.appendChild(el('div','n',n==null?'—':String(n))); k.appendChild(el('div','l',l)); dep.appendChild(k);};
-  dadd(d.median_evidence_confidence==null?'—':d.median_evidence_confidence, 'median fused evidence confidence','hl');
-  dadd(d.findings_with_2plus_independent_channels, 'findings with 2+ independent channels');
-  dadd(d.patches_red_team_held, 'patches the red team could not break','vi');
-  dadd(d.patches_red_team_broke, 'patches the red team broke', (d.patches_red_team_broke?'':'vi'));
-  dadd(d.viable_attack_chains, 'viable attack chains','hl');
-  dadd(d.race_findings, 'data races found (ThreadSanitizer)','vi');
-  dadd(d.crypto_findings, 'weak-crypto findings','vi');
-  dadd(d.pqc_quantum_vulnerable_sites, 'quantum-vulnerable crypto sites','vi');
-  dadd(d.findings_flagged_for_investigation, 'flagged: reasoners disagree');
-  dadd(d.structural_hypotheses!=null?d.structural_hypotheses:(s.precision.structural_hypotheses), 'structural (CPG) hypotheses');
-  dadd(d.patches_with_frontier_alternatives, 'patches chosen from a frontier','vi');
-  const dh = el('h3',null,'Depth — evidence fusion, red team, attack chains, post-quantum');
-  dh.style.cssText='margin:18px 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)';
-  body.appendChild(dh); body.appendChild(dep);
-  if (d.mission_tiers && Object.keys(d.mission_tiers).length){
-    const mt = el('p',null,'Mission tiers touched: ' + Object.entries(d.mission_tiers).map(([k,v])=>k+' '+v).join(' · '));
-    mt.style.cssText='margin:6px 0 0;font-size:12px;color:var(--dim)'; body.appendChild(mt);
-  }
-
-  // the boundary of the claim, next to the claim: what this run did NOT establish
-  const b = el('div','boundary');
-  b.appendChild(el('h3',null,'Assurance boundary — what this run does not claim'));
-  b.appendChild(el('p',null,s.boundary && s.boundary.statement ? s.boundary.statement : '—'));
-  body.appendChild(b);
-}
-
-refresh();
-setInterval(refresh, 2500);   // live feel; the server is local so this is free
-</script>
+<script src="app.js"></script>
 </body>
 </html>
