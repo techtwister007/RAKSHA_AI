@@ -7,6 +7,7 @@ re-read the target's file and re-run the same detector:
     python -m raksha match ECOSYSTEM PACKAGE VERSION --advisory ID [--manifest PATH]
     python -m raksha secret-match RULE PATH LINE
     python -m raksha spec-check ORACLE METHOD API_PATH --spec SPEC_PATH
+    python -m raksha crypto-match RULE PATH LINE
 
 Exit status mirrors a crashing exploit: 1 = the finding REPRODUCED, 0 = it did not (e.g. the manifest
 was bumped, the secret removed), 2 = the replay could not run. Run from the target's root.
@@ -85,6 +86,17 @@ def _spec(a: argparse.Namespace) -> int:
     return NOT_REPRODUCED
 
 
+def _crypto(a: argparse.Namespace) -> int:
+    from .lanes import crypto
+    try:
+        hit = crypto.replay(a.rule, a.path, a.line)      # root = cwd, like the other subcommands
+    except (FileNotFoundError, ValueError) as e:
+        print(e)
+        return ERROR
+    print(("REPRODUCED" if hit else "NOT REPRODUCED") + f": {a.rule} at {a.path}:{a.line}")
+    return REPRODUCED if hit else NOT_REPRODUCED
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m raksha", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -99,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("oracle"); c.add_argument("method"); c.add_argument("api_path")
     c.add_argument("--spec", required=True)
     c.set_defaults(fn=_spec)
+    cm = sub.add_parser("crypto-match", help="re-check a weak-crypto finding at a file:line")
+    cm.add_argument("rule"); cm.add_argument("path"); cm.add_argument("line", type=int)
+    cm.set_defaults(fn=_crypto)
     args = ap.parse_args(argv)
     return args.fn(args)
 

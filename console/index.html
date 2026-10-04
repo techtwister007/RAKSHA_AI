@@ -413,6 +413,29 @@ function renderScore(){
   z(s.posture.cloud_calls,'cloud calls');
   body.appendChild(zero);
 
+  // depth: the assurance layers for the AI-vs-AI / quantum / concurrency horizon
+  const d = s.depth || {};
+  const dep = el('div','kpis');
+  const dadd=(n,l,cls)=>{const k=el('div','kpi '+(cls||'')); k.appendChild(el('div','n',n==null?'—':String(n))); k.appendChild(el('div','l',l)); dep.appendChild(k);};
+  dadd(d.median_evidence_confidence==null?'—':d.median_evidence_confidence, 'median fused evidence confidence','hl');
+  dadd(d.findings_with_2plus_independent_channels, 'findings with 2+ independent channels');
+  dadd(d.patches_red_team_held, 'patches the red team could not break','vi');
+  dadd(d.patches_red_team_broke, 'patches the red team broke', (d.patches_red_team_broke?'':'vi'));
+  dadd(d.viable_attack_chains, 'viable attack chains','hl');
+  dadd(d.race_findings, 'data races found (ThreadSanitizer)','vi');
+  dadd(d.crypto_findings, 'weak-crypto findings','vi');
+  dadd(d.pqc_quantum_vulnerable_sites, 'quantum-vulnerable crypto sites','vi');
+  dadd(d.findings_flagged_for_investigation, 'flagged: reasoners disagree');
+  dadd(d.structural_hypotheses!=null?d.structural_hypotheses:(s.precision.structural_hypotheses), 'structural (CPG) hypotheses');
+  dadd(d.patches_with_frontier_alternatives, 'patches chosen from a frontier','vi');
+  const dh = el('h3',null,'Depth — evidence fusion, red team, attack chains, post-quantum');
+  dh.style.cssText='margin:18px 0 6px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)';
+  body.appendChild(dh); body.appendChild(dep);
+  if (d.mission_tiers && Object.keys(d.mission_tiers).length){
+    const mt = el('p',null,'Mission tiers touched: ' + Object.entries(d.mission_tiers).map(([k,v])=>k+' '+v).join(' · '));
+    mt.style.cssText='margin:6px 0 0;font-size:12px;color:var(--dim)'; body.appendChild(mt);
+  }
+
   // the boundary of the claim, next to the claim: what this run did NOT establish
   const b = el('div','boundary');
   b.appendChild(el('h3',null,'Assurance boundary — what this run does not claim'));

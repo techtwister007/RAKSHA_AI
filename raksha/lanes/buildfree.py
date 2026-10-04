@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..finding import Finding, dedup
-from . import secrets, service, supply, vulndb
+from . import crypto, secrets, service, supply, vulndb
 
 #: Files worth reading for secrets. Covers every language with source here (C/C++, Rust, C#,
 #: Kotlin, Scala, Swift included, not only the three with deep adapters), config, and the files
@@ -47,6 +47,8 @@ class BuildFreeResult:
     files_scanned: int = 0
     manifests_found: int = 0
     seconds: float = 0.0
+    #: Cryptographic primitives in use (not findings) for the post-quantum migration plan.
+    crypto_uses: list = field(default_factory=list)
 
     def by_lane(self) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -56,12 +58,14 @@ class BuildFreeResult:
         return out
 
 
-def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on: bool = True) -> BuildFreeResult:
+def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on: bool = True,
+                crypto_on: bool = True) -> BuildFreeResult:
     root = Path(root)
     db = db or vulndb.load()
     started = time.monotonic()
     deps: list[supply.Dependency] = []
     findings: list[Finding] = []
+    crypto_uses: list = []
     imports = supply.ImportIndex()
     files = manifests = 0
 
@@ -79,6 +83,9 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
         imports.add(path, text)
         if secrets_on and (path.suffix in _SECRET_EXT or name in _SECRET_NAMES):
             findings.extend(secrets.scan_text(text, rel))
+        if crypto_on and (path.suffix in _SECRET_EXT or name in _SECRET_NAMES):
+            findings.extend(crypto.scan_text(text, rel))
+            crypto_uses.extend(crypto.inventory(text, rel))
         if _looks_like_openapi(name, text):
             findings.extend(service.scan_openapi(text, rel))
 
@@ -87,7 +94,7 @@ def scan_target(root: str | Path, *, db: vulndb.VulnDB | None = None, secrets_on
     findings.extend(dep_findings)
     findings = dedup(findings)
     return BuildFreeResult(findings=findings, files_scanned=files, manifests_found=manifests,
-                           seconds=round(time.monotonic() - started, 3))
+                           seconds=round(time.monotonic() - started, 3), crypto_uses=crypto_uses)
 
 
 def _looks_like_openapi(name: str, text: str) -> bool:

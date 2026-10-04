@@ -20,6 +20,9 @@ from datetime import datetime
 from .finding import Finding, RoeLevel, Status, utcnow
 from .lanes import scan_target
 from .metrics import live_counters, scorecard
+from . import assets as _assets
+from .gate.crossconfirm import cross_confirm
+from .lanes import structure as _structure
 
 
 @dataclass
@@ -63,6 +66,12 @@ class Session:
     #: Fleet variants found per verified fix by the vaccine sweep. None until a sweep runs, so the
     #: scorecard shows the row as honestly-unmeasured rather than a faked zero.
     vaccine_variants: int | None = None
+    #: The asset registry (mission tiers per codebase), loaded once; drives mission-impact and ROE.
+    registry: _assets.Registry = field(default_factory=_assets.load)
+    #: Cryptographic primitives seen across the estate, for the post-quantum migration report.
+    crypto_uses: list = field(default_factory=list)
+    #: Per-target structural graph summaries (nodes/edges/sinks) for the console.
+    structure_summaries: dict = field(default_factory=dict)
     #: Where sealed evidence bundles are kept (one directory per finding); created on first use.
     evidence_root: Path | None = None
     #: When the run began, and the live counters at that moment: the scorecard reports this run's
@@ -85,13 +94,26 @@ class Session:
             t = Target(name=name, build_status="red", note=f"could not ingest: {e}")
             self.targets.append(t)
             return t
-        langs = sorted({f.language for f in result.findings})
+        self.crypto_uses.extend(result.crypto_uses)
+        found = list(result.findings)
+        # Structural (CPG) hypotheses: SUSPECTED source->sink paths that exist to be cross-confirmed
+        # by a lane that lands a reproducer on the same site+CWE, and otherwise to feed triage. They
+        # never become reports on their own — "no reproducer, no report" holds.
+        try:
+            sres = _structure.scan_structure(root)
+            self.structure_summaries[name] = sres.graph_summary
+            found = cross_confirm([*found, *_structure.to_findings(sres)])
+        except Exception:  # noqa: BLE001 — a tree we cannot parse structurally is not a crash
+            pass
+        _assets.annotate(found, self.registry, target=name)
+        langs = sorted({f.language for f in found if f.language not in ("any", "api")})
         t = Target(name=name, languages=langs, build_status="amber", roe_level=roe,
                    note=note or "build-free mode, still finding")
-        for f in result.findings:
+        for f in found:
             self.add_finding(f)
             t.finding_ids.append(f.id)
         self.targets.append(t)
+        self._annotate_evidence()
         return t
 
     def ingest(self, root: str | Path, runner=None, *, name: str | None = None,
@@ -129,7 +151,7 @@ class Session:
 
     def ingest_autofuzz(self, root: str | Path, *, name: str | None = None,
                         repair_it: bool = True, corpus: list[bytes] | None = None,
-                        roe: RoeLevel = RoeLevel.R1) -> Target:
+                        red_team: bool = True, roe: RoeLevel = RoeLevel.R1) -> Target:
         """Deep-ingest a target that ships no fuzz harness: synthesize one, find a bug, and (by
         default) drive the repair ladder through the gate. This is the find→fix→prove loop on an
         unknown target with no human writing a driver."""
@@ -147,6 +169,15 @@ class Session:
         if repair_it:
             _repair(f, r.target, root=r.target.source_root, reproducer=r.crashing_input,
                     corpus=corpus or [b"ok", b"test", b"\x01\x02"])
+            # Independent red team: once the gate says VERIFIED, try to falsify the fix. A patch
+            # that cannot survive a fresh adversary is not actually proven. Bounded and offline.
+            if f.status is Status.VERIFIED and red_team:
+                try:
+                    from .redteam import red_round
+                    red_round(f, r.target, reproducer=r.crashing_input,
+                              corpus=corpus or [b"ok", b"test", b"\x01\x02"], rounds=120, seconds=4.0)
+                except Exception:  # noqa: BLE001 — the red team is a check, not a gate; never fatal
+                    pass
             if hasattr(r.target, "discard"):
                 try:
                     r.target.discard(r.target.build(None))
@@ -158,12 +189,14 @@ class Session:
     def attach_target(self, name: str, findings: list[Finding], *, build_status: str = "green",
                       roe: RoeLevel = RoeLevel.R1, languages: list[str] | None = None) -> Target:
         """Attach a target whose findings came from the deep lanes (e.g. the Java slice)."""
+        _assets.annotate(findings, self.registry, target=name)
         t = Target(name=name, build_status=build_status, roe_level=roe,
                    languages=languages or sorted({f.language for f in findings}))
         for f in findings:
             self.add_finding(f)
             t.finding_ids.append(f.id)
         self.targets.append(t)
+        self._annotate_evidence()
         return t
 
     # -- snapshots for the console ------------------------------------------------------------
@@ -174,6 +207,7 @@ class Session:
         degraded = len([t for t in self.targets if t.build_status in ("amber", "red")])
         return scorecard(self.findings.values(), vaccine_variants=self.vaccine_variants,
                          targets_degraded=degraded, targets_total=len(self.targets),
+                         attack_graph=self.attack_graph(), pqc=self.pqc_report(),
                          started_at=self.started_at, counter_baseline=self.counter_baseline).as_dict()
 
     def run_vaccine_sweep(self, codebases: dict[str, Path]) -> int:
@@ -285,9 +319,43 @@ class Session:
             rows.append({"status": s.value, "count": counts.get(s.value, 0), "at_or_past": at_or_past})
         return rows
 
+    def _annotate_evidence(self) -> None:
+        """Fuse independent evidence on every finding, and record the model parliament's read
+        (offline: a single-source verdict and the deterministic epistemic-conflict signal). Neither
+        can change status — only the gate does; these annotate the record and raise scrutiny."""
+        from . import evidence, parliament
+        from .inference import get_client
+        client = get_client()
+        for f in self.findings.values():
+            try:
+                parliament.convene(f, client=client)
+            except Exception:  # noqa: BLE001 — a model that will not answer must not stop the run
+                pass
+            if f.parliament is None or f.parliament.get("disagreement") is None:
+                ec = parliament.epistemic_conflict(f)
+                if ec is not None:
+                    f.parliament = {**(f.parliament or {}), "epistemic_conflict": ec}
+        evidence.fuse_all(self.findings.values())
+
+    def attack_graph(self) -> dict:
+        """Chains of individually-moderate findings into a path to impact, scored by attack
+        economics. Built over the whole estate at snapshot time."""
+        from . import attackgraph
+        g = attackgraph.build(list(self.findings.values()), assets=self.registry,
+                              critical_scopes=self.registry.critical_names())
+        attackgraph.annotate(list(self.findings.values()), g)
+        return g.as_dict()
+
+    def pqc_report(self) -> dict:
+        """Post-quantum readiness across the estate: which cryptography must migrate, and to what."""
+        from .lanes import crypto
+        return crypto.pqc_report(self.crypto_uses)
+
     def snapshot(self) -> dict:
         return {"board": self.board(), "findings": self.finding_rows(), "scorecard": self.scorecard(),
-                "risk": self.risk_register(), "pipeline": self.pipeline_stages()}
+                "risk": self.risk_register(), "pipeline": self.pipeline_stages(),
+                "attack_graph": self.attack_graph(), "pqc": self.pqc_report(),
+                "structure": self.structure_summaries}
 
 
 def demo_session(repo_root: Path | None = None) -> Session:

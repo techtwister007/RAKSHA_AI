@@ -49,6 +49,9 @@ class Scorecard:
     #: What this run did NOT establish. A proof of presence is never a proof of absence, so the
     #: scoresheet carries the boundary of the claim next to the claim.
     boundary: dict[str, Any] = field(default_factory=dict)
+    #: The layers added for the AI-vs-AI / quantum / concurrency threat horizon: evidence fusion,
+    #: the model parliament, the independent red team, attack chains, PQC readiness, mission tiers.
+    depth: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -60,6 +63,7 @@ class Scorecard:
             "resource": self.resource,
             "posture": self.posture,
             "boundary": self.boundary,
+            "depth": self.depth,
         }
 
 
@@ -77,6 +81,8 @@ def scorecard(
     counter_baseline: dict[str, int] | None = None,
     targets_degraded: int | None = None,
     targets_total: int | None = None,
+    attack_graph: dict | None = None,
+    pqc: dict | None = None,
 ) -> Scorecard:
     """Compute the full scorecard for a set of findings.
 
@@ -178,6 +184,9 @@ def scorecard(
         # A dependency match proves the version is present; the import scan says whether the
         # code reaches it. Shown so a CVE in an unused library is never dressed as an exploit.
         "dependency_reachability": _count(f.reachability for f in findings if f.reachability),
+        # Structural (CPG) hypotheses raised; those a dynamic reproducer later confirmed are already
+        # in static_findings_promoted. The rest stay SUSPECTED and never become reports.
+        "structural_hypotheses": len([f for f in findings if f.oracle.startswith("cpg:")]),
     }
 
     # ---- Functionality: did the loop run unattended ----------------------
@@ -265,8 +274,42 @@ def scorecard(
     }
     boundary["statement"] = assurance_statement(boundary, performance)
 
+    # ---- Depth: the assurance layers for the threat horizon ----------------
+    ev = [f.evidence_score for f in findings if f.evidence_score]
+    confidences = [e["confidence"] for e in ev]
+    parl = [f.parliament for f in findings if f.parliament]
+    red = [f.red_team for f in findings if f.red_team]
+    depth = {
+        # evidence fusion
+        "findings_with_fused_evidence": len(ev),
+        "median_evidence_confidence": _median(confidences),
+        "findings_with_2plus_independent_channels": len([e for e in ev if e.get("independent_channels", 0) >= 2]),
+        # model parliament / epistemic conflict (offline: disagreement is None, conflict is measured)
+        "parliament_quorum": max((p.get("quorum", 0) for p in parl), default=0),
+        "findings_flagged_for_investigation": len([p for p in parl if p.get("flag_for_investigation")]),
+        "epistemic_conflicts": len([p for p in parl if p.get("epistemic_conflict")]),
+        # independent red team against verified patches
+        "patches_red_teamed": len(red),
+        "patches_red_team_held": len([r for r in red if r.get("held")]),
+        "patches_red_team_broke": len([r for r in red if r.get("held") is False]),
+        # patch frontier (Pareto choice among passing candidates)
+        "patches_with_frontier_alternatives": len([f for f in verified if len(f.frontier) > 1]),
+        # crypto / post-quantum readiness
+        "crypto_findings": len([f for f in reported if f.oracle.startswith("crypto:")]),
+        "pqc_quantum_vulnerable_sites": (pqc or {}).get("quantum_vulnerable_sites"),
+        "pqc_blast_radius": (pqc or {}).get("blast_radius"),
+        # attack chains (composition into a path to impact)
+        "attack_chains": ((attack_graph or {}).get("summary") or {}).get("chains"),
+        "viable_attack_chains": ((attack_graph or {}).get("summary") or {}).get("viable_chains"),
+        # mission impact tiers exercised (from the asset registry)
+        "mission_tiers": _count(f.mission_impact for f in findings if f.mission_impact),
+        # concurrency: races found and proven (the TSan oracle)
+        "race_findings": len([f for f in findings if f.oracle.startswith("tsan") or f.bug_class == "CWE-362"]),
+    }
+
     return Scorecard(
         performance=performance,
+        depth=depth,
         boundary=boundary,
         speed=speed,
         precision=precision,

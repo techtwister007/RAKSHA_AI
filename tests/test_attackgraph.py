@@ -42,7 +42,10 @@ def test_estate_yields_credential_to_endpoint_to_rce_chain(estate_findings):
     assert chain.cost == 4.5 and chain.viable and chain.combined_severity == "critical"
     assert chain.id.startswith("chain-") and len(chain.finding_ids) == 3
     assert "config/app.properties" in chain.steps[0] and "openapi.json" in chain.steps[1]
-    assert "audit-java/pom.xml" in chain.steps[2] and "CWE-917" in chain.steps[2]   # imported Log4Shell
+    # the RCE is an imported Log4Shell-family CVE at the audit service (2.14.1 matches CVE-2021-44228
+    # CWE-917 and CVE-2021-45105 CWE-74; any of the co-located advisories proves the same path)
+    assert "audit-java/pom.xml" in chain.steps[2]
+    assert "CWE-917" in chain.steps[2] or "CWE-74" in chain.steps[2]
 
 
 def test_not_imported_dependency_is_never_an_rce_step(estate_findings):

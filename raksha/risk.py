@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .assets import mission_multiplier
 from .finding import DETERMINISTIC_MATCH, EXPLOIT_REPLAY, Finding, Status, reportable
 
 _SEVERITY = {"critical": 4.0, "high": 3.0, "medium": 2.0, "low": 1.0, "info": 0.5}
@@ -73,6 +74,7 @@ class RiskRow:
             "has_fix": f.status is Status.VERIFIED, "message": f.message[:120],
             "evidence": f.reproducer.kind if f.reproducer else None,
             "reachability": f.reachability,
+            "mission_impact": f.mission_impact,
         }
 
 
@@ -83,7 +85,8 @@ def register(findings) -> list[RiskRow]:
         sev = _SEVERITY.get(f.severity.lower(), 1.0)
         reach = _reachability(f)
         expl = _exploitability(f)
-        rows.append(RiskRow(f, sev * reach * expl, sev, reach, expl))
+        mission = mission_multiplier(f.mission_impact)   # a flaw on a mission asset outranks the same flaw on a test tool
+        rows.append(RiskRow(f, sev * reach * expl * mission, sev, reach, expl))
     rows.sort(key=lambda r: (r.score, r.actionable), reverse=True)
     return rows
 
