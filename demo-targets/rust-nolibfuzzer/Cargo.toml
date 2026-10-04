@@ -1,0 +1,16 @@
+[package]
+name = "rust_nolibfuzzer"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "rust_nolibfuzzer"
+path = "src/lib.rs"
+
+# overflow-checks on in test builds so an arithmetic overflow panics (CWE-190) instead of wrapping
+# silently — the gate and the oracle both need the panic to actually fire under `cargo test`.
+[profile.test]
+overflow-checks = true
+
+# No dependencies: a sealed, offline node with only the Rust toolchain builds this.
