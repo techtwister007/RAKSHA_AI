@@ -1,0 +1,103 @@
+{
+  "_comment": "Asset registry: every codebase, its mission function and criticality tier. Patterns are globs on the target name (full path, or any trailing path suffix). Order: most specific first; `lookup` prefers a pattern without wildcards, then the longest. Tiers: mission-critical | operational | support | test.",
+  "assets": [
+    {
+      "name": "c-nolibfuzzer",
+      "pattern": "c-nolibfuzzer",
+      "tier": "mission-critical",
+      "mission_function": "message parsing",
+      "owner_unit": "Signals"
+    },
+    {
+      "name": "c-overflow",
+      "pattern": "c-overflow",
+      "tier": "mission-critical",
+      "mission_function": "record parsing",
+      "owner_unit": "Signals"
+    },
+    {
+      "name": "java-log4shell",
+      "pattern": "java-log4shell",
+      "tier": "operational",
+      "mission_function": "audit logging",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "go-decoder",
+      "pattern": "go-decoder",
+      "tier": "operational",
+      "mission_function": "wire-format decoding",
+      "owner_unit": "Signals"
+    },
+    {
+      "name": "py-noharness",
+      "pattern": "py-noharness",
+      "tier": "support",
+      "mission_function": "unit conversion helper",
+      "owner_unit": "Ops Cell"
+    },
+    {
+      "name": "py-cmdinject",
+      "pattern": "py-cmdinject",
+      "tier": "support",
+      "mission_function": "command runner",
+      "owner_unit": "Ops Cell"
+    },
+    {
+      "name": "mixed-estate/audit-java",
+      "pattern": "mixed-estate/audit-java",
+      "tier": "operational",
+      "mission_function": "audit logging",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "mixed-estate/gateway-go",
+      "pattern": "mixed-estate/gateway-go",
+      "tier": "operational",
+      "mission_function": "API gateway",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "mixed-estate/config",
+      "pattern": "mixed-estate/config",
+      "tier": "operational",
+      "mission_function": "estate configuration",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "mixed-estate/service-js",
+      "pattern": "mixed-estate/service-js",
+      "tier": "support",
+      "mission_function": "health service",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "mixed-estate/tool-py",
+      "pattern": "mixed-estate/tool-py",
+      "tier": "support",
+      "mission_function": "ops unit converter",
+      "owner_unit": "Ops Cell"
+    },
+    {
+      "name": "mixed-estate/crypto-svc",
+      "pattern": "mixed-estate/crypto-svc",
+      "tier": "operational",
+      "mission_function": "token signing service",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "mixed-estate",
+      "pattern": "mixed-estate/*",
+      "tier": "support",
+      "mission_function": "mixed-language estate (other services)",
+      "owner_unit": "Logistics IT"
+    },
+    {
+      "name": "fleet",
+      "pattern": "fleet/*",
+      "tier": "support",
+      "mission_function": "ops tooling fleet",
+      "owner_unit": "Ops Cell"
+    }
+  ]
+}
