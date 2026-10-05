@@ -12,9 +12,10 @@
 #   4. lets that system reach the Ollama you run on Windows (mirrored networking on Windows 11)
 #   5. inside it, runs deploy/laptop-bootstrap.sh: toolchains, scanners, the repository, the
 #      virtualenv, the offline vulnerability database, then the checks
-#   6. writes double-click launchers into <drive>:\RAKSHA (console, shell, change model, update)
+#   6. asks which model provider + model to use (any time later: 'RAKSHA Set Model.bat')
+#   7. writes double-click launchers into <drive>:\RAKSHA (console, shell, change model, update)
 #
-# Parameters: -Drive D  -Model "gpt-oss:120b-cloud"  -SkipTests
+# Parameters: -Drive D  -Model "gpt-oss:120b-cloud" (an Ollama model; skips the provider menu)  -SkipTests
 # Needs ~6 GB free on the chosen drive and an internet connection for the install only.
 
 param(
@@ -106,24 +107,7 @@ if ((Wsl-Distros) -notcontains $distro) {
     Say "Using the existing '$distro' system"
 }
 
-# ---- 5. model --------------------------------------------------------------------------------
-if (-not $Model) {
-    $prev = (wsl.exe -d $distro -u root -- sh -c "cat /root/.raksha-model 2>/dev/null") -replace "`0", ""
-    if ($prev) { $Model = $prev.Trim() }
-}
-if (-not $Model) {
-    if (Get-Command ollama -ErrorAction SilentlyContinue) {
-        Say "Models Ollama has right now:"
-        ollama list
-    } else {
-        Write-Host "Ollama was not found on PATH. RAKSHA still runs without a model (templates + gate)."
-    }
-    Write-Host ""
-    Write-Host "Type the Ollama model RAKSHA should use (e.g. gpt-oss:120b-cloud, qwen3-coder:480b-cloud,"
-    Write-Host "or a local one like qwen2.5-coder:7b). Leave empty to run model-free; change later with"
-    Write-Host "'RAKSHA Set Model.bat'."
-    $Model = (Read-Host "Model").Trim()
-}
+# ---- 5. model: an Ollama model can be given up front; any provider is chosen after install ------
 if ($Model -match "(-cloud|:cloud)") {
     Write-Host "Note: '$Model' is an Ollama cloud model. Prompts, including the source code being fixed," -ForegroundColor Yellow
     Write-Host "go to ollama.com. Use it on the demo targets or code you may send out. Run 'ollama signin' once." -ForegroundColor Yellow
@@ -139,9 +123,17 @@ Say "Installing RAKSHA inside '$distro' (10-30 minutes the first time)"
 wsl.exe -d $distro -u root -- env "RAKSHA_OLLAMA_MODEL=$Model" "RAKSHA_SKIP_TESTS=$skip" sh -c "tr -d '\r' < '$shWsl' > /tmp/rb.sh && sh /tmp/rb.sh /root/RAKSHA_AI"
 if ($LASTEXITCODE -ne 0) { Write-Host "The installer stopped with code $LASTEXITCODE — see above. Re-running this script resumes." -ForegroundColor Red; exit $LASTEXITCODE }
 
+# ---- 6b. choose the model provider (any time later: 'RAKSHA Set Model.bat') ----------------
+$enter = "cd /root/RAKSHA_AI && . .venv/bin/activate && . /root/.raksha-env"
+$has = (wsl.exe -d $distro -u root -- sh -c "test -f /root/.raksha/provider.json && echo yes") -replace "`0", ""
+if (-not $has) {
+    Say "Choose the model provider and model (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, DeepSeek, ...)"
+    Write-Host "Pick 0 to run model-free for now; change it any time with 'RAKSHA Set Model.bat'."
+    wsl.exe -d $distro -u root -- bash -lc "$enter && python -m raksha.provider"
+}
+
 # ---- 7. launchers --------------------------------------------------------------------------
 Say "Writing launchers to $base"
-$enter = "cd /root/RAKSHA_AI && . .venv/bin/activate && . /root/.raksha-env"
 @"
 @echo off
 title RAKSHA AI console
@@ -157,15 +149,15 @@ wsl.exe -d $distro -u root -- bash -lc "$enter && exec bash -i"
 "@ | Set-Content "$base\RAKSHA Shell.bat" -Encoding ASCII
 @"
 @echo off
-set /p M=Ollama model name (empty = model-free):
-wsl.exe -d $distro -u root -- sh -c "printf '%%s\n' '%M%' > /root/.raksha-model"
-echo Saved. The next console or shell you open uses it.
+title RAKSHA AI model provider
+wsl.exe -d $distro -u root -- bash -lc "$enter && python -m raksha.provider && python -m raksha.provider test"
+echo The console and every command use this from now on (restart an open console).
 pause
 "@ | Set-Content "$base\RAKSHA Set Model.bat" -Encoding ASCII
 @"
 @echo off
 title RAKSHA AI checks
-wsl.exe -d $distro -u root -- bash -lc "$enter && python -m raksha.airgap && python scripts/model_lane_check.py && python -m raksha.slice_autofuzz && python -m pytest -q"
+wsl.exe -d $distro -u root -- bash -lc "$enter && export RAKSHA_PROVIDER=off && python -m raksha.airgap && python scripts/model_lane_check.py && python -m raksha.slice_autofuzz && python -m pytest -q"
 pause
 "@ | Set-Content "$base\RAKSHA Checks.bat" -Encoding ASCII
 @"
@@ -190,7 +182,7 @@ Write-Host @"
     RAKSHA Console.bat    the web console (opens http://127.0.0.1:8080)
     RAKSHA Shell.bat      a terminal inside the RAKSHA system, ready to run commands
     RAKSHA Checks.bat     air-gap guard, model-lane check, find-fix-prove slice, full tests
-    RAKSHA Set Model.bat  change the Ollama model
+    RAKSHA Set Model.bat  choose provider + model (Ollama, LM Studio, vLLM, OpenAI, DeepSeek, ...)
     RAKSHA Files.bat      open the code in Explorer
     RAKSHA Update.bat     pull the latest branch and re-verify
   Guide: docs/laptop-setup.md

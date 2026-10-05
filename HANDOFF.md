@@ -51,7 +51,10 @@ python -m pytest -q                  # ~880 tests; 7–15 min on a laptop
 RAKSHA_TARGETS=~/targets RAKSHA_OUT=~/out python -m raksha.orchestrator   # your own code
 ```
 
-Model: Ollama, set by `raksha_model <name>` or `RAKSHA Set Model.bat`.
+Model: any OpenAI-compatible provider (Ollama, LM Studio, vLLM, llama.cpp, OpenAI, DeepSeek,
+OpenRouter, Groq, Mistral, or a custom URL). Choose or change it any time with `raksha_provider`
+(a menu) or `RAKSHA Set Model.bat`. Change only the model with `raksha_model <name>`. Details are
+in `docs/laptop-setup.md` §2.
 - **Cloud models** (`…-cloud`) send source code to ollama.com. RAKSHA counts those calls as cloud
   calls and refuses them in sealed mode. Use them on demo targets only.
 - **No model** is a supported mode.
@@ -104,6 +107,11 @@ Model: Ollama, set by `raksha_model <name>` or `RAKSHA Set Model.bat`.
    whose disk lives on the big drive, sets up mirrored networking for Ollama, installs every
    toolchain and scanner, adds double-click launchers, and runs the checks. The Linux half was
    tested end to end in a fresh home directory: all 14 tools installed, every check passed.
+
+8. **Switchable model provider** (`raksha/provider.py`). Presets for local and hosted providers,
+   keys kept in a private file, servers on Windows found from WSL automatically, hosted providers
+   recorded as such (sealed off, CLOUD counted), and environment variables always win.
+   Tests: `tests/test_provider.py`.
 
 ## 6. What is left
 

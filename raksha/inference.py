@@ -137,7 +137,14 @@ class InferenceConfig:
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> "InferenceConfig":
-        env = env if env is not None else os.environ
+        if env is None:
+            env = os.environ
+            if not env.get("RAKSHA_INFERENCE_BASE_URL") and env.get("RAKSHA_PROVIDER", "") != "off":
+                # no endpoint in the environment: use the provider saved with `python -m raksha.provider`
+                # (environment variables still win one by one, e.g. RAKSHA_SEALED=1 on the sealed node;
+                # RAKSHA_PROVIDER=off ignores the saved choice for one command)
+                from .provider import env_settings
+                env = {**env_settings(), **env}
         return cls(
             base_url=env.get("RAKSHA_INFERENCE_BASE_URL") or None,
             api_key=env.get("RAKSHA_INFERENCE_API_KEY") or None,
@@ -266,6 +273,24 @@ def model_server_alive(config: InferenceConfig | None = None, timeout: float = 3
             return 200 <= resp.status < 300
     except Exception:  # noqa: BLE001 — any failure is "not alive"
         return False
+
+
+def list_models(config: InferenceConfig | None = None, timeout: float = 10.0) -> list[str]:
+    """Model ids the configured server offers (GET /models), [] when it cannot say. Sends the API
+    key when there is one (hosted providers require it). Does not count as an inference call."""
+    config = config or InferenceConfig.from_env()
+    if not config.base_url:
+        return []
+    try:
+        config.validate()
+        req = urllib.request.Request(config.base_url.rstrip("/") + "/models",
+                                     headers={"Authorization": f"Bearer {config.api_key}"} if config.api_key else {})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (allowlisted module)
+            data = json.loads(resp.read())
+    except Exception:  # noqa: BLE001 — "cannot list" is an answer, not a crash
+        return []
+    items = data.get("data", data.get("models", [])) if isinstance(data, dict) else []
+    return sorted({(m.get("id") or m.get("name")) for m in items if isinstance(m, dict) and (m.get("id") or m.get("name"))})
 
 
 def get_client(config: InferenceConfig | None = None) -> InferenceClient | None:

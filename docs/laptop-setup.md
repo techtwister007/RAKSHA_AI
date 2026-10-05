@@ -1,14 +1,15 @@
 # Running RAKSHA AI on your laptop
 
 Written for: a Windows laptop with **no GPU**, little space on C:, room on **D: or E:**, and
-**Ollama** installed (local or cloud models). Linux and macOS instructions are at the end.
+**Ollama** installed (local or cloud models). Any other OpenAI-compatible provider works too (§2). Linux and macOS instructions are at the end.
 
 ## 1. One click (Windows)
 
 1. Download **`deploy/windows/RAKSHA-Setup.bat`** from the repository (on GitHub, open the file
    and click *Download raw file*), or from a clone.
 2. Double-click it.
-3. Answer the one question: which Ollama model to use. Examples: `gpt-oss:120b-cloud`,
+3. At the end, pick a model provider and model from the menu (Ollama, LM Studio, vLLM, OpenAI,
+   DeepSeek, …), or 0 for model-free. Examples for Ollama: `gpt-oss:120b-cloud`,
    `qwen3-coder:480b-cloud`, or a local `qwen2.5-coder:7b`. Leave it empty to run model-free.
 
 What it does, in order:
@@ -35,36 +36,73 @@ skip the suite).
 | `RAKSHA Console.bat` | starts the console and opens http://127.0.0.1:8080 |
 | `RAKSHA Shell.bat` | a terminal inside the RAKSHA system, in the repo, with everything set up |
 | `RAKSHA Checks.bat` | air-gap guard, model-lane check, find → fix → prove slice, full tests |
-| `RAKSHA Set Model.bat` | change the Ollama model |
+| `RAKSHA Set Model.bat` | choose or change the provider and model (menu + test call) |
 | `RAKSHA Files.bat` | open the code in Explorer (`\\wsl.localhost\RAKSHA\root\RAKSHA_AI`) |
 | `RAKSHA Update.bat` | pull the latest branch and re-verify |
 
-## 2. Ollama: local or cloud
+## 2. Choosing and changing the model provider
 
-RAKSHA talks to Ollama's OpenAI-compatible endpoint (`/v1/chat/completions`). The shell settings
-live in `~/.raksha-env` inside the RAKSHA system, and the model name in `~/.raksha-model`.
-Change the model from `RAKSHA Shell.bat` with `raksha_model <name>`, or with
-`RAKSHA Set Model.bat`.
+Every provider RAKSHA supports speaks the OpenAI-compatible API, so a switch changes only the
+URL, the model name and, for hosted services, an API key. The choice is saved in
+`~/.raksha/provider.json` inside the RAKSHA system, and every RAKSHA command and the console use
+it. Change it as often as you like:
 
-- **Cloud models** are names ending in `-cloud` or `:cloud`. Run `ollama signin` once on Windows.
-  These are fast and need no GPU, but **the prompt, including the source code being fixed, goes to
-  ollama.com**. RAKSHA knows this:
-  - it counts every such call as a cloud call (the CLOUD badge stops reading 0);
-  - in sealed mode it refuses them;
-  - the launcher sets `RAKSHA_SEALED=0` for cloud models.
+- double-click **`RAKSHA Set Model.bat`**: a menu of providers, then the models that server
+  offers, then a one-line test; or
+- from `RAKSHA Shell.bat`:
 
-  Use cloud models only on the demo targets or code you are allowed to send out. Never at the
-  finale.
-- **Local models** (for example `ollama pull qwen2.5-coder:7b`) keep everything on the laptop. On
-  a CPU-only laptop a 7B model takes about a minute per answer. See `docs/model-benchmark.md`.
-- **No model at all** is a fully supported mode. Templates, fix memory and the mitigation floor
-  fixed every demo bug in the benchmark with zero model calls.
-
-Check that the model is reachable, from `RAKSHA Shell.bat`:
 ```sh
-echo $RAKSHA_INFERENCE_BASE_URL $RAKSHA_REPAIR_MODEL
-python -m raksha.slice_autofuzz          # model lane available as a fallback
-python scripts/model_benchmark.py        # measure the model on the 8 benchmark variants
+raksha_provider                                   # the same menu
+raksha_provider list                              # the presets below
+raksha_provider set ollama   --model qwen2.5-coder:7b
+raksha_provider set ollama   --model gpt-oss:120b-cloud
+raksha_provider set lmstudio --model qwen2.5-coder-7b-instruct
+raksha_provider set vllm     --model Qwen/Qwen2.5-Coder-32B-Instruct
+raksha_provider set llamacpp --model local
+raksha_provider set openai   --model gpt-4.1        --key sk-...
+raksha_provider set deepseek --model deepseek-chat  --key sk-...
+raksha_provider set custom   --url http://192.168.1.20:8000/v1 --model my-model
+raksha_model <name>                               # change only the model, same provider
+raksha_provider show | models | test | off        # what is in use / list models / one test call / model-free
+```
+
+| Provider | Default URL | Where the code goes | Key |
+|---|---|---|---|
+| Ollama | `http://127.0.0.1:11434/v1` | stays on the laptop (`…-cloud` models: ollama.com) | — (cloud: `ollama signin`) |
+| LM Studio | `http://127.0.0.1:1234/v1` | stays on the laptop | — |
+| vLLM | `http://127.0.0.1:8000/v1` | stays on the machine (the finale setup) | — |
+| llama.cpp server | `http://127.0.0.1:8081/v1` | stays on the laptop (start it on 8081; 8080 is the console) | — |
+| OpenAI | `https://api.openai.com/v1` | **OpenAI** | `OPENAI_API_KEY` or `--key` |
+| DeepSeek | `https://api.deepseek.com/v1` | **DeepSeek** | `DEEPSEEK_API_KEY` or `--key` |
+| OpenRouter / Groq / Mistral | their `/v1` URLs | **that service** | `OPENROUTER_API_KEY` / `GROQ_API_KEY` / `MISTRAL_API_KEY` |
+| custom | any `--url` | wherever that URL is | `RAKSHA_INFERENCE_API_KEY` or `--key` |
+
+How the details work:
+- **Keys** given with `--key` or typed into the menu go to `~/.raksha/keys.json` (readable only
+  by you, never in the repository). A key in the provider's environment variable is used instead
+  when set.
+- **Servers on Windows** (Ollama, LM Studio) are found automatically from the RAKSHA system: at
+  `127.0.0.1` with mirrored networking (Windows 11), otherwise at the Windows host address. On
+  Windows 10, make the server listen on the network: `OLLAMA_HOST=0.0.0.0` (the installer sets
+  it), or "Serve on Local Network" in LM Studio.
+- **Hosted providers and Ollama `-cloud` models receive the prompt, which includes the source
+  code being fixed.**
+  - Choosing one switches sealed mode off in the saved settings and prints a warning.
+  - Every call is counted on the CLOUD badge.
+  - The sealed finale node (`RAKSHA_SEALED=1` in its environment) refuses them whatever is saved.
+
+  Use them only on the demo targets or code you are allowed to send out.
+- **Environment variables win** over the saved choice (`RAKSHA_INFERENCE_BASE_URL`,
+  `RAKSHA_REPAIR_MODEL`, …). `RAKSHA_PROVIDER=off` ignores the saved choice for one command; the
+  install checks use it. Tests always run model-free.
+- **No model at all** is a fully supported mode. Templates, fix memory and the mitigation floor
+  fixed every demo bug in the benchmark with zero model calls. On a CPU-only laptop a local 7B
+  model takes about a minute per answer (`docs/model-benchmark.md`).
+
+Measure any provider on the same 8 benchmark bugs:
+```sh
+raksha_provider test
+python scripts/model_benchmark.py      # model-free vs with the model, table of results
 ```
 
 ## 3. Running it on your own code
@@ -103,7 +141,8 @@ session in that folder; `CLAUDE.md` and `HANDOFF.md` give it the full picture.
 | Symptom | Fix |
 |---|---|
 | "WSL has been enabled. RESTART…" | restart Windows, double-click `RAKSHA-Setup.bat` again |
-| "Ollama not reachable on 11434" | start Ollama on Windows; on Windows 10 quit and restart it after setup (it must pick up `OLLAMA_HOST`); open a new shell |
+| `raksha_provider test` fails: connection refused | start the model server (Ollama / LM Studio); on Windows 10 make it listen on the network (§2), restart it |
+| `raksha_provider test` fails: 401 | wrong or missing API key: `raksha_provider set <provider> --model <m> --key <key>` (Ollama cloud: `ollama signin`) |
 | Cloud model replies 401 / unauthorised | run `ollama signin` in a Windows terminal |
 | Very slow tests | normal on a laptop: the suite is about 880 tests, 7–15 minutes. Use `-SkipTests` for setup and `RAKSHA Checks.bat` later |
 | Java demo skipped | the Maven warm-up needs internet once; run `RAKSHA Update.bat` |
@@ -128,6 +167,6 @@ On macOS the apt steps are skipped. Install Python 3.11+, git and gcc yourself.
 | | Laptop | Sealed node |
 |---|---|---|
 | Network isolation of target code | none (`NET IF: unenforced`, shown honestly) | Docker sandbox, `NET IF: 0` (`RAKSHA_SANDBOX_IMAGE`, `RAKSHA_REQUIRE_SANDBOX=1`) |
-| Model | Ollama, local or cloud | vLLM serving a ~32B model on the GPU, sealed mode on |
+| Model | any provider (`raksha_provider`) | vLLM serving a ~32B model on the GPU, sealed mode on |
 | GPU numbers | `null` on the scorecard (never a fake zero) | measured |
 | Signing key | generate one with `python -m raksha.keys init ~/.raksha-bundle.key` and set `RAKSHA_BUNDLE_KEY_FILE` to it | generated at install by `deploy/install.sh`, read-only mount |

@@ -10,7 +10,7 @@
 #   - the external scanners RAKSHA can take findings from: semgrep, checkov, gitleaks,
 #     osv-scanner (plus its offline database), and opa + cosign for the policy check and the seal
 #   - the optional solver (z3) for the bound proofs
-#   - ~/.raksha-env: PATH for the tools, and the model settings (Ollama) if RAKSHA_OLLAMA_MODEL is set
+#   - ~/.raksha-env: PATH for the tools and the raksha_provider / raksha_model commands
 # Re-runnable: an existing checkout is updated, tools already present are kept.
 #
 # Environment knobs (all optional):
@@ -94,6 +94,7 @@ else
     git clone -q --branch "$BRANCH" "$REPO" "$TARGET"
 fi
 cd "$TARGET"
+TARGET=$(pwd)                       # absolute: the shell functions in ~/.raksha-env use it
 
 # ---- 3. python environment -----------------------------------------------------------------
 say "creating the virtualenv (runtime has no third-party deps; dev = pytest + jsonschema; z3 optional)"
@@ -140,50 +141,34 @@ if need mvn && need java && [ ! -f "$TOOLS/maven.ok" ]; then
     sh deploy/warm-maven.sh && touch "$TOOLS/maven.ok" || echo "  (Maven warm-up failed — the Java demo will be skipped; everything else is unaffected)"
 fi
 
-# ---- 6. ~/.raksha-env: tools on PATH, scanners on, model settings ---------------------------
+# ---- 6. ~/.raksha-env and the model provider ----------------------------------------------
 say "writing ~/.raksha-env"
-MODEL="${RAKSHA_OLLAMA_MODEL:-}"
-[ -z "$MODEL" ] && [ -f "$HOME/.raksha-model" ] && MODEL=$(cat "$HOME/.raksha-model")
-[ -n "$MODEL" ] && printf '%s\n' "$MODEL" > "$HOME/.raksha-model"
-cat > "$HOME/.raksha-env" <<'ENV'
+cat > "$HOME/.raksha-env" <<ENV
 # RAKSHA AI environment — written by deploy/laptop-bootstrap.sh. Safe to edit.
-export PATH="$HOME/.raksha-tools/bin:/usr/local/go/bin:$PATH"
-export OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY="$HOME/.raksha-tools/osv-db"
-[ -f "$HOME/.raksha-tools/osv-db.ok" ] && export RAKSHA_OSV_OFFLINE=1
+export PATH="\$HOME/.raksha-tools/bin:/usr/local/go/bin:\$PATH"
+export OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY="\$HOME/.raksha-tools/osv-db"
+[ -f "\$HOME/.raksha-tools/osv-db.ok" ] && export RAKSHA_OSV_OFFLINE=1
 export RAKSHA_TAKE_ALL=1               # take findings from every installed scanner
 
-# --- model (Ollama) ---------------------------------------------------------------------
-# The model name lives in ~/.raksha-model (one line). Change it with:  raksha_model <name>
-# Ollama runs on Windows; WSL reaches it at 127.0.0.1 (mirrored networking) or at the Windows
-# host address otherwise. The first one that answers is used.
-raksha_ollama_url() {
-    for h in 127.0.0.1 "$(ip route show default 2>/dev/null | awk '{print $3; exit}')"; do
-        [ -n "$h" ] && curl -sf -m 2 "http://$h:11434/api/tags" >/dev/null 2>&1 && { echo "http://$h:11434/v1"; return 0; }
-    done
-    return 1
-}
-raksha_model() { printf '%s\n' "$1" > "$HOME/.raksha-model"; . "$HOME/.raksha-env"; echo "model: $1"; }
-if [ -s "$HOME/.raksha-model" ]; then
-    _m=$(cat "$HOME/.raksha-model")
-    if _u=$(raksha_ollama_url); then
-        export RAKSHA_INFERENCE_BASE_URL="$_u" RAKSHA_REPAIR_MODEL="$_m" RAKSHA_ADVISOR_MODEL="$_m"
-        export RAKSHA_INFERENCE_TIMEOUT=300
-        case "$_m" in
-            *-cloud|*:cloud|*-cloud:*)
-                # Cloud models send the prompt (and the source in it) to ollama.com. Sealed mode
-                # refuses them; this turns sealed mode off for this shell. Use on demo or own code only.
-                export RAKSHA_SEALED=0 ;;
-        esac
-    else
-        unset RAKSHA_INFERENCE_BASE_URL
-        echo "(raksha: Ollama not reachable on 11434 — running model-free; start Ollama and open a new shell)" >&2
-    fi
-fi
-raksha_test() { python -m pytest -q "$@"; }   # tests ignore the model/scanner settings above
+# Model provider and model: saved in ~/.raksha/provider.json and read by RAKSHA itself.
+#   raksha_provider            interactive: Ollama, LM Studio, vLLM, llama.cpp, OpenAI, DeepSeek, ...
+#   raksha_provider show       what is in use;   raksha_provider test   one tiny request
+#   raksha_model <name>        change only the model;   raksha_provider off   run model-free
+raksha_provider() { "$TARGET/.venv/bin/python" -m raksha.provider "\$@"; }
+raksha_model() { raksha_provider model "\$1"; }
+raksha_test() { (cd "$TARGET" && "$TARGET/.venv/bin/python" -m pytest -q "\$@"); }   # tests ignore the provider
 ENV
 grep -q '.raksha-env' "$HOME/.bashrc" 2>/dev/null || printf '\n[ -f ~/.raksha-env ] && . ~/.raksha-env\n' >> "$HOME/.bashrc"
 
+# An Ollama model given to the installer (or saved by an older install) becomes the provider choice.
+MODEL="${RAKSHA_OLLAMA_MODEL:-}"
+[ -z "$MODEL" ] && [ -f "$HOME/.raksha-model" ] && MODEL=$(cat "$HOME/.raksha-model")
+if [ -n "$MODEL" ] && [ ! -f "${RAKSHA_HOME:-$HOME/.raksha}/provider.json" ]; then
+    python -m raksha.provider set ollama --model "$MODEL" >/dev/null && rm -f "$HOME/.raksha-model"
+fi
+
 # ---- 7. verify ------------------------------------------------------------------------------
+export RAKSHA_PROVIDER=off           # the install checks run model-free, whatever model is saved
 say "installed tools"
 for t in python3 git gcc java mvn go cargo node semgrep checkov gitleaks osv-scanner opa cosign; do
     if need "$t"; then printf '  %-12s ok\n' "$t"; else printf '  %-12s absent (that lane is skipped)\n' "$t"; fi
@@ -198,10 +183,9 @@ if [ "${RAKSHA_SKIP_TESTS:-0}" != 1 ]; then
     say "full test suite (several minutes on a laptop; skip with RAKSHA_SKIP_TESTS=1)"
     python -m pytest -q
 fi
-. "$HOME/.raksha-env" || true
-if [ -n "${RAKSHA_INFERENCE_BASE_URL:-}" ]; then
-    say "model reachable: ${RAKSHA_REPAIR_MODEL:-?} at $RAKSHA_INFERENCE_BASE_URL"
-fi
+unset RAKSHA_PROVIDER
+say "model provider"
+python -m raksha.provider show
 
 say "installed at $TARGET"
 cat <<EOF
@@ -210,6 +194,7 @@ cat <<EOF
       cd "$TARGET" && . .venv/bin/activate
       python -m raksha.orchestrator     # console at http://127.0.0.1:8080
       python -m raksha.slice_three      # C, Python, Java through the one gate
-      raksha_model <ollama model name>  # switch model;  raksha_test  runs the tests
+      raksha_provider                   # choose provider + model (Ollama, LM Studio, OpenAI, DeepSeek, vLLM, ...)
+      raksha_model <name>               # change only the model;  raksha_test  runs the tests
   Full guide: docs/laptop-setup.md
 EOF
