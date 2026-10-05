@@ -101,8 +101,9 @@ recall is undefined — there is no catalogue of all real bugs to divide by — 
 population recall is still declined. Two sets have an exact denominator:
 
 - **Mutation factory:** **100%** (8/8). Every bug-preserving variant is a real instance of a known
-  defect, so the denominator is exact; recall is the find half, the fix rate (75% of variants) the
-  repair half.
+  defect, so the denominator is exact; recall is the find half, the fix rate the repair half — now
+  **100%** (8/8, zero model calls) after the `os.system`/`os.popen` template was added (it was 75%).
+  The local-model benchmark that exposed the gap is in `docs/model-benchmark.md`.
 - **Demo ground truth, fuzzable families:** **54.5%** (6/11), misses named
   (c-binsink, js-noharness, go-decoder, rust-nolibfuzzer, java-noharness — the deep-lane toolchains
   absent on this box, or no fuzzable entry point). Families a runtime oracle cannot reach
