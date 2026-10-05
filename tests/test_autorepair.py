@@ -256,6 +256,20 @@ def test_model_edits_become_exact_diffs():
     assert edits_to_diff("<<<<<<< SEARCH\nnot there\n=======\nx\n>>>>>>> REPLACE", "conv.py", src) is None
 
 
+def test_model_edit_matches_a_line_copied_without_its_trailing_comment():
+    """Found by scripts/model_lane_check.py: models copy a line's code and drop the comment after
+    it. The edit still lands; an edit that matches two places is still refused."""
+    from raksha.repair import edits_to_diff
+    src = ("int f(char *s, size_t n) {\n    char b[32];\n"
+           "    memcpy(b, s, n);        /* BUG: unbounded */\n    return b[0];\n}\n")
+    edit = ("<<<<<<< SEARCH\n    memcpy(b, s, n);\n=======\n    if (n > sizeof(b)) n = sizeof(b);\n"
+            "    memcpy(b, s, n);\n>>>>>>> REPLACE")
+    d = edits_to_diff(edit, "t.c", src)
+    assert d and "+    if (n > sizeof(b)) n = sizeof(b);" in d
+    py = "x = run(a)  # first\nx = run(a)  # second\n"
+    assert edits_to_diff("<<<<<<< SEARCH\nx = run(a)\n=======\nx = 1\n>>>>>>> REPLACE", "t.py", py) is None
+
+
 def test_model_lane_tops_up_candidates_and_drops_no_op_patches(tmp_path):
     """A server that returns one choice per call (llama.cpp) still yields n attempts; a reply whose
     'diff' changes nothing is dropped before the gate."""

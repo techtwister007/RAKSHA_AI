@@ -1,0 +1,5 @@
+<<<<<<< SEARCH
+    v2 = subprocess.run("echo converting: " + v4, shell=True, capture_output=True, text=True)
+=======
+    v2 = subprocess.run(["echo", "converting:", v4], capture_output=True, text=True)
+>>>>>>> REPLACE

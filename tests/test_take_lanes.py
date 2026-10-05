@@ -140,3 +140,13 @@ def test_unparseable_output_is_dropped_not_fatal(tmp_path, monkeypatch):
     _install_fake(tmp_path, monkeypatch, "semgrep", 'echo "not json {{{"\n')
     monkeypatch.setenv("RAKSHA_TAKE_SEMGREP", "1")
     assert take.run_take_lanes("/root") == []     # garbage output degrades cleanly
+
+
+def test_osv_offline_flag_matches_the_installed_version(tmp_path, monkeypatch):
+    """osv-scanner v1 rejects `--offline` (it has `--experimental-offline`); v2 has `--offline`.
+    The lane reads the tool's own help so RAKSHA_OSV_OFFLINE=1 never breaks the lane."""
+    for help_text, want in (("   --experimental-offline   run in offline mode", "--experimental-offline"),
+                            ("   --offline   run in offline mode\n   --experimental-offline x", "--offline")):
+        _install_fake(tmp_path, monkeypatch, "osv-scanner", f"echo '{help_text}'\n")
+        monkeypatch.setattr(take, "_OSV_OFFLINE_FLAGS", None)
+        assert take._osv_offline_flags() == [want]

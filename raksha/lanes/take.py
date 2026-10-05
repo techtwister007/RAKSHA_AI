@@ -142,6 +142,26 @@ def _semgrep_findings(stdout: str, root: str) -> list[Finding]:
     return out
 
 
+_OSV_OFFLINE_FLAGS: list[str] | None = None
+
+
+def _osv_offline_flags() -> list[str]:
+    """The offline flag this osv-scanner understands: `--offline` (v2) or `--experimental-offline`
+    (v1, which rejects `--offline` and so would fail the lane). Read from its own help, once."""
+    global _OSV_OFFLINE_FLAGS
+    if _OSV_OFFLINE_FLAGS is None:
+        try:
+            out = subprocess.run(["osv-scanner", "scan", "--help"], capture_output=True, text=True,
+                                 timeout=30)
+            text = out.stdout + out.stderr
+        except (OSError, subprocess.SubprocessError):
+            text = ""
+        v2 = "--offline" in text.replace("--experimental-offline", "")
+        v1 = "--experimental-offline" in text
+        _OSV_OFFLINE_FLAGS = ["--experimental-offline"] if v1 and not v2 else ["--offline"]
+    return _OSV_OFFLINE_FLAGS
+
+
 def _semgrep_rules() -> str:
     """Rules for the Semgrep lane: RAKSHA_SEMGREP_RULES when set, else the bundled offline ruleset
     (Semgrep's "auto" config downloads rules, which a sealed box cannot)."""
@@ -297,7 +317,7 @@ LANES: tuple[TakeLane, ...] = (
              _gitleaks_findings),
     TakeLane("osv-scanner", "osv-scanner", "RAKSHA_TAKE_OSV_SCANNER",
              lambda root: ["osv-scanner", "--format", "json", "--recursive",
-                           *(["--offline"] if _truthy(os.environ.get("RAKSHA_OSV_OFFLINE")) else []), root],
+                           *(_osv_offline_flags() if _truthy(os.environ.get("RAKSHA_OSV_OFFLINE")) else []), root],
              _osv_scanner_findings),
     TakeLane("checkov", "checkov", "RAKSHA_TAKE_CHECKOV",
              lambda root: ["checkov", "-d", root, "-o", "json", "--quiet", "--compact",

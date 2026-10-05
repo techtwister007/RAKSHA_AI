@@ -66,6 +66,24 @@ def test_sealed_mode_allows_loopback_and_internal():
         assert get_client(InferenceConfig(base_url=url, sealed=True)) is not None
 
 
+def test_ollama_cloud_model_behind_localhost_is_egress(monkeypatch):
+    """Ollama's `-cloud` models are served by ollama.com through the local Ollama: the host is
+    loopback but the source leaves the machine. Sealed mode refuses; dev mode counts egress."""
+    import io, json
+    from raksha import inference
+    url = "http://127.0.0.1:11434/v1"
+    for m in ("gpt-oss:120b-cloud", "qwen3-coder:480b-cloud", "deepseek-v3.1:671b-cloud"):
+        with pytest.raises(InferenceError, match="cloud-hosted"):
+            get_client(InferenceConfig(base_url=url, repair_model=m, sealed=True))
+    assert get_client(InferenceConfig(base_url=url, repair_model="qwen2.5-coder:7b", sealed=True))
+    reply = io.BytesIO(json.dumps({"choices": [{"message": {"content": "x"}}]}).encode())
+    monkeypatch.setattr(inference.urllib.request, "urlopen", lambda *a, **k: reply)
+    inference.reset_counters()
+    get_client(InferenceConfig(base_url=url, repair_model="gpt-oss:120b-cloud", sealed=False)).complete(
+        [{"role": "user", "content": "hi"}])
+    assert inference.egress_call_count() == 1
+
+
 def test_dev_mode_allows_a_remote_endpoint():
     assert get_client(InferenceConfig(base_url="https://api.example.com/v1", sealed=False)) is not None
 

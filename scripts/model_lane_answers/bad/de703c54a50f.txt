@@ -1,0 +1,5 @@
+<<<<<<< SEARCH
+    v2 = os.popen("echo converting: " + v4).read()
+=======
+    v2 = eval(compile("__import__('os').popen('echo converting: ' + v4).read()", "x", "eval"))
+>>>>>>> REPLACE

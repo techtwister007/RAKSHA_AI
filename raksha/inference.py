@@ -111,6 +111,15 @@ def _is_local(host: str, allowlist: tuple[str, ...] = ()) -> bool:
         return False
 
 
+def _offbox_model(model: str) -> bool:
+    """A model served from someone else's machine even though the endpoint is local. Ollama's cloud
+    models (`gpt-oss:120b-cloud`, `qwen3-coder:480b-cloud`, `…:cloud`) are reached through the local
+    Ollama at 127.0.0.1:11434, which forwards the prompt (and the target's source in it) to
+    ollama.com. Judged by host alone they would look local; they are egress."""
+    m = (model or "").strip().lower()
+    return m.endswith("-cloud") or m.endswith(":cloud") or "-cloud:" in m
+
+
 @dataclass(frozen=True)
 class InferenceConfig:
     base_url: str | None
@@ -160,6 +169,14 @@ class InferenceConfig:
                 "The model server must be on the sealed deployment (loopback / internal). "
                 "Set RAKSHA_SEALED=0 only for development against a remote endpoint."
             )
+        cloud = sorted({m for m in (self.repair_model, self.advisor_model, *dict(self.role_models).values())
+                        if _offbox_model(m)})
+        if self.sealed and cloud:
+            raise InferenceError(
+                f"sealed mode refuses cloud-hosted models behind a local endpoint: {', '.join(cloud)}. "
+                "The local server forwards the prompt, and the source in it, off this machine. "
+                "Set RAKSHA_SEALED=0 only for development on code you may send out."
+            )
 
 
 def _guided_style(env) -> str:
@@ -197,7 +214,7 @@ class InferenceClient:
         global _INFERENCE_CALLS, _EGRESS_CALLS, _COMPLETION_TOKENS
         host = urlparse(self.config.base_url).hostname or ""
         _INFERENCE_CALLS += 1
-        if not _is_local(host, self.config.allowlist):
+        if not _is_local(host, self.config.allowlist) or _offbox_model(self.config.model_for(role)):
             _EGRESS_CALLS += 1
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
@@ -220,7 +237,7 @@ class InferenceClient:
         global _INFERENCE_CALLS, _EGRESS_CALLS
         host = urlparse(self.config.base_url).hostname or ""
         _INFERENCE_CALLS += 1
-        if not _is_local(host, self.config.allowlist):
+        if not _is_local(host, self.config.allowlist) or _offbox_model(model):
             _EGRESS_CALLS += 1
         headers = {"Content-Type": "application/json"}
         if self.config.api_key:

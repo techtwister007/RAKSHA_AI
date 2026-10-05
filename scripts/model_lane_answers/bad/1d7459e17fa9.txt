@@ -1,0 +1,6 @@
+<<<<<<< SEARCH
+        memmove(v18, v19 + 2, v11);
+=======
+        if (v11 > 2*sizeof(v18)) v11 = 2*sizeof(v18);   /* bound the copy to the destination */
+        memmove(v18, v19 + 2, v11);
+>>>>>>> REPLACE

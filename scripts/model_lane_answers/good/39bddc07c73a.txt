@@ -1,0 +1,5 @@
+<<<<<<< SEARCH
+    v2 = str(os.system("echo converting: " + v4))
+=======
+    v2 = str(subprocess.run(["echo", "converting:", v4]).returncode)
+>>>>>>> REPLACE

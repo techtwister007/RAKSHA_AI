@@ -161,12 +161,21 @@ def split_diff_and_test(text: str) -> tuple[str | None, str | None]:
 _EDIT_BLOCK = re.compile(r"<{5,}\s*SEARCH\s*\n(.*?)\n={5,}\s*\n(.*?)\n?>{5,}\s*REPLACE", re.DOTALL)
 
 
+_TRAILING_COMMENT = re.compile(r"\s*(?:/\*.*?\*/|//.*|#[^'\"]*)\s*$")
+
+
+def _code_only(s: str) -> str:
+    """A line without its trailing comment or surrounding whitespace. Models routinely copy the
+    code of a line and drop the comment after it; matching on code alone keeps that fix."""
+    return _TRAILING_COMMENT.sub("", s).strip()
+
+
 def _locate(lines: list[str], block: list[str]) -> int | None:
-    """Index where `block` occurs in `lines`, exactly or ignoring surrounding whitespace; None if
-    absent or ambiguous (more than one place)."""
+    """Index where `block` occurs in `lines`: exactly, then ignoring surrounding whitespace, then
+    ignoring trailing comments too. None if absent or ambiguous (more than one place)."""
     if not block:
         return None
-    for norm in (lambda s: s, lambda s: s.strip()):
+    for norm in (lambda s: s, lambda s: s.strip(), _code_only):
         want = [norm(b) for b in block]
         hits = [i for i in range(len(lines) - len(block) + 1)
                 if [norm(x) for x in lines[i:i + len(block)]] == want]

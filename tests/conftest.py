@@ -40,3 +40,18 @@ def _isolated_project_store(monkeypatch, tmp_path):
     """Wave 5: project reports and learning state go to a per-test RAKSHA_HOME, never the real one."""
     if not __import__("os").environ.get("RAKSHA_HOME_KEEP"):
         monkeypatch.setenv("RAKSHA_HOME", str(tmp_path / "raksha-home"))
+
+
+_OPERATOR_ENV = ("RAKSHA_INFERENCE_BASE_URL", "RAKSHA_INFERENCE_API_KEY", "RAKSHA_REPAIR_MODEL",
+                 "RAKSHA_ADVISOR_MODEL", "RAKSHA_TRIAGE_MODEL", "RAKSHA_RED_MODEL", "RAKSHA_JUDGE_MODEL",
+                 "RAKSHA_EMBED_MODEL", "RAKSHA_SEALED", "RAKSHA_TAKE_ALL", "RAKSHA_TAKE_SEMGREP",
+                 "RAKSHA_TAKE_GITLEAKS", "RAKSHA_TAKE_OSV_SCANNER", "RAKSHA_TAKE_CHECKOV",
+                 "RAKSHA_OSV_OFFLINE", "RAKSHA_OPA", "RAKSHA_COSIGN_KEY", "RAKSHA_GUIDED_DECODING")
+
+
+@pytest.fixture(autouse=True)
+def _no_operator_settings(monkeypatch):
+    """A laptop shell set up for real use (a model on Ollama, scanners on) must not leak into the
+    tests: each test sees the model-free, scanner-off default and opts in to anything it needs."""
+    for name in _OPERATOR_ENV:
+        monkeypatch.delenv(name, raising=False)
