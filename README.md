@@ -17,9 +17,11 @@ real. Nothing unproven ever ships.
 | Path | What it is |
 |---|---|
 | `RAKSHA_AI_Dossier/` | The settled brief — competition decode, architecture, tool map, models, honest gaps. Read `README.md` there first. |
-| **`HANDOVER.md`** | **Start here on a new machine:** current state, how to resume, prioritised remaining work, honest limits. |
+| **`HANDOFF.md`** | **Start here on a new machine (5 Oct 2026):** what it is, how to run it, what the last session fixed, what is left. |
+| `HANDOVER.md` | Full build history, prioritised remaining work, honest limits. |
+| **`deploy/windows/RAKSHA-Setup.bat`** | **One-click Windows install onto D:/E:** (WSL2, all toolchains and scanners, Ollama, launchers) — `docs/laptop-setup.md`. |
 | `BUILD_PLAN.md` | The execution plan: finale answers, settled decisions, phases, and the scoring ledger. |
-| `docs/` | The architecture sheet, campaign plan and plan map (HTML). **`docs/laptop-setup.md`: run the whole system on your own machine.** `docs/external-review-vetting.md`: the build vetted against an outside critical review. **`docs/future-technologies.md`: the 2026→2030 technology horizon — PQC, heterogeneous intelligence, concurrency, attack graphs, attestation — marked built / wired / roadmap.** **`docs/threat-model.md`: the threat model of RAKSHA itself — each surface mapped to a built control and its test.** |
+| `docs/` | **`docs/app-walkthrough.md`: every console screen, screenshotted and explained.** `docs/ui-design-brief.md`: brief for a UI redesign. `docs/missing-pieces.md`: what is not built and how to build it. The architecture sheet, campaign plan and plan map (HTML). **`docs/laptop-setup.md`: run the whole system on your own machine.** `docs/external-review-vetting.md`: the build vetted against an outside critical review. **`docs/future-technologies.md`: the 2026→2030 technology horizon — PQC, heterogeneous intelligence, concurrency, attack graphs, attestation — marked built / wired / roadmap.** **`docs/threat-model.md`: the threat model of RAKSHA itself — each surface mapped to a built control and its test.** |
 | `raksha/` | The product. |
 | `tests/` | The invariant and keystone tests. |
 
@@ -35,7 +37,7 @@ slow mutation test), with every slow lane, the deep and Java slices and the z3 p
 air-gap guard and pyflakes clean; all slices `VERIFIED`.
 What is deliberately not claimed — and what remains to do — is in `HANDOVER.md` §4–5 and
 `docs/threat-model.md` (residual risks): the 36-hour rehearsal and the real-Docker sandbox need
-the finale hardware; the model lane has run only against a mock endpoint; the SMT solver is an
+the finale hardware; the model lane is checked end to end with known-good and known-bad model answers (`scripts/model_lane_check.py`) and benchmarked with a local 7B model on CPU, but not yet with the finale's GPU model; the SMT solver is an
 optional extra baked into the sealed image (absent, proofs read `unavailable`); no code-embedding
 model is bundled, so cross-language retrieval uses a stated structural vector; fix templates are
 few and the model generalises beyond them.

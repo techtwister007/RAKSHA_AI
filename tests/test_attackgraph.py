@@ -205,3 +205,13 @@ def test_annotate_sets_mission_impact(estate_findings):
     assert unknown.mission_impact == "operational"                             # the documented default
     assets.annotate([unknown], reg, target="c-nolibfuzzer")
     assert unknown.mission_impact == "mission-critical"
+
+
+def test_deep_lane_target_name_is_its_own_service():
+    """A deep finding's target is a bare project name; it is that service, not the estate root
+    (found in the console walkthrough: those graph nodes showed an empty service)."""
+    from types import SimpleNamespace as NS
+    assert attackgraph.service_of(NS(target="c-nolibfuzzer")) == "c-nolibfuzzer"
+    assert attackgraph.service_of(NS(target="gateway-go/openapi.json")) == "gateway-go"
+    assert attackgraph.service_of(NS(target="app.properties")) == ""
+    assert not attackgraph.estate_wide(NS(target="py-noharness"))

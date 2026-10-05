@@ -62,7 +62,7 @@ unit-tested here, but the full execution needs the finale hardware (named in the
 | Signed internal-CERT advisory from a verified fix | BUILT | `raksha/advisory.py`; sequential id, affected assets, proven patch; `verify_advisory` detects a one-byte change |
 | Scrub the run to any hour | BUILT | the time-lapse (J9): replays a verified, hash-chained journal; a shipped 16-minute recording verifies |
 | Tamper-evident audit trail | BUILT | hash-chained session journal (`raksha/journal.py`); `verify()` fails on any altered or dropped line |
-| Air-gap: 0 cloud calls | BUILT + MEASURED | the egress counter (J6) + the inference client counting any non-local call; the two agree by construction |
+| Air-gap: 0 cloud calls | BUILT + MEASURED | the egress counter (J6) + the inference client counting any non-local call; the two agree by construction. Ollama `-cloud` models behind localhost are counted as cloud calls and refused in sealed mode (`raksha/inference.py::_offbox_model`, tested) |
 
 ## Wave 5 claims
 
@@ -85,6 +85,14 @@ unit-tested here, but the full execution needs the finale hardware (named in the
 | Evidence can be verified without the power to forge | BUILT (optional) | cosign public-key seal, `raksha/cosign.py` |
 | Rules of engagement are enforced twice | BUILT (optional) | OPA policy `raksha/data/roe.rego` must agree with `raksha/roe.py` |
 | Each deployment has its own signing key | BUILT | `raksha/keys.py`, run by `deploy/install.sh` |
+| OSV-Scanner works offline | BUILT + MEASURED | offline flag chosen per installed version; 81 findings on the demo estate with the local database, no network |
+
+## Model lane
+
+| claim | status | behind it |
+|-------|--------|-----------|
+| A model-proposed fix is accepted only through the gate | BUILT + MEASURED | `scripts/model_lane_check.py`, templates off: 8/8 correct model fixes VERIFIED, 0/8 plausible-but-wrong ones (loose bound, blocklist, shell quoting, eval) |
+| A model improves the fix rate | NOT CLAIMED | 7B on CPU added no fixes beyond the templates (`docs/model-benchmark.md`); the finale GPU model is still to be measured |
 
 ## Standing honest gaps (unchanged from the threat model)
 

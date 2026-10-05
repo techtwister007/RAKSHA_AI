@@ -47,7 +47,13 @@ def test_board_card_counts_verified():
     f = _verified()
     s.attach_target("svc", [f], build_status="green")
     card = s.board()[0]
-    assert card["build_status"] == "green" and card["verified"] == 1 and card["status"] == "fixing"
+    assert card["build_status"] == "green" and card["verified"] == 1 and card["status"] == "fixed"
+    # one proven fix among open findings is still "fixing"; every finding fixed is "fixed"
+    from types import SimpleNamespace
+    from raksha.finding import Status
+    from raksha.orchestrator import Target
+    open_one = SimpleNamespace(status=Status.CONFIRMED)
+    assert Target._status([f, open_one]) == "fixing" and Target._status([f]) == "fixed"
 
 
 def test_unreadable_target_is_red_not_a_crash(tmp_path):
@@ -164,3 +170,16 @@ def _verified() -> Finding:
     f.record_replay_after(ReplayResult(oracle_fired=False, at=utcnow()))
     f.verify()
     return f
+
+
+def test_console_serves_its_own_static_files_and_nothing_else(tmp_path, monkeypatch):
+    """A redesigned console can ship css/js/fonts under console/; nothing outside it is served."""
+    from console import server
+    monkeypatch.setattr(server, "CONSOLE_DIR", tmp_path)
+    (tmp_path / "ui").mkdir()
+    (tmp_path / "ui" / "style.css").write_text("body{}")
+    (tmp_path / "server.py").write_text("secret")
+    (tmp_path.parent / "outside.css").write_text("x")
+    assert server._static_file("/ui/style.css")[1].startswith("text/css")
+    for bad in ("/server.py", "/../outside.css", "/.git/config", "/ui/../../outside.css", "/"):
+        assert server._static_file(bad) is None, bad

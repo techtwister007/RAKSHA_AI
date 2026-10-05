@@ -45,6 +45,28 @@ CONSOLE_DIR = Path(__file__).parent
 INDEX = CONSOLE_DIR / "index.html"
 
 
+_STATIC_TYPES = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+                 ".mjs": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png",
+                 ".jpg": "image/jpeg", ".webp": "image/webp", ".ico": "image/x-icon",
+                 ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".json": "application/json"}
+
+
+def _static_file(path: str):
+    """A file under console/ with a known static type, or None. Lets a redesigned console ship its
+    own stylesheets, scripts, fonts and images (all offline). Never leaves console/; never serves
+    Python or dotfiles."""
+    rel = path.lstrip("/")
+    if not rel or rel.startswith(".") or "/." in rel or "\\" in rel:
+        return None
+    try:
+        f = (CONSOLE_DIR / rel).resolve()
+        f.relative_to(CONSOLE_DIR.resolve())
+    except (ValueError, OSError):
+        return None
+    ctype = _STATIC_TYPES.get(f.suffix.lower())
+    return (f, ctype) if ctype and f.is_file() else None
+
+
 def make_handler(session, *, token: str | None = None):
     tok = token or secrets.token_urlsafe(16)
 
@@ -106,6 +128,9 @@ def make_handler(session, *, token: str | None = None):
                 else:
                     self._send(404, b"app.js missing", "text/plain")
                 return
+            static = _static_file(path)
+            if static is not None:
+                self._send(200, static[0].read_bytes(), static[1]); return
             if path == "/api/snapshot":
                 self._json(200, session.snapshot()); return
             if path == "/api/timelapse":

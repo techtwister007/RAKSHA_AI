@@ -1,5 +1,8 @@
 # RAKSHA AI — Handover and remaining work
 
+> **Newest state and the laptop setup: read `HANDOFF.md` first** (5 October 2026). This file is
+> the full history and the long work list.
+
 **Read this first when resuming on a new machine.** It says exactly where the project stands,
 how to pick it up, what is left, and what is honestly *not* done. Everything else in the repo is
 either the product (`raksha/`), its proof (`tests/`), or the brief (`RAKSHA_AI_Dossier/`).
@@ -10,7 +13,7 @@ either the product (`raksha/`), its proof (`tests/`), or the brief (`RAKSHA_AI_D
 |---|---|
 | Repository | `https://github.com/techtwister007/RAKSHA_AI` |
 | Branch | `claude/magical-mayer-gs2xno` (all 35+ commits; nothing lives anywhere else) |
-| Get it on a laptop | `docs/laptop-setup.md` — one pasteable command for Windows (WSL2) or Linux/macOS |
+| Get it on a laptop | double-click `deploy/windows/RAKSHA-Setup.bat` (installs on D:/E:) — guide `docs/laptop-setup.md` |
 | Execution plan + scoring ledger | `BUILD_PLAN.md` |
 | The settled brief | `RAKSHA_AI_Dossier/` (start with `EXECUTIVE_SUMMARY.md`) |
 | Our own measured numbers | `docs/benchmark-report.md` (regenerate with `python -m raksha.benchmark`) |
@@ -102,16 +105,17 @@ dispatches by what the target ships (Cargo.toml / go.mod / package.json / else C
 
 ## 3. How to resume
 
-**On the laptop:** follow `docs/laptop-setup.md` §0 (one command). Then the smoke test that proves
+**On the laptop:** double-click `deploy/windows/RAKSHA-Setup.bat` (`docs/laptop-setup.md` §1). Then the smoke test that proves
 the install is whole:
 ```sh
 pytest -q && python -m raksha.airgap && python -m raksha.slice_autofuzz && python -m raksha.slice_three
 ```
 
 **With a model:** set `RAKSHA_INFERENCE_BASE_URL` (+ `RAKSHA_INFERENCE_API_KEY`, and
-`RAKSHA_SEALED=0` for a cloud host) — `docs/laptop-setup.md` §6. The model lane is already wired;
-it has only ever been exercised with a mock client in CI, so the first real run is itself a task
-(see P1-1 below).
+`RAKSHA_SEALED=0` for a cloud host) — `docs/laptop-setup.md` §6. The model lane is wired and
+checked end to end: `python scripts/model_lane_check.py` (templates off; the gate accepts 8/8
+correct model fixes and rejects 8/8 wrong ones) and a real local-model benchmark
+(`docs/model-benchmark.md`).
 
 **With a fresh Claude Code session**, paste:
 > Read `HANDOVER.md`, then `BUILD_PLAN.md`. Run `pytest -q` and `python -m raksha.slice_autofuzz`

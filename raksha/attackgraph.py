@@ -111,9 +111,13 @@ def step_cost(f: Finding) -> float:
 
 
 def service_of(f: Finding) -> str:
-    """Top-level directory of the finding's path: the service it belongs to within the estate."""
+    """Top-level directory of the finding's path: the service it belongs to within the estate. A
+    bare target name (a deep-lane finding records its target, e.g. `c-nolibfuzzer`) is its own
+    service; a bare file name (`app.properties`) sits at the estate root."""
     path = (f.target or "").strip("/")
-    return path.split("/", 1)[0] if "/" in path else ""
+    if "/" in path:
+        return path.split("/", 1)[0]
+    return path if path and "." not in path else ""
 
 
 def estate_wide(f: Finding) -> bool:

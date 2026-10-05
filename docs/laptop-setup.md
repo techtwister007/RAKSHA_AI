@@ -1,140 +1,133 @@
-# Running the full system on a laptop
+# Running RAKSHA AI on your laptop
 
-Everything is in this repository. The runtime has **no third-party Python dependencies** (stdlib
-only, by design — see `pyproject.toml`); every lane drives an ordinary toolchain as a subprocess.
-Linux or macOS natively; on Windows use WSL2 (the gate relies on `fork`, `sh`, `gcc`).
+Written for: a Windows laptop with **no GPU**, little space on C:, room on **D: or E:**, and
+**Ollama** installed (local or cloud models). Linux and macOS instructions are at the end.
 
-## 0. The one-command way
+## 1. One click (Windows)
 
-**Windows** (PowerShell; installs under WSL2 on whichever of D:/E: has more free space):
-```powershell
-irm https://raw.githubusercontent.com/techtwister007/RAKSHA_AI/refs/heads/claude/magical-mayer-gs2xno/deploy/laptop-bootstrap.ps1 | iex
-```
-**Linux / macOS / inside WSL:**
-```sh
-curl -fsSL https://raw.githubusercontent.com/techtwister007/RAKSHA_AI/refs/heads/claude/magical-mayer-gs2xno/deploy/laptop-bootstrap.sh | sh -s -- ~/RAKSHA_AI
-```
-Both install the toolchains they can, clone, create the venv, warm Maven, and run the full
-verification (tests, air-gap guard, the no-harness find→fix→prove slice). Re-runnable. The manual
-steps below are what they do.
+1. Download **`deploy/windows/RAKSHA-Setup.bat`** from the repository (on GitHub, open the file
+   and click *Download raw file*), or from a clone.
+2. Double-click it.
+3. Answer the one question: which Ollama model to use. Examples: `gpt-oss:120b-cloud`,
+   `qwen3-coder:480b-cloud`, or a local `qwen2.5-coder:7b`. Leave it empty to run model-free.
 
-### Windows: what to expect, honestly
+What it does, in order:
 
-- **It runs under WSL2, not natively.** The gate's fork-server, gcc's AddressSanitizer and gcov
-  are POSIX. WSL2 is a real Linux kernel, so under it behaviour is identical to a Linux box —
-  this is the supported, reliable path; native Windows is not.
-- **Use Ubuntu 24.04** (`wsl --install -d Ubuntu-24.04`): its apt has Python 3.12 and Go 1.22.
-  An existing Ubuntu 22.04 (Python 3.10, Go 1.18) still works — the bootstrap installs a newer
-  Python package and the official Go 1.22 itself — but 24.04 has fewer moving parts.
-- **The checkout on D:/E: is fine; the heavy work is not there.** Every scratch build, fuzz
-  campaign and evidence bundle is written under `/tmp`, which lives on WSL's own ext4 disk, so
-  the gate runs at native Linux speed. Only reading the repository and running pytest touch
-  NTFS through WSL, which is slower: expect the ~20 s test suite to take 1–3 minutes. If that
-  bothers you, clone inside the WSL filesystem (`~/RAKSHA_AI`) instead.
-- **Disk:** WSL's virtual disk (where `/tmp`, `~/.m2` and the Go cache live) sits on C: by
-  default (`%LOCALAPPDATA%\Packages\...\ext4.vhdx`). The demos need well under 2 GB there. If
-  C: is tight, move the distro: `wsl --export Ubuntu-24.04 D:\wsl.tar`, then
-  `wsl --import Ubuntu-24.04 D:\wsl D:\wsl.tar`.
-- **Windows Defender** scanning NTFS files slows WSL file access further; excluding the
-  `RAKSHA_AI` folder from real-time scanning is optional and safe.
-
-## 1. Toolchains
-
-| Needed for | Install | Required? |
+| Step | What happens | Where it goes |
 |---|---|---|
-| everything | Python **3.11+**, git | yes |
-| C lane (ASan) + autofuzz for C | `gcc` (we use gcc's ASan; clang's runtime is often missing) | yes for C |
-| Java lane (Log4Shell demo) | JDK **17+**, Maven 3.9+ | optional |
-| Go lane (native fuzzing) | Go **1.21+** (builtin `min` in the repair template) | optional |
-| Python lane | nothing extra | — |
-| sandbox (optional, for the honest `NETWORK INTERFACES: 0` badge) | Docker | optional |
-| model lane (optional) | any OpenAI-compatible `/chat/completions` endpoint: local vLLM/Ollama, or a cloud provider | optional |
+| 1 | picks D: or E:, whichever has more space (`-Drive E` overrides) | `<drive>:\RAKSHA` |
+| 2 | checks WSL2. If missing, asks for Administrator once, enables it, and asks you to **restart and double-click again** | Windows feature |
+| 3 | downloads Ubuntu 24.04 (~350 MB) and creates a private Linux system called **RAKSHA** | its disk: `<drive>:\RAKSHA\wsl\ext4.vhdx` |
+| 4 | Windows 11: turns on WSL *mirrored networking* so Linux reaches Ollama at `127.0.0.1:11434`. Windows 10: sets `OLLAMA_HOST=0.0.0.0:11434` (restart Ollama once) | `%USERPROFILE%\.wslconfig` |
+| 5 | points Ollama's local model folder to the big drive, in case you ever pull a local model | `OLLAMA_MODELS=<drive>:\RAKSHA\ollama-models` |
+| 6 | inside Linux: gcc, Python 3.12, JDK 17 + Maven, Go 1.22, cargo, Node; semgrep, checkov, gitleaks, osv-scanner (with its offline database), opa, cosign, z3; clones the repo; creates the virtualenv | all inside the vhdx on D:/E: |
+| 7 | runs the checks: air-gap guard, model-lane check, find → fix → prove slice, full test suite | — |
+| 8 | writes double-click launchers and a desktop shortcut | `<drive>:\RAKSHA\*.bat` |
 
-Debian/Ubuntu in one line:
+**Time:** 20–40 minutes the first time (mostly downloads and the test suite; add `-SkipTests` to
+skip the suite).
+**Space:** about 5 GB on D:/E:. Keep 10 GB free to be comfortable. Nothing large lands on C:.
+
+### The launchers in `<drive>:\RAKSHA`
+
+| File | What it does |
+|---|---|
+| `RAKSHA Console.bat` | starts the console and opens http://127.0.0.1:8080 |
+| `RAKSHA Shell.bat` | a terminal inside the RAKSHA system, in the repo, with everything set up |
+| `RAKSHA Checks.bat` | air-gap guard, model-lane check, find → fix → prove slice, full tests |
+| `RAKSHA Set Model.bat` | change the Ollama model |
+| `RAKSHA Files.bat` | open the code in Explorer (`\\wsl.localhost\RAKSHA\root\RAKSHA_AI`) |
+| `RAKSHA Update.bat` | pull the latest branch and re-verify |
+
+## 2. Ollama: local or cloud
+
+RAKSHA talks to Ollama's OpenAI-compatible endpoint (`/v1/chat/completions`). The shell settings
+live in `~/.raksha-env` inside the RAKSHA system, and the model name in `~/.raksha-model`.
+Change the model from `RAKSHA Shell.bat` with `raksha_model <name>`, or with
+`RAKSHA Set Model.bat`.
+
+- **Cloud models** are names ending in `-cloud` or `:cloud`. Run `ollama signin` once on Windows.
+  These are fast and need no GPU, but **the prompt, including the source code being fixed, goes to
+  ollama.com**. RAKSHA knows this:
+  - it counts every such call as a cloud call (the CLOUD badge stops reading 0);
+  - in sealed mode it refuses them;
+  - the launcher sets `RAKSHA_SEALED=0` for cloud models.
+
+  Use cloud models only on the demo targets or code you are allowed to send out. Never at the
+  finale.
+- **Local models** (for example `ollama pull qwen2.5-coder:7b`) keep everything on the laptop. On
+  a CPU-only laptop a 7B model takes about a minute per answer. See `docs/model-benchmark.md`.
+- **No model at all** is a fully supported mode. Templates, fix memory and the mitigation floor
+  fixed every demo bug in the benchmark with zero model calls.
+
+Check that the model is reachable, from `RAKSHA Shell.bat`:
 ```sh
-sudo apt-get install -y python3 python3-venv git gcc libc6-dev openjdk-17-jdk-headless maven golang-go
+echo $RAKSHA_INFERENCE_BASE_URL $RAKSHA_REPAIR_MODEL
+python -m raksha.slice_autofuzz          # model lane available as a fallback
+python scripts/model_benchmark.py        # measure the model on the 8 benchmark variants
 ```
 
-## 2. Get the code
+## 3. Running it on your own code
+
+From `RAKSHA Shell.bat`:
+```sh
+mkdir -p ~/targets && cp -r /mnt/d/path/to/your-project ~/targets/
+RAKSHA_TARGETS=~/targets RAKSHA_OUT=~/raksha-out python -m raksha.orchestrator
+```
+Every folder under `~/targets` is scanned: built where a toolchain exists, build-free always. The
+console opens with the results, and `~/raksha-out` gets the submission files and a signed evidence
+bundle per finding. You can also use the console's *Demo Beats → Bring your own target* from an
+allowed folder.
+
+Before trusting results on a new codebase, compare RAKSHA's output with what you already know about
+that code: known bugs it should find, and clean files it must not flag. Report both numbers.
+
+## 4. Do I need `claude --teleport`?
+
+**No, not to run RAKSHA.** `--teleport` moves a *Claude Code conversation* from the web into a
+terminal Claude Code on your laptop: the chat history plus a checkout of the session's branch. It
+does not install tools, copy the Ubuntu system, or set up Ollama. The installer above does all
+that from git.
+
+Use teleport only if you want to *continue this exact conversation* on the laptop. To do that:
+1. install Claude Code;
+2. open `RAKSHA Shell.bat` and `cd /root/RAKSHA_AI`;
+3. make sure `git status` is clean;
+4. run `claude --teleport` and pick this session.
+
+It needs the same claude.ai account and the branch pushed (it is). Otherwise just start a fresh
+session in that folder; `CLAUDE.md` and `HANDOFF.md` give it the full picture.
+
+## 5. Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| "WSL has been enabled. RESTART…" | restart Windows, double-click `RAKSHA-Setup.bat` again |
+| "Ollama not reachable on 11434" | start Ollama on Windows; on Windows 10 quit and restart it after setup (it must pick up `OLLAMA_HOST`); open a new shell |
+| Cloud model replies 401 / unauthorised | run `ollama signin` in a Windows terminal |
+| Very slow tests | normal on a laptop: the suite is about 880 tests, 7–15 minutes. Use `-SkipTests` for setup and `RAKSHA Checks.bat` later |
+| Java demo skipped | the Maven warm-up needs internet once; run `RAKSHA Update.bat` |
+| Out of space | `wsl --shutdown`, free space on D:/E:, re-run setup (it resumes) |
+| Start over | `wsl --unregister RAKSHA` (deletes the Linux system), delete `<drive>:\RAKSHA`, run setup again |
+
+## 6. Linux, macOS, or an existing WSL
 
 ```sh
-git clone https://github.com/techtwister007/RAKSHA_AI.git
-cd RAKSHA_AI
-git checkout claude/magical-mayer-gs2xno      # the branch everything was built on
-python3 -m venv .venv && . .venv/bin/activate
-pip install -e '.[dev]'                        # dev extras = pytest + jsonschema only
+curl -fsSL https://raw.githubusercontent.com/techtwister007/RAKSHA_AI/refs/heads/claude/magical-mayer-gs2xno/deploy/laptop-bootstrap.sh \
+  | RAKSHA_OLLAMA_MODEL=gpt-oss:120b-cloud sh -s -- ~/RAKSHA_AI
 ```
+The script is the same one the Windows installer runs inside WSL. Knobs:
+- `RAKSHA_OLLAMA_MODEL`: the model to use;
+- `RAKSHA_SKIP_TESTS=1`: skip the test suite;
+- `RAKSHA_MINIMAL=1`: core only, no scanners or extra toolchains.
 
-## 3. One-time, with network: warm the Maven cache (Java lane only)
+On macOS the apt steps are skipped. Install Python 3.11+, git and gcc yourself.
 
-The gate runs Maven **offline** (`-o`), so both log4j versions, JUnit, the Jazzer API and the
-build plugins must be in `~/.m2` before the first run. Once:
+## 7. What differs from the sealed finale node
 
-```sh
-./deploy/warm-maven.sh
-```
-
-Skip this if you do not care about the Java demo; the other lanes never touch Maven.
-
-## 4. Verify
-
-```sh
-pytest -q                     # ~370 tests, ~20 s; needs gcc + python; Java/Go e2e are opt-in
-python -m raksha.airgap       # must print "air-gap clean"
-python -m raksha.slice_three  # C, Python (+ Java if Maven is warm) VERIFIED through the one gate
-python -m raksha.slice_autofuzz  # find→fix→prove on targets with NO hand-written harness
-python -m raksha.slice_go     # Go deep lane (skips cleanly if `go` is absent)
-RAKSHA_RUN_GO=1 pytest -q tests/test_go_lane.py   # the slow Go end-to-end test, opt-in
-python -m raksha.benchmark    # regenerates docs/benchmark-report.md from YOUR machine's run
-```
-
-Everything a judge will see — the demo slices, the console, the bundles — is produced by these.
-
-## 5. The console
-
-```sh
-python -m raksha.orchestrator           # http://127.0.0.1:8080 — the bundled demo estate
-RAKSHA_TARGETS=/path/to/targets RAKSHA_OUT=./out python -m raksha.orchestrator
-```
-With `RAKSHA_TARGETS` set, every directory under it is ingested (build attempted, build-free lanes
-always) and the jury submission plus a sealed evidence bundle per finding are written to `RAKSHA_OUT`.
-
-## 6. The model lane (optional)
-
-Every model call goes through `raksha/inference.py`. With nothing configured the pipeline is
-model-free (templates + retrieval + mitigation floor) and still reaches VERIFIED on the demos.
-
-**Local (sealed, the finale shape):**
-```sh
-export RAKSHA_INFERENCE_BASE_URL=http://127.0.0.1:8000/v1       # vLLM / Ollama OpenAI-compatible
-export RAKSHA_REPAIR_MODEL=<served model name>
-```
-
-**Cloud, for development only.** Sealed mode *refuses* a non-local host by design, so you must
-turn it off explicitly — and remember the air-gap badges then reflect real egress:
-```sh
-export RAKSHA_SEALED=0
-export RAKSHA_INFERENCE_BASE_URL=https://<provider>/v1              # OpenAI-compatible chat/completions
-export RAKSHA_INFERENCE_API_KEY=<your key>                          # read from env, never committed
-export RAKSHA_REPAIR_MODEL=<model id>  RAKSHA_ADVISOR_MODEL=<model id>
-```
-Then re-run `python -m raksha.slice_autofuzz`: patches the model proposes are labelled `LLM` on the
-record and go through the same gate; the Scorecard's `cloud_calls` and token counters become non-zero.
-
-## 7. What differs from the sealed deployment
-
-- **No Docker** → target code runs on the host and the posture badge honestly reads
-  `NETWORK INTERFACES: unenforced`. To get `0`, build the sandbox image from `deploy/Dockerfile`
-  and set `RAKSHA_SANDBOX_IMAGE=raksha-sandbox:latest` (`RAKSHA_REQUIRE_SANDBOX=1` to refuse
-  running without it).
-- **No GPU** → `vram` on the Scorecard is `null`, not a faked zero.
-- **The 36-hour rehearsal** (`python -m raksha.rehearse 129600`) and the sealed `docker compose`
-  stack in `deploy/` are for the finale node; `python -m raksha.rehearse 30` is the self-test.
-
-## Troubleshooting
-
-- `clang: cannot find libclang_rt.asan` → expected; the C lane uses **gcc**. Install `gcc`.
-- Java slice says the target did not build → run `./deploy/warm-maven.sh` once with network.
-- Go template fix fails to compile → Go < 1.21 (no builtin `min`); upgrade.
-- Tests leave nothing behind: scratch builds go to pytest's temp dir and are deleted; the gate
-  discards its own builds. If `/tmp/raksha-*` ever accumulates, it is safe to delete.
+| | Laptop | Sealed node |
+|---|---|---|
+| Network isolation of target code | none (`NET IF: unenforced`, shown honestly) | Docker sandbox, `NET IF: 0` (`RAKSHA_SANDBOX_IMAGE`, `RAKSHA_REQUIRE_SANDBOX=1`) |
+| Model | Ollama, local or cloud | vLLM serving a ~32B model on the GPU, sealed mode on |
+| GPU numbers | `null` on the scorecard (never a fake zero) | measured |
+| Signing key | generate one with `python -m raksha.keys init ~/.raksha-bundle.key` and set `RAKSHA_BUNDLE_KEY_FILE` to it | generated at install by `deploy/install.sh`, read-only mount |

@@ -59,7 +59,10 @@ class Target:
     def _status(mine: list[Finding]) -> str:
         if not mine:
             return "scanning"
-        if any(f.status is Status.VERIFIED for f in mine):
+        verified = [f for f in mine if f.status is Status.VERIFIED]
+        if verified and len(verified) == len(mine):
+            return "fixed"            # every finding on it has a proven fix (not "secure": presence only)
+        if verified:
             return "fixing"
         return "finding"
 

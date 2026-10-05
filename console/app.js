@@ -401,7 +401,8 @@ function renderScore(){
   add(s.scalability.language_count,"languages covered","vi");
   add((s.resource.zero_inference_fix_pct==null?"—":s.resource.zero_inference_fix_pct+"%"),"fixes at zero inference","vi");
   add(s.functionality.zero_human_input_verified,"fixes with zero human input");
-  add((s.speed.time_to_first_proven_finding_seconds==null?"—":s.speed.time_to_first_proven_finding_seconds+"s"),"time to first proven finding","hl");
+  { const t1=s.speed.time_to_first_proven_finding_seconds;   // measured: under a second shows as "<1s", never "0s"
+  add((t1==null?"—":(t1<1?"<1s":t1+"s")),"time to first proven finding","hl"); }
   body.appendChild(kpis);
 
   // F5 boundary as bars

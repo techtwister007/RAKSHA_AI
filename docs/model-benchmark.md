@@ -47,3 +47,35 @@ reading the refusal reasons, the gate records and the model's raw replies.
   no wasted gate runs. They are tested with fake model replies (`tests/test_autorepair.py`).
 - RAKSHA's design holds: templates and fix memory fix what they know at zero inference cost; the model
   is the fallback, and nothing it proposes is accepted without the gate.
+
+## Is the pipeline sound? A check with a capable "model" (5 October 2026)
+
+The runs above could not separate *the model is weak* from *the pipeline loses good answers*. So
+the model lane was tested on its own:
+- the fix templates are switched off, so every fix must come from the model;
+- a stand-in model returns answers written in advance for the eight variants: correct fixes
+  written the way a capable model writes them, and, separately, plausible but wrong ones.
+
+`python3 scripts/model_lane_check.py` reproduces it in about a minute, with no model server.
+
+| Answers given | Found | Fixed through the gate | Lane |
+|---|---|---|---|
+| none (control) | 8/8 | 0/8 | — |
+| correct, before the fix below | 8/8 | 4/8 (all four C fixes lost) | LLM |
+| correct, after the fix | 8/8 | **8/8** | LLM |
+| wrong (bound too loose, `;` blocklist, shell quoting, `eval`) | 8/8 | **0/8** | — |
+
+**Flaw found and fixed.** A model copies a code line but drops its trailing comment
+(`/* ...but not to sizeof: BUG */`). The edit-block matcher allowed for differences in whitespace
+but not in comments, so every correct C fix was discarded before it reached the gate. `_locate` in
+`raksha/repair.py` now has a third matching tier, *code without its trailing comment*. It still
+refuses an edit that matches more than one place. The test is
+`test_model_edit_matches_a_line_copied_without_its_trailing_comment`.
+
+The wrong answers were stopped at the right places:
+- `eval` by patch hygiene, before the gate ran at all;
+- the other seven (four too-loose C bounds, the `;` blocklist, two shell-quoting attempts) passed
+  hygiene and were rejected by the five-check gate itself.
+
+So the pipeline accepts a correct model fix end to end and rejects wrong ones. What remains is
+model quality.
