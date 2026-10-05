@@ -585,6 +585,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 </tbody></table></div>
 <div class="box partial"><span class="t">Partial · model server</span><p>RAKSHA talks to any OpenAI-compatible model server. The finale design serves a ~32B coding model with vLLM on the box's GPU. No model is bundled in the repository; without one, RAKSHA runs model-free and still finds and proves, fixing only the shapes its templates and memory know.</p></div>
 <div class="box built"><span class="t">Built · benchmarked with a local model</span><p>Four runs with Qwen2.5-Coder-7B on CPU (<code>docs/model-benchmark.md</code>) found six weaknesses in the model path, all now fixed: patch hygiene refused the standard command-injection fix; small models write malformed diffs (now they may send "search / replace" edits and RAKSHA writes the exact diff); the prompt contradicted the fix; the model server returned one candidate instead of three; empty patches reached the gate; and a template gap meant two variants were never fixed. The 7B model itself added no fixes; the finale design uses a ~32B model on the GPU.</p></div>
+<div class="box built"><span class="t">Built · the model path checked on its own</span><p>To separate "the model is weak" from "the pipeline loses good answers", the fix templates were switched off and a stand-in model gave answers written in advance (<code>scripts/model_lane_check.py</code>). Correct fixes: 8 of 8 proven through the gate. Plausible but wrong fixes (a bound that is too loose, a blocklist, shell quoting, <code>eval</code>): 0 of 8. The check exposed one more flaw, now fixed: a model that copied a line without its trailing comment had every correct C fix thrown away before the gate.</p></div>
 <div class="box term"><span class="t">Terms explained</span><p><dfn>LLM</dfn> (large language model): an AI that writes text and code. <dfn>vLLM</dfn>: software that serves a model on a GPU. <dfn>Sealed mode</dfn>: a setting that refuses any model endpoint that is not on the box itself.</p></div>
 
 <h2 id="c25"><span class="n">25</span>The evidence bundle</h2>
@@ -800,6 +801,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <tr><td>Edge</td><td>A laptop or field machine</td><td>Smallest budgets, slices still run</td></tr>
 <tr><td>CPU-only</td><td>No GPU available</td><td>Model on CPU or model-free</td></tr>
 </tbody></table></div>
+<div class="box built"><span class="t">Built · one-click laptop install</span><p><code>deploy/windows/RAKSHA-Setup.bat</code> installs everything on D: or E: inside a private Linux system (WSL2): every toolchain, the industry scanners with an offline vulnerability database, the repository, and launchers for the console. It connects to Ollama for a local or cloud model; cloud models are counted as cloud calls and refused in sealed mode. Guide: <code>docs/laptop-setup.md</code>.</p></div>
 
 <h2 id="c51"><span class="n">51</span>The demo arc</h2>
 <ol>

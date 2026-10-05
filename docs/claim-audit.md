@@ -92,7 +92,7 @@ unit-tested here, but the full execution needs the finale hardware (named in the
 | claim | status | behind it |
 |-------|--------|-----------|
 | A model-proposed fix is accepted only through the gate | BUILT + MEASURED | `scripts/model_lane_check.py`, templates off: 8/8 correct model fixes VERIFIED, 0/8 plausible-but-wrong ones (loose bound, blocklist, shell quoting, eval) |
-| A model improves the fix rate | NOT CLAIMED | 7B on CPU added no fixes beyond the templates (`docs/model-benchmark.md`); the finale GPU model is still to be measured |
+| A model improves the fix rate | NOT CLAIMED | 7B on CPU added no fixes beyond the templates; on its own (templates off) it fixes 3/8 through the gate (`docs/model-benchmark.md`); the finale GPU model is still to be measured |
 
 ## Standing honest gaps (unchanged from the threat model)
 

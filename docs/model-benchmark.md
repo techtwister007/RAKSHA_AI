@@ -79,3 +79,19 @@ The wrong answers were stopped at the right places:
 
 So the pipeline accepts a correct model fix end to end and rejects wrong ones. What remains is
 model quality.
+
+**The real 7B model, on its own.** The same setup (templates off, everything from the model), with
+Qwen2.5-Coder-7B on 4 CPU threads and the matching fix in place:
+
+| | Found | Fixed through the gate | Model calls | Tokens | Time |
+|---|---|---|---|---|---|
+| Qwen2.5-Coder-7B, model only | 8/8 | **3/8** (two C variants, one Python) | 25 | 5,614 | 1,609 s |
+
+It fixed the C `reorder` and `reflow` variants and the Python `reflow` variant. It failed the C
+`rename` and `memmove` variants, the Python `rename` variant, and both `os.system` / `os.popen`
+variants. In the one failure inspected in detail (`os.system`), its replies restated the vulnerable
+line and proposed a test instead of a change. Every fix it made was proven by the same gate.
+
+Conclusion: the pipeline is not the bottleneck. A small CPU model fixes some bugs on its own, the
+templates fix all eight, and a stronger model (the finale GPU model, or an Ollama cloud model on
+demo code) should be measured with `scripts/model_benchmark.py`.

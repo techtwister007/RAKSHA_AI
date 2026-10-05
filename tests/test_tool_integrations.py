@@ -34,7 +34,8 @@ def test_semgrep_uses_offline_rules_by_default(monkeypatch):
 def test_osv_offline_flag(monkeypatch):
     lane = next(l for l in take.LANES if l.tool == "osv-scanner")
     monkeypatch.setenv("RAKSHA_OSV_OFFLINE", "1")
-    assert "--offline" in lane.argv("/x")
+    argv = lane.argv("/x")       # the flag the installed version understands (v1 vs v2)
+    assert "--offline" in argv or "--experimental-offline" in argv
 
 
 @pytest.mark.skipif(shutil.which("checkov") is None, reason="checkov not installed")

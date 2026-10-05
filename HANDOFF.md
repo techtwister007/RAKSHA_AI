@@ -58,8 +58,9 @@ Model: Ollama, set by `raksha_model <name>` or `RAKSHA Set Model.bat`.
 
 ## 4. State today
 
-- **Tests:** 873 passed / 10 skipped on 5 October, before this session's additions. This session
-  added 6 tests; re-run with `python -m pytest -q`.
+- **Tests:** 875 passed, 0 failed, 13 skipped (5 October). Skips are opt-in slow lanes, plus tools
+  not on PATH. The cosign / OPA / semgrep / checkov tests pass when those are installed, as the
+  laptop install does.
 - **Deep find → fix → prove, with no hand-written harness:** C, Python, Go, Rust, JavaScript. Java
   uses its shipped driver.
 - **Build-free lanes on any language:** dependencies, secrets, crypto / post-quantum, OpenAPI
@@ -80,9 +81,11 @@ Model: Ollama, set by `raksha_model <name>` or `RAKSHA Set Model.bat`.
    hand-written good and bad model answers fed in. Fixed in `raksha/repair.py::_locate`. Now 8/8
    good fixes are accepted and 0/8 bad ones (too-loose bound, blocklist filter, shell quoting,
    `eval`).
-2. **Why the local Qwen 7B failed.** Its replies mostly restated the vulnerable code unchanged (see
-   `docs/model-benchmark.md`). That is a model-quality limit on CPU, not a pipeline fault. The
-   pipeline is now proven to accept a correct model fix end to end.
+2. **Why the local Qwen 7B "failed".** It never added a fix *on top of* the templates, because
+   the templates already fixed everything it could. Measured on its own (templates off), it fixes
+   **3/8** through the gate in about 27 minutes on CPU. In the failure inspected in detail, its
+   replies restated the vulnerable line. That is model quality, not the pipeline
+   (`docs/model-benchmark.md`).
 3. **Ollama cloud models looked local.** They are reached through `localhost:11434`, so the
    CLOUD badge would have read 0. They now count as cloud calls, and sealed mode refuses them
    (`raksha/inference.py::_offbox_model`).
