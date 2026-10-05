@@ -21,7 +21,8 @@
 param(
     [string]$Drive = "",
     [string]$Model = "",
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$Status
 )
 
 $ErrorActionPreference = "Continue"      # native tools write to stderr; failures are checked explicitly
@@ -44,13 +45,35 @@ if ($Drive) { $d = Get-PSDrive ($Drive.TrimEnd(':')) }
 else {
     $d = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Name -in @("D", "E") -and $_.Free } |
          Sort-Object Free -Descending | Select-Object -First 1
-    if (-not $d) { Write-Host "No D: or E: drive found. Re-run with -Drive <letter>."; exit 1 }
+    if (-not $d) { Write-Host "No D: or E: drive found. Re-run with -Drive <letter>." -ForegroundColor Red; return }
 }
 $base = "$($d.Name):\RAKSHA"
+
+# -Status: say what is installed and what to do next, change nothing.
+function Show-Status {
+    $ok = { param($c, $t) if ($c) { Write-Host "  [OK]      $t" -ForegroundColor Green } else { Write-Host "  [MISSING] $t" -ForegroundColor Yellow }; $c }
+    Write-Host "RAKSHA install status ($base)"
+    wsl.exe --status *> $null; $w = & $ok ($LASTEXITCODE -eq 0) "WSL2 enabled"
+    $dist = $w -and ((Wsl-Distros) -contains $distro); & $ok $dist "RAKSHA Linux system" | Out-Null
+    $repo = $dist -and (((wsl.exe -d $distro -u root -- sh -c "test -x /root/RAKSHA_AI/.venv/bin/python && echo y") -replace "`0","") -match "y")
+    & $ok $repo "code + Python environment (/root/RAKSHA_AI)" | Out-Null
+    $envf = $dist -and (((wsl.exe -d $distro -u root -- sh -c "test -f /root/.raksha-env && echo y") -replace "`0","") -match "y")
+    & $ok $envf "tools installed and checks run" | Out-Null
+    $lnch = & $ok (Test-Path "$base\RAKSHA Console.bat") "launchers in $base"
+    $prov = $dist -and (((wsl.exe -d $distro -u root -- sh -c "test -f /root/.raksha/provider.json && echo y") -replace "`0","") -match "y")
+    & $ok $prov "model provider chosen (optional)" | Out-Null
+    Write-Host ""
+    if (-not $w) { Write-Host "NEXT: restart Windows if setup already enabled WSL, then run the setup line again." }
+    elseif (-not ($repo -and $envf -and $lnch)) { Write-Host "NEXT: run the setup line again; it resumes where it stopped. Log: $base\setup.log" }
+    elseif (-not $prov) { Write-Host "NEXT: install is complete. Double-click '$base\RAKSHA Set Model.bat' to choose a model (or run model-free)." }
+    else { Write-Host "NEXT: all done. Double-click '$base\RAKSHA Console.bat'." }
+}
 $freeGB = [math]::Round($d.Free / 1GB, 1)
 Say "Installing under $base  ($freeGB GB free)"
 if ($d.Free -lt 6GB) { Write-Host "Warning: under 6 GB free on $($d.Name):. The install may run out of space." -ForegroundColor Yellow }
+if ($Status) { Show-Status; return }
 New-Item -ItemType Directory -Force -Path "$base\cache", "$base\wsl" | Out-Null
+try { Start-Transcript -Path "$base\setup.log" -Append | Out-Null } catch { }
 
 # ---- 2. WSL2 -----------------------------------------------------------------------------
 wsl.exe --status *> $null
@@ -58,8 +81,9 @@ if ($LASTEXITCODE -ne 0) {
     Say "WSL is not enabled yet. Windows will ask for Administrator permission to turn it on."
     Start-Process wsl.exe -ArgumentList "--install --no-distribution" -Verb RunAs -Wait
     Write-Host ""
-    Write-Host "WSL has been enabled. RESTART the laptop, then run RAKSHA-Setup.bat again." -ForegroundColor Yellow
-    exit 0
+    Write-Host "WSL has been enabled. RESTART the laptop, then run the same setup line again." -ForegroundColor Yellow
+    try { Stop-Transcript | Out-Null } catch { }
+    return
 }
 wsl.exe --update *> $null                          # newest WSL; harmless if already current
 wsl.exe --set-default-version 2 *> $null
@@ -121,7 +145,7 @@ $shWsl = "/mnt/" + $d.Name.ToLower() + ($sh.Substring(2) -replace "\\", "/")
 $skip = if ($SkipTests) { "1" } else { "0" }
 Say "Installing RAKSHA inside '$distro' (10-30 minutes the first time)"
 wsl.exe -d $distro -u root -- env "RAKSHA_OLLAMA_MODEL=$Model" "RAKSHA_SKIP_TESTS=$skip" sh -c "tr -d '\r' < '$shWsl' > /tmp/rb.sh && sh /tmp/rb.sh /root/RAKSHA_AI"
-if ($LASTEXITCODE -ne 0) { Write-Host "The installer stopped with code $LASTEXITCODE — see above. Re-running this script resumes." -ForegroundColor Red; exit $LASTEXITCODE }
+if ($LASTEXITCODE -ne 0) { Write-Host "The installer stopped with code $LASTEXITCODE - see above and $base\setup.log. Running the setup line again resumes." -ForegroundColor Red; try { Stop-Transcript | Out-Null } catch { }; return }
 
 # ---- 6b. choose the model provider (any time later: 'RAKSHA Set Model.bat') ----------------
 $enter = "cd /root/RAKSHA_AI && . .venv/bin/activate && . /root/.raksha-env"
@@ -187,3 +211,5 @@ Write-Host @"
     RAKSHA Update.bat     pull the latest branch and re-verify
   Guide: docs/laptop-setup.md
 "@
+Write-Host "Check any time with the setup line plus -Status. Log: $base\setup.log"
+try { Stop-Transcript | Out-Null } catch { }
