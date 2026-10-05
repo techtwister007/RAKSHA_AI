@@ -124,6 +124,71 @@ def py_shell_safe(finding: Finding, root: Path) -> str | None:
     return _diff(text, body, rel)
 
 
+def _call_args(line: str, open_at: int) -> int | None:
+    """Index of the parenthesis closing the one at `open_at`, honouring nesting and string quotes."""
+    depth, quote, i = 0, None, open_at
+    while i < len(line):
+        c = line[i]
+        if quote:
+            if c == "\\":
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "\"'":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+        i += 1
+    return None
+
+
+_PY_OS_SHELL = re.compile(r"\bos\.(?P<fn>system|popen)\(")
+
+
+def py_os_shell_safe(finding: Finding, root: Path) -> str | None:
+    """Turn `os.system(cmd)` / `os.popen(cmd)` at the fix site into a no-shell argument-list call.
+
+    os.system(cmd)  -> subprocess.run(shlex.split(cmd)).returncode
+    os.popen(cmd)   -> subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, text=True).stdout
+    Same command, same output stream, no shell to interpret metacharacters. The gate then proves
+    normal inputs behave identically; anything it cannot prove is refused there.
+    """
+    got = _read_fix_site(finding, root)
+    if got is None:
+        return None
+    rel, text = got
+    lines = text.splitlines(keepends=True)
+    idx = (finding.fix_site_set[0].start_line or 1) - 1
+    after = list(lines)
+    changed = False
+    for i in range(max(0, idx - 2), min(len(lines), idx + 3)):
+        m = _PY_OS_SHELL.search(lines[i])
+        if not m:
+            continue
+        close = _call_args(lines[i], m.end() - 1)
+        if close is None:
+            continue
+        cmd = lines[i][m.end():close].strip()
+        if m.group("fn") == "system":
+            repl = f"subprocess.run(shlex.split({cmd})).returncode"
+        else:
+            repl = f"subprocess.Popen(shlex.split({cmd}), stdout=subprocess.PIPE, text=True).stdout"
+        after[i] = lines[i][:m.start()] + repl + lines[i][close + 1:]
+        changed = True
+        break
+    if not changed:
+        return None
+    for mod in ("subprocess", "shlex"):
+        if not re.search(rf"^\s*import {mod}\b", "".join(after), re.M):
+            after.insert(_import_insertion_point(after), f"import {mod}\n")
+    return _diff(text, "".join(after), rel)
+
+
 def _import_insertion_point(lines: list[str]) -> int:
     """After the last top-level import (or the module docstring / shebang when there is none)."""
     last = -1
@@ -186,6 +251,7 @@ def generic_templates(finding: Finding, root: Path):
         out.append(lambda: c_bound_copy(finding, root))
     if finding.language == "python" and cwe in ("CWE-78", "CWE-77"):
         out.append(lambda: py_shell_safe(finding, root))
+        out.append(lambda: py_os_shell_safe(finding, root))
     if finding.language == "go" and cwe in ("CWE-125", "CWE-787", "CWE-129"):
         out.append(lambda: go_bound_slice(finding, root))
     if finding.language == "rust" and cwe in ("CWE-125", "CWE-787", "CWE-129", "CWE-190"):

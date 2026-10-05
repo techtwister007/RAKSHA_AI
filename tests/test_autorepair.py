@@ -285,3 +285,16 @@ def test_model_lane_tops_up_candidates_and_drops_no_op_patches(tmp_path):
     cands = _llm_candidates(f, tmp_path, c, n=3)
     assert c.calls == 3
     assert len(cands) == 2 and all("+++ b/c.py" in x.diff for x in cands)
+
+
+def test_os_shell_template_handles_wrapped_calls(tmp_path):
+    from raksha.repair_templates import py_os_shell_safe
+    from raksha.finding import Finding, FixSite
+    (tmp_path / "c.py").write_text('import os\n\ndef f(v):\n    return str(os.system("echo " + v))\n')
+    f = Finding(oracle="pysecsan", bug_class="CWE-78", language="python", target="t", message="m")
+    f.add_fix_site(FixSite(uri="c.py", rank=0, start_line=4))
+    d = py_os_shell_safe(f, tmp_path)
+    assert '+    return str(subprocess.run(shlex.split("echo " + v)).returncode)' in d
+    assert "+import subprocess" in d and "+import shlex" in d
+    from raksha import hygiene
+    assert hygiene.check(d, f) is None                    # passes hygiene under the class rule

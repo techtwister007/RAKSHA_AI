@@ -82,12 +82,13 @@ def test_c_variant_keeps_the_bug_and_is_found():
 
 
 def test_generalisation_report_python_counts_and_lists_losses():
+    # Once a loss: the shell template knew only subprocess.run(shell=True), so the os.system and
+    # os.popen variants were found but not fixed (memorisation, shown). The os-shell template now
+    # covers them, so the Python set fully generalises; a loss would still be listed by name.
     report = generalisation_report(mutate_source(PY_SRC, "python", seed=5), max_execs=6000)
     assert report["total"] == 4 and report["found"] == 4
-    assert report["fixed"] == 2                              # rename + reflow (subprocess form)
-    lost = {l["name"] for l in report["losses"]}
-    assert lost == {"os_system", "os_popen"}                 # the template memorised subprocess.run
-    assert report["fix_rate_pct"] == 50.0
+    assert report["fixed"] == 4 and report["losses"] == []
+    assert report["fix_rate_pct"] == 100.0
 
 
 @pytest.mark.skipif(not (HAVE_GCC and SLOW), reason="slow; set RAKSHA_SLOW_TESTS=1")
