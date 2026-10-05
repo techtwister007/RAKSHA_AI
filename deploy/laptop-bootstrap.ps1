@@ -145,7 +145,13 @@ $shWsl = "/mnt/" + $d.Name.ToLower() + ($sh.Substring(2) -replace "\\", "/")
 $skip = if ($SkipTests) { "1" } else { "0" }
 Say "Installing RAKSHA inside '$distro' (10-30 minutes the first time)"
 wsl.exe -d $distro -u root -- env "RAKSHA_OLLAMA_MODEL=$Model" "RAKSHA_SKIP_TESTS=$skip" sh -c "tr -d '\r' < '$shWsl' > /tmp/rb.sh && sh /tmp/rb.sh /root/RAKSHA_AI"
-if ($LASTEXITCODE -ne 0) { Write-Host "The installer stopped with code $LASTEXITCODE - see above and $base\setup.log. Running the setup line again resumes." -ForegroundColor Red; try { Stop-Transcript | Out-Null } catch { }; return }
+$checksFailed = ($LASTEXITCODE -ne 0)
+if ($checksFailed) {
+    # The install itself is in place (code, venv, tools); a failing self-check must not stop the
+    # launchers and the model menu. Say so plainly and carry on.
+    Write-Host "A self-check failed (exit $LASTEXITCODE) - see above and $base\setup.log." -ForegroundColor Red
+    Write-Host "Continuing: launchers and the model menu are still set up. Re-run the checks with 'RAKSHA Checks.bat'." -ForegroundColor Red
+}
 
 # ---- 6b. choose the model provider (any time later: 'RAKSHA Set Model.bat') ----------------
 $enter = "cd /root/RAKSHA_AI && . .venv/bin/activate && . /root/.raksha-env"
@@ -211,5 +217,6 @@ Write-Host @"
     RAKSHA Update.bat     pull the latest branch and re-verify
   Guide: docs/laptop-setup.md
 "@
+if ($checksFailed) { Write-Host "NOTE: the self-checks did not all pass. Run 'RAKSHA Checks.bat' and send the output." -ForegroundColor Red }
 Write-Host "Check any time with the setup line plus -Status. Log: $base\setup.log"
 try { Stop-Transcript | Out-Null } catch { }
