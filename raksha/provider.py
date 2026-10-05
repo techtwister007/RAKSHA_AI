@@ -254,6 +254,25 @@ def _wizard() -> int:
     return 0
 
 
+def _failure_hint(url: str, err: str) -> str:
+    """What to do when the test call fails, in the operator's terms."""
+    gw = _wsl_gateway()
+    if "401" in err or "403" in err or "nauthor" in err:
+        return "hint: the server refused the API key. Set it with: python -m raksha.provider set <provider> --model <m> --key <key>"
+    if "127.0.0.1" in url or "localhost" in url or (gw and gw in url):
+        return ("hint: the model server is not reachable from this Linux system.\n"
+                "  1. Is it running on Windows? (Ollama: tray icon; LM Studio: Developer > Start Server)\n"
+                "  2. Windows 11 22H2+ uses mirrored networking (127.0.0.1 works). Older Windows needs the server to\n"
+                "     listen on the network: OLLAMA_HOST=0.0.0.0:11434 (set by the installer; QUIT and restart Ollama\n"
+                "     from the tray), or LM Studio 'Serve on Local Network'.\n"
+                f"  3. Windows Firewall must allow it from WSL{f' (WSL sees Windows at {gw})' if gw else ''}. In an Administrator\n"
+                "     PowerShell: New-NetFirewallRule -DisplayName 'Model server for WSL' -Direction Inbound\n"
+                "     -Protocol TCP -LocalPort 11434 -RemoteAddress 172.16.0.0/12 -Action Allow  (1234 for LM Studio)")
+    if "timed out" in err:
+        return "hint: the server is reachable but slow; raise the timeout: set ... --timeout 600"
+    return "hint: check the URL and model name with: python -m raksha.provider show / models"
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m raksha.provider", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd")
@@ -310,10 +329,13 @@ def main(argv: list[str] | None = None) -> int:
         got = list_models(cfg)
         print("\n".join(got) if got else "(the server did not list models)"); return 0 if got else 1
     try:                                              # test
+        # room for "thinking" models, which spend tokens reasoning before they answer
         out = get_client(cfg).complete([{"role": "user", "content": "Reply with the single word: ready"}],
-                                       max_tokens=8, temperature=0)
+                                       max_tokens=512, temperature=0)
     except InferenceError as e:
-        print(f"FAILED: {e}"); return 1
+        print(f"FAILED: {e}")
+        print(_failure_hint(cfg.base_url or "", str(e)))
+        return 1
     print(f"OK — {cfg.repair_model} at {cfg.base_url} replied: {(out[0] if out else '').strip()[:60]!r}")
     return 0
 

@@ -122,3 +122,9 @@ def test_provider_off_for_one_command(monkeypatch):
     provider.choose("ollama", model="qwen2.5-coder:7b")
     monkeypatch.setenv("RAKSHA_PROVIDER", "off")
     assert get_client() is None
+
+
+def test_failed_test_call_explains_what_to_do(monkeypatch):
+    monkeypatch.setattr(provider, "_wsl_gateway", lambda: "172.20.0.1")
+    assert "Firewall" in provider._failure_hint("http://172.20.0.1:11434/v1", "connection refused")
+    assert "--key" in provider._failure_hint("https://api.openai.com/v1", "HTTP Error 401: Unauthorized")
