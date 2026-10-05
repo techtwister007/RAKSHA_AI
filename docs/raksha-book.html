@@ -163,7 +163,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
   <div class="k">AI Kavach · Grand Finale · Indian Army</div>
   <h1>The RAKSHA Book</h1>
   <p class="sub">Everything about RAKSHA AI in one place: what we are building and why, how every part works, what the operator sees, where we stand today, and what the finished system should look like.</p>
-  <p class="meta">Status as of 4 October 2026 · Branch <code>claude/magical-mayer-gs2xno</code> · Last full test run: 863 passed, 0 failed</p>
+  <p class="meta">Status as of 5 October 2026 · Branch <code>claude/magical-mayer-gs2xno</code> · Last full test run: 873 passed, 0 failed</p>
 </section>
 
 <div class="part" id="part0"><div class="k">Part 0</div><h1>Start here</h1></div>
@@ -495,7 +495,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <tr><td>Config / infrastructure</td><td>Risky settings in configuration files</td><td>debug mode on in production config</td></tr>
 <tr><td>API specs</td><td>Endpoints with no authorisation, debug endpoints exposed</td><td><code>DELETE /users/{id}</code> with no security</td></tr>
 <tr><td>Binaries</td><td>Library versions read from compiled files; a software bill of materials</td><td>a vulnerable library inside a <code>.jar</code></td></tr>
-<tr><td>Git history</td><td>A secret that was committed once and later deleted</td><td>a key in an old commit</td></tr>
+<tr><td>Git history</td><td>A secret that was committed once and later deleted</td><td>a key in an old commit</td></tr><tr><td>External scanners (optional)</td><td>OSV-Scanner, Gitleaks, Checkov confirmed by re-match; Semgrep leads confirmed only by RAKSHA's own lanes</td><td>a misconfigured Dockerfile</td></tr>
 <tr><td>Structure</td><td>A map of the code (who calls what) used to rank risk</td><td>input reaching a dangerous call</td></tr>
 </tbody></table></div>
 <div class="box term"><span class="t">Terms explained</span><p><dfn>Dependency</dfn>: a library your code borrows. <dfn>Advisory</dfn>: a public notice that a version of a library has a flaw. RAKSHA carries an offline copy of the OSV advisory database. <dfn>SBOM</dfn> (software bill of materials): an ingredients list of the software.</p></div>
@@ -544,7 +544,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <li><b>Mitigation</b>: a blunt but safe floor, labelled as such.</li>
 </ol>
 <p>At most three rounds. If nothing passes, the finding is <b>report only</b> and the record says exactly which check refused each attempt.</p>
-<div class="box built"><span class="t">Built · measured</span><p>On the demo set, 100% of verified fixes so far cost zero AI calls (templates and memory). The mutation factory shows templates still fix 75% of disguised variants of known bugs.</p></div>
+<div class="box built"><span class="t">Built · measured</span><p>On the demo set, 100% of verified fixes so far cost zero AI calls (templates and memory). The mutation factory shows templates fix 8 of 8 disguised variants of known bugs (it was 6 of 8 until the local-model benchmark exposed a template gap, now closed).</p></div>
 
 <h2 id="c20"><span class="n">20</span>Patch hygiene: refusing unsafe fixes before they are tried</h2>
 <div class="box plain"><span class="t">In plain words</span><p>Before a fix is even built, three rules check it. A fix may only touch the files where the weakness is; it must stay small (at most 150 added lines); and it may not introduce anything that runs commands, opens network connections or loads code, unless the original already did. A fix that breaks a rule is refused and the refusal is recorded.</p></div>
@@ -584,12 +584,13 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <tr><td>Similarity search over past fixes</td><td>Severity scores (computed from the record)</td></tr>
 </tbody></table></div>
 <div class="box partial"><span class="t">Partial · model server</span><p>RAKSHA talks to any OpenAI-compatible model server. The finale design serves a ~32B coding model with vLLM on the box's GPU. No model is bundled in the repository; without one, RAKSHA runs model-free and still finds and proves, fixing only the shapes its templates and memory know.</p></div>
+<div class="box built"><span class="t">Built · benchmarked with a local model</span><p>Four runs with Qwen2.5-Coder-7B on CPU (<code>docs/model-benchmark.md</code>) found six weaknesses in the model path, all now fixed: patch hygiene refused the standard command-injection fix; small models write malformed diffs (now they may send "search / replace" edits and RAKSHA writes the exact diff); the prompt contradicted the fix; the model server returned one candidate instead of three; empty patches reached the gate; and a template gap meant two variants were never fixed. The 7B model itself added no fixes; the finale design uses a ~32B model on the GPU.</p></div>
 <div class="box term"><span class="t">Terms explained</span><p><dfn>LLM</dfn> (large language model): an AI that writes text and code. <dfn>vLLM</dfn>: software that serves a model on a GPU. <dfn>Sealed mode</dfn>: a setting that refuses any model endpoint that is not on the box itself.</p></div>
 
 <h2 id="c25"><span class="n">25</span>The evidence bundle</h2>
 <p>Every reportable finding gets a sealed folder: the proof record, the replay script and reproducer, the patch and rollback script, the regression test, plain-language report, Commander's Brief, environment details, a provenance statement and a signature over all of it.</p>
 <div class="box plain"><span class="t">In plain words</span><p>A bundle is a receipt. Change one byte anywhere in it and verification fails. A judge can check it on the console's Evidence Vault, or on their own laptop with the verifier media.</p></div>
-<div class="box partial"><span class="t">Partial · signing key</span><p>Bundles are signed with HMAC-SHA256. Without a deployment key, the published demo key is used and every bundle says so. A deployment key is generated on the box at install time (team step); stronger public-key signing (cosign/in-toto, post-quantum when available) is the ideal state.</p></div>
+<div class="box built"><span class="t">Built · signing</span><p>Bundles are signed with HMAC-SHA256 using a deployment key the installer generates on the box (never shipped, never committed); without one, the published demo key is used and every bundle says so. When a cosign key pair is provisioned, every bundle also gets a public-key seal that anyone can verify but no one without the private key can forge. Post-quantum signatures are added when the library is present.</p></div>
 
 <h2 id="c26"><span class="n">26</span>The session journal</h2>
 <p>Every event is appended to a diary in which each line carries a fingerprint of the line before it. Change or delete any line and the chain breaks. The journal lets a crashed run resume exactly, powers the live event log, and feeds the time-lapse that replays a whole run minute by minute.</p>
@@ -743,7 +744,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 
 <h2 id="c44"><span class="n">44</span>How claims are proven</h2>
 <ul>
-<li><b>Tests:</b> 863 automated tests, run with every slow language lane on; 0 failures at the last run.</li>
+<li><b>Tests:</b> 873 automated tests, run with every slow language lane on; 0 failures at the last run.</li>
 <li><b>Benchmark:</b> <code>python -m raksha.benchmark</code> regenerates every number in the benchmark report from a real run.</li>
 <li><b>Negative controls:</b> a deliberately clean estate scanned after every change; any finding there is a false alarm.</li>
 <li><b>Baseline comparison:</b> the same targets through a standard static scanner and through RAKSHA.</li>
@@ -758,7 +759,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <tr><td>Static scanner: reports / with reproducer / defect files hit</td><td class="num">8 / 0 / 5</td><td>7 demo targets</td></tr>
 <tr><td>RAKSHA: reports / with reproducer / defect files hit</td><td class="num">7 / 7 / 7</td><td>7 demo targets</td></tr>
 <tr><td>Recall, mutation factory</td><td class="num">100% (8/8)</td><td>disguised variants of known bugs</td></tr>
-<tr><td>Fix rate, mutation factory</td><td class="num">75%</td><td>same variants</td></tr>
+<tr><td>Fix rate, mutation factory</td><td class="num">100% (8/8)</td><td>same variants, zero model calls</td></tr><tr><td>Local 7B model (CPU) added fixes</td><td class="num">0</td><td>4 runs; exposed 6 pipeline weaknesses, all fixed</td></tr><tr><td>Extra findings from wired-in scanners</td><td class="num">90 in ≈15 s</td><td>OSV-Scanner, Semgrep, Checkov, Gitleaks on the demo estate</td></tr>
 <tr><td>Recall, fuzzable demo ground truth</td><td class="num">54.5% (6/11)</td><td>misses named; some need toolchains absent here</td></tr>
 <tr><td>Verified fixes needing no AI call</td><td class="num">100%</td><td>demo set</td></tr>
 <tr><td>"It says no" beat, all four verdicts as scripted</td><td class="num">≈ 25 s</td><td>C demo target</td></tr>
@@ -778,7 +779,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <li>Deep testing depends on finding an entry point that takes input; unusual code may yield no crash in the time budget.</li>
 <li>Without a local model, automatic fixes are limited to known shapes.</li>
 <li>The 36-hour endurance runs and the model server under load have not been run on the finale hardware.</li>
-<li>Bundles use symmetric (HMAC) signatures; public-key signing is the ideal state.</li>
+<li>Public-key (cosign) seals are optional and need a key pair provisioned at install.</li>
 <li>The Hindi Commander's Brief is on screen and in text, not in the PDF export.</li>
 <li>K21, K24 and K30 are not built.</li></ul></div>
 <div class="note"><span class="t">Your notes · Part VI</span><div class="lines"></div></div>
@@ -823,7 +824,7 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <div class="tw"><table><thead><tr><th>Item</th><th>Why</th><th>Status</th></tr></thead><tbody>
 <tr><td>Serve a coding model on the box (vLLM) and set the endpoint</td><td>Broader automatic fixes</td><td><span class="chip c-part">to do</span></td></tr>
 <tr><td>Add Node, Go, Rust and clang to the images</td><td>Deep lanes for those languages</td><td><span class="chip c-part">to do</span></td></tr>
-<tr><td>Generate a deployment signing key at install</td><td>Bundles not on the demo key</td><td><span class="chip c-part">to do</span></td></tr>
+<tr><td>Generate a deployment signing key at install</td><td>Bundles not on the demo key</td><td><span class="chip c-built">built into install.sh</span></td></tr><tr><td>Optional: cosign key pair, OPA on, scanner lanes on</td><td>Public-key seals, policy check, extra evidence</td><td><span class="chip c-part">switch on</span></td></tr>
 <tr><td>Fill the asset registry with the jury's systems</td><td>Correct tiers and approvals</td><td><span class="chip c-part">on the day</span></td></tr>
 <tr><td>Two long runs, three beats, backup recording</td><td>Proven on the real box</td><td><span class="chip c-part">to do</span></td></tr>
 <tr><td>Build K21, K24, K30 (optional)</td><td>Complete Wave 5</td><td><span class="chip c-gap">not built</span></td></tr>
@@ -855,11 +856,11 @@ svg text{font-family:var(--display);fill:var(--ink)}
 <div class="status-ideal"><h4>Ideal state (finished)</h4><p>A sealed box that, installed in twenty minutes with the cable out, ingests any estate the jury hands over, deep-tests every language with full toolchains, fixes most proven weaknesses with a local model under the gate, signs with deployment keys, survives 36 hours unattended, and gives every project owner, commander and auditor a live, versioned, colour-coded picture of their security that they can verify themselves.</p></div>
 </div>
 <div class="tw"><table><thead><tr><th>Area</th><th>Present</th><th>Ideal</th></tr></thead><tbody>
-<tr><td>AI model</td><td>Wired, optional; none served here</td><td>Local ~32B coding model on the GPU, measured fix rate on real code</td></tr>
+<tr><td>AI model</td><td>Wired and benchmarked with a local 7B model on CPU (too slow and weak to add fixes; benchmark fixed six pipeline weaknesses)</td><td>Local ~32B coding model on the GPU, measured fix rate on real code</td></tr>
 <tr><td>Languages (deep)</td><td>C/C++, Python, Java in the image; JS, Go, Rust need toolchains</td><td>All six in the sealed images, plus more where demand exists</td></tr>
 <tr><td>Real-world evidence</td><td>Demo-set baseline, recall on known sets</td><td>Published win/loss table on real public bug benchmarks, run on a prep machine</td></tr>
 <tr><td>Fix coverage without AI</td><td>A few template shapes + fix memory</td><td>A larger template library grown from approved guidelines and proven fixes</td></tr>
-<tr><td>Signing</td><td>HMAC; demo key unless a key is provided</td><td>Deployment keys generated at install; public-key and post-quantum signatures</td></tr>
+<tr><td>Signing</td><td>HMAC with a key generated at install; optional cosign public-key seal</td><td>cosign on by default; post-quantum signatures bundled</td></tr>
 <tr><td>Endurance</td><td>Harness and watchdog built, short runs only</td><td>Two clean 36-hour runs on the finale box</td></tr>
 <tr><td>Project memory</td><td>Versioned signed reports, learning on probation</td><td>Months of history across the estate driving approved ACG guidelines</td></tr>
 <tr><td>Owner features</td><td>Projects and Learning screens; K21/K24/K30 not built</td><td>All of Wave 5, including questions answered from the record</td></tr>
@@ -968,7 +969,7 @@ python -m pytest                       # the test suite</pre>
 </tbody></table></div>
 
 <h2 id="ge">E · Evidence index</h2>
-<ul><li><code>docs/benchmark-report.md</code>: results, baseline, recall</li><li><code>docs/claim-audit.md</code>: every claim mapped</li><li><code>docs/threat-model.md</code>: 16 surfaces and controls</li><li><code>docs/rehearsal-runbook.md</code>: rehearsals and demo beats</li><li><code>PLAN_V2.md</code>: every item, wave by wave, with status</li><li><code>tests/</code>: 863 tests</li></ul>
+<ul><li><code>docs/benchmark-report.md</code>: results, baseline, recall</li><li><code>docs/claim-audit.md</code>: every claim mapped</li><li><code>docs/threat-model.md</code>: 16 surfaces and controls</li><li><code>docs/rehearsal-runbook.md</code>: rehearsals and demo beats</li><li><code>PLAN_V2.md</code>: every item, wave by wave, with status</li><li><code>tests/</code>: 873 tests</li></ul>
 
 <h2 id="gf">F · Sources</h2>
 <ul><li>AI Kavach problem statement (competition brief, dossier file 01)</li><li>DARPA AI Cyber Challenge (AIxCC), the modern cyber-reasoning reference</li><li>MITRE CWE, ATT&amp;CK, D3FEND; FIRST CVSS; OSV advisory database</li><li>ARVO and AutoPatchBench (external benchmarks, for the ideal state)</li></ul>
@@ -999,7 +1000,7 @@ python -m pytest                       # the test suite</pre>
 <tr><td>SARIF 2.1.0 schema</td><td><a href="https://github.com/oasis-tcs/sarif-spec">oasis-tcs/sarif-spec</a></td><td>Standard format so other security tools can read RAKSHA's findings</td><td><span class="chip c-built">today</span></td></tr>
 <tr><td>CycloneDX</td><td><a href="https://github.com/CycloneDX/specification">CycloneDX/specification</a></td><td>Standard software bill of materials from the binary lane</td><td><span class="chip c-built">today</span></td></tr>
 <tr><td>in-toto</td><td><a href="https://github.com/in-toto/in-toto">in-toto/in-toto</a></td><td>Standard provenance statement inside each evidence bundle</td><td><span class="chip c-built">today</span> (format) · <span class="chip c-part">planned</span> (tooling)</td></tr>
-<tr><td>Sigstore cosign</td><td><a href="https://github.com/sigstore/cosign">sigstore/cosign</a></td><td>Public-key signing of bundles in production</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Sigstore cosign</td><td><a href="https://github.com/sigstore/cosign">sigstore/cosign</a></td><td>Public-key seal on every evidence bundle: verifiable by anyone with the public key, forgeable by no one without the private key</td><td><span class="chip c-built">wired · optional</span></td></tr>
 <tr><td>Open Quantum Safe (liboqs)</td><td><a href="https://github.com/open-quantum-safe/liboqs">open-quantum-safe/liboqs</a></td><td>A post-quantum signature next to the standard one, when the library is present</td><td><span class="chip c-part">optional</span></td></tr>
 </tbody></table></div>
 
@@ -1028,13 +1029,13 @@ python -m pytest                       # the test suite</pre>
 
 <h3>Static analysis, dependencies, secrets, config (full deployment)</h3>
 <div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th><th>Status</th></tr></thead><tbody>
-<tr><td>OSV-Scanner / OSV data</td><td><a href="https://github.com/google/osv-scanner">google/osv-scanner</a> · <a href="https://github.com/google/osv.dev">google/osv.dev</a></td><td>The open advisory database RAKSHA carries offline for the supply lane</td><td><span class="chip c-built">today</span> (data) · <span class="chip c-part">optional</span> (scanner)</td></tr>
-<tr><td>Semgrep</td><td><a href="https://github.com/semgrep/semgrep">semgrep/semgrep</a></td><td>Pattern rules; a home for vaccine rules and approved guidelines</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>OSV-Scanner / OSV data</td><td><a href="https://github.com/google/osv-scanner">google/osv-scanner</a> · <a href="https://github.com/google/osv.dev">google/osv.dev</a></td><td>The open advisory database RAKSHA carries offline, plus the scanner as an independent dependency check</td><td><span class="chip c-built">today</span> (data) · <span class="chip c-built">wired · optional</span> (scanner)</td></tr>
+<tr><td>Semgrep</td><td><a href="https://github.com/semgrep/semgrep">semgrep/semgrep</a></td><td>Static leads on a bundled offline ruleset; they count only when RAKSHA's own lanes confirm the same site</td><td><span class="chip c-built">wired · optional</span></td></tr>
 <tr><td>Joern</td><td><a href="https://github.com/joernio/joern">joernio/joern</a></td><td>A deeper code property graph than RAKSHA's built-in structure lane</td><td><span class="chip c-part">planned</span></td></tr>
-<tr><td>Gitleaks</td><td><a href="https://github.com/gitleaks/gitleaks">gitleaks/gitleaks</a></td><td>A second opinion for the secrets lane</td><td><span class="chip c-part">planned</span></td></tr>
-<tr><td>Checkov</td><td><a href="https://github.com/bridgecrewio/checkov">bridgecrewio/checkov</a></td><td>Infrastructure-as-code checks beyond the built-in config lane</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Gitleaks</td><td><a href="https://github.com/gitleaks/gitleaks">gitleaks/gitleaks</a></td><td>A second opinion for the secrets lane, confirmed by re-match</td><td><span class="chip c-built">wired · optional</span></td></tr>
+<tr><td>Checkov</td><td><a href="https://github.com/bridgecrewio/checkov">bridgecrewio/checkov</a></td><td>Infrastructure-as-code checks (Dockerfiles, Kubernetes, Terraform, CI files)</td><td><span class="chip c-built">wired · optional</span></td></tr>
 <tr><td>Syft</td><td><a href="https://github.com/anchore/syft">anchore/syft</a></td><td>Software bill of materials from images and binaries</td><td><span class="chip c-part">planned</span></td></tr>
-<tr><td>Open Policy Agent</td><td><a href="https://github.com/open-policy-agent/opa">open-policy-agent/opa</a></td><td>Rules of engagement as policy code</td><td><span class="chip c-part">planned</span></td></tr>
+<tr><td>Open Policy Agent</td><td><a href="https://github.com/open-policy-agent/opa">open-policy-agent/opa</a></td><td>Rules of engagement as policy code; with it on, both the policy and the built-in rule must allow a deploy</td><td><span class="chip c-built">wired · optional</span></td></tr>
 </tbody></table></div>
 
 <h3>Reference data (carried offline)</h3>
@@ -1055,11 +1056,19 @@ python -m pytest                       # the test suite</pre>
 
 <h3>Development only</h3>
 <div class="tw"><table><thead><tr><th>Tool</th><th>Repository</th><th>Why</th></tr></thead><tbody>
-<tr><td>pytest</td><td><a href="https://github.com/pytest-dev/pytest">pytest-dev/pytest</a></td><td>The 863-test suite</td></tr>
+<tr><td>pytest</td><td><a href="https://github.com/pytest-dev/pytest">pytest-dev/pytest</a></td><td>The 873-test suite</td></tr>
 <tr><td>Playwright + Chromium</td><td><a href="https://github.com/microsoft/playwright-python">microsoft/playwright-python</a></td><td>Driving the console in a headless browser to check every screen; rendering this book's PDF</td></tr>
 <tr><td>flawfinder</td><td><a href="https://github.com/david-a-wheeler/flawfinder">david-a-wheeler/flawfinder</a></td><td>The static-scanner baseline for C in the comparison table</td></tr>
 <tr><td>Bandit</td><td><a href="https://github.com/PyCQA/bandit">PyCQA/bandit</a></td><td>The static-scanner baseline for Python in the comparison table</td></tr>
 <tr><td>pyflakes</td><td><a href="https://github.com/PyCQA/pyflakes">PyCQA/pyflakes</a></td><td>Keeps the code free of unused or undefined names</td></tr>
+</tbody></table></div>
+<h3>Why some tools are not wired in yet</h3>
+<div class="tw"><table><thead><tr><th>Tool</th><th>Reason</th><th>Path</th></tr></thead><tbody>
+<tr><td>vLLM, Qwen, Foundation-sec</td><td>They need the finale GPU; RAKSHA already talks to any such server</td><td>Start them on the finale box; set the endpoint</td></tr>
+<tr><td>gVisor</td><td>A container runtime set on the Docker host, not inside RAKSHA</td><td>Install runsc on the finale host and set it as the sandbox runtime</td></tr>
+<tr><td>AFL++, honggfuzz, Atheris, Jazzer engines</td><td>RAKSHA's own engine already runs every lane; these plug into its fuzzer engine seam</td><td>Team task, with the toolchain image work</td></tr>
+<tr><td>Joern</td><td>Large Java service; RAKSHA's built-in structure lane covers the call map it needs today</td><td>Add as an optional take lane if deeper data-flow is wanted</td></tr>
+<tr><td>Syft, Trivy, Grype</td><td>RAKSHA already writes CycloneDX SBOMs and OSV-Scanner covers dependency advisories</td><td>Add Trivy or Grype as a redundant second dependency opinion if desired</td></tr>
 </tbody></table></div>
 <p>Licences for each are tracked in <code>THIRD_PARTY.md</code>; anything marked "confirm" there must be checked against the exact version before the bundle is handed over.</p>
 
