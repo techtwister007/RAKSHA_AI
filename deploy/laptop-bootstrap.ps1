@@ -200,6 +200,14 @@ pause
 explorer.exe \\wsl.localhost\$distro\root\RAKSHA_AI
 "@ | Set-Content "$base\RAKSHA Files.bat" -Encoding ASCII
 
+# A guide for an AI coding assistant (Claude Code) opened on this folder
+$guide = "$base\cache\CLAUDE-windows.md"
+$localGuide = if ($PSScriptRoot) { Join-Path $PSScriptRoot "windows\CLAUDE-windows.md" } else { "" }
+try {
+    if ($localGuide -and (Test-Path $localGuide)) { Copy-Item $localGuide "$base\CLAUDE.md" -Force }
+    else { Download "$raw/deploy/windows/CLAUDE-windows.md" $guide; Copy-Item $guide "$base\CLAUDE.md" -Force }
+} catch { }
+
 try {
     $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath("Desktop")) "RAKSHA Console.lnk"))
     $lnk.TargetPath = "$base\RAKSHA Console.bat"; $lnk.WorkingDirectory = $base; $lnk.Save()
