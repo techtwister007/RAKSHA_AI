@@ -139,8 +139,8 @@ if ($Model -match "(-cloud|:cloud)") {
 
 # ---- 6. install everything inside the RAKSHA system --------------------------------------
 $sh = "$base\cache\laptop-bootstrap.sh"
-$local = Join-Path $PSScriptRoot "laptop-bootstrap.sh"
-if ($PSScriptRoot -and (Test-Path $local)) { Copy-Item $local $sh -Force } else { Download "$raw/deploy/laptop-bootstrap.sh" $sh }
+$local = if ($PSScriptRoot) { Join-Path $PSScriptRoot "laptop-bootstrap.sh" } else { "" }   # empty when pasted
+if ($local -and (Test-Path $local)) { Copy-Item $local $sh -Force } else { Download "$raw/deploy/laptop-bootstrap.sh" $sh }
 $shWsl = "/mnt/" + $d.Name.ToLower() + ($sh.Substring(2) -replace "\\", "/")
 $skip = if ($SkipTests) { "1" } else { "0" }
 Say "Installing RAKSHA inside '$distro' (10-30 minutes the first time)"
